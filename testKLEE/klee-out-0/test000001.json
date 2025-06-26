@@ -1,0 +1,10 @@
+{
+  "controlFlowTrace": [
+    {
+      "condition": "(Slt 0\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test1.c",
+      "line": 17,
+      "taken": false
+    }
+  ]
+}

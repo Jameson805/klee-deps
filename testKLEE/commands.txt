@@ -1,0 +1,4 @@
+clang-13 -I ~/klee/include -emit-llvm -c -g /mnt/c/Users/james/OneDrive/Documents/College\ Classes/CS+\ Semester/TestKLEE/secret_branch.c -o secret_branch.bc
+~/klee-deps/klee/build/bin/klee --write-smt2s tests/test1.bc
+export PATH=$PATH:~/klee-deps/klee/tools/ktest-tool
+python3 find_counterexamples.py
