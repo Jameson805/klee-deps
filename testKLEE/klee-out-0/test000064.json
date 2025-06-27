@@ -1,0 +1,400 @@
+{
+  "controlFlowTrace": [
+    {
+      "condition": "true",
+      "filename": "tests/test25.c",
+      "line": 27,
+      "taken": true
+    },
+    {
+      "condition": "true",
+      "filename": "tests/test25.c",
+      "line": 28,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 0\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 1\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 2\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 3\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 4\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 5\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 6\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 7\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 8\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 9\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 10\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 11\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 12\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 13\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 14\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 15\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 16\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 17\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 18\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 19\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 20\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 21\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 22\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 23\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 24\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 25\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 26\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 27\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 28\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 29\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 30\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 31\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 32\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 33\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 34\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 35\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 36\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 37\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 38\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 39\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 40\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 41\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 42\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 43\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 44\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 45\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 46\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 47\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 48\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 49\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 50\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 51\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 52\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 53\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 54\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 55\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 56\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 57\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 58\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 59\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 60\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 61\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 62\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": true
+    },
+    {
+      "condition": "(Slt 63\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test25.c",
+      "line": 17,
+      "taken": false
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 """
 Author: Jameson DiPalma
-Note: Everything here was a first try for this idea. I'm currently trying what
-seems to be a better approach, we'll see how it goes
+Note: Everything here was a first try for this idea. find_counterexamples.py
+is currently a much better implementation of a better approach, but I'm keeping
+this around just in case
 """
 
 from z3 import *

@@ -1,23 +1,23 @@
-/home/james/klee-deps/klee-controlflow/build/bin/klee --output-dir=constrained-cases/klee-out-0 constrained-cases/target_false_test000001.bc
-PID: 17866
+/home/james/klee-deps/klee-controlflow/build/bin/klee --output-dir=constrained-cases/klee-out-0 --max-tests=1000 --write-paths constrained-cases/target_true_test000064.bc
+PID: 169235
 Using monotonic steady clock with 1/1000000000s resolution
-Started: 2025-06-25 23:00:53
+Started: 2025-06-26 21:33:06
 BEGIN searcher description
 <InterleavedSearcher> containing 2 searchers:
 RandomPathSearcher
 WeightedRandomSearcher::CoveringNew
 </InterleavedSearcher>
 END searcher description
-Finished: 2025-06-25 23:00:53
-Elapsed: 00:00:00
-KLEE: done: explored paths = 2
-KLEE: done: avg. constructs per query = 10
-KLEE: done: total queries = 3
-KLEE: done: valid queries = 0
-KLEE: done: invalid queries = 3
-KLEE: done: query cex = 3
+Finished: 2025-06-26 21:33:07
+Elapsed: 00:00:01
+KLEE: done: explored paths = 64
+KLEE: done: avg. constructs per query = 431
+KLEE: done: total queries = 67
+KLEE: done: valid queries = 1
+KLEE: done: invalid queries = 66
+KLEE: done: query cex = 67
 
-KLEE: done: total instructions = 50
-KLEE: done: completed paths = 2
+KLEE: done: total instructions = 990
+KLEE: done: completed paths = 64
 KLEE: done: partially completed paths = 0
-KLEE: done: generated tests = 2
+KLEE: done: generated tests = 64

@@ -6,7 +6,9 @@ Author: Jameson DiPalma
 #include <assert.h>
 #include <stdio.h>
 
-int branch_taken = -1;
+// VARS: pub, secret
+// PUBLIC: pub
+// KLEE_TARGET_BRANCH_LINE: 19
 
 
 __attribute__((noinline))
@@ -14,10 +16,8 @@ int test_branch(int pub, int secret) {
     int ret = 0;
 
     if (secret > 0) {
-        branch_taken = 1;
         ret = pub + 1;
     } else {
-        branch_taken = 0;
         ret = pub - 1;
     }
 
@@ -32,6 +32,5 @@ int main() {
     klee_make_symbolic(&secret, sizeof(secret), "secret");
 
     test_branch(pub, secret);
-    klee_print_expr("branch_taken = ", branch_taken);
     return 0;
 }

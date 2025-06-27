@@ -1,22 +1,10 @@
 {
   "controlFlowTrace": [
     {
-      "condition": "true",
-      "filename": "constrained-cases/target_false_test000001.c",
-      "line": 32,
-      "taken": true
-    },
-    {
-      "condition": "true",
-      "filename": "constrained-cases/target_false_test000001.c",
-      "line": 35,
-      "taken": true
-    },
-    {
-      "condition": "(Slt 0\n      (ReadLSB w32 0 secret))",
-      "filename": "constrained-cases/target_false_test000001.c",
+      "condition": "(Slt 1\n      (ReadLSB w32 0 secret))",
+      "filename": "constrained-cases/target_true_test000064.c",
       "line": 17,
-      "taken": true
+      "taken": false
     }
   ]
 }

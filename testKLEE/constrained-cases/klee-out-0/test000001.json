@@ -2,7 +2,7 @@
   "controlFlowTrace": [
     {
       "condition": "(Slt 0\n      (ReadLSB w32 0 secret))",
-      "filename": "constrained-cases/target_false_test000001.c",
+      "filename": "constrained-cases/target_true_test000064.c",
       "line": 17,
       "taken": false
     }
