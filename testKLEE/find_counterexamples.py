@@ -18,6 +18,8 @@ ORIGINAL_KLEE_DIR = "klee-out-0"
 CONSTRAINED_KLEE_DIR = os.path.join(OUTPUT_DIR, "klee-out-0")
 
 MAX_TESTS = "1000"
+MAX_DEPTH = "1000"
+MAX_TIME = "60" 
 DEBUG = False
 
 
@@ -62,7 +64,13 @@ def compile_and_run_klee(c_file_path, output_dir, write_paths=False):
     subprocess.run(clang_cmd, check=True)
 
     print(f"Running KLEE with output dir {os.path.relpath(output_dir, BASE_DIR)}...")
-    klee_cmd = [KLEE_BIN, "--output-dir=" + output_dir, "--max-tests=" + MAX_TESTS]
+    klee_cmd = [
+        KLEE_BIN,
+        f"--output-dir={output_dir}",
+        f"--max-tests={MAX_TESTS}",
+        f"--max-depth={MAX_DEPTH}",
+        f"--max-time={MAX_TIME}",
+    ]
     
     if write_paths:
         klee_cmd.append("--write-paths")
@@ -72,7 +80,7 @@ def compile_and_run_klee(c_file_path, output_dir, write_paths=False):
         subprocess.run(klee_cmd, check=True)
     else:
         subprocess.run(klee_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    
+
     print("KLEE run complete")
     if os.path.exists(bc_file_path):
         os.remove(bc_file_path)
@@ -172,7 +180,7 @@ def create_constrained_file(test_id, label, var_list, public_vars, target_c_path
     return out_path
 
 
-def detect_control_flow_leak_for_tests(test_ids, label, vars_list, public_vars, target_branch, original_c_path):
+def detect_control_flow_leak(test_ids, label, vars_list, public_vars, target_branch, original_c_path):
     for test_id in test_ids:
         constrained_file = create_constrained_file(test_id, label, vars_list, public_vars, original_c_path)
         if constrained_file is None:
@@ -194,25 +202,68 @@ def detect_control_flow_leak_for_tests(test_ids, label, vars_list, public_vars, 
         with open(path_files[0], 'rb') as f:
             ref = f.read()
 
+        leak_found = False
+
         for pf in path_files[1:]:
             with open(pf, 'rb') as f:
-                if f.read() != ref:
-                    base1 = os.path.splitext(os.path.basename(path_files[0]))[0]
-                    base2 = os.path.splitext(os.path.basename(pf))[0]
+                curr = f.read()
+            if curr != ref:
+                base1 = os.path.splitext(os.path.basename(path_files[0]))[0]
+                base2 = os.path.splitext(os.path.basename(pf))[0]
 
-                    i1 = extract_ktest_inputs(base1, CONSTRAINED_KLEE_DIR)
-                    i2 = extract_ktest_inputs(base2, CONSTRAINED_KLEE_DIR)
+                i1 = extract_ktest_inputs(base1, CONSTRAINED_KLEE_DIR)
+                i2 = extract_ktest_inputs(base2, CONSTRAINED_KLEE_DIR)
 
-                    print("\nCONTROL-FLOW LEAK DETECTED!")
+                # Now compare the corresponding JSON files to find first differing branch
+                json1_path = os.path.join(CONSTRAINED_KLEE_DIR, base1 + ".json")
+                json2_path = os.path.join(CONSTRAINED_KLEE_DIR, base2 + ".json")
+
+                try:
+                    with open(json1_path, 'r') as jf1, open(json2_path, 'r') as jf2:
+                        trace1 = json.load(jf1).get("controlFlowTrace", [])
+                        trace2 = json.load(jf2).get("controlFlowTrace", [])
+                except Exception as e:
+                    print(f"Error loading JSON trace files: {e}")
+                    # Fallback: just report leak without branch check
+                    print("\nCONTROL-FLOW LEAK DETECTED! (Could not verify target branch)")
+                    leak_found = True
+                    break
+
+                # Find first difference in branch decision in traces
+                min_len = min(len(trace1), len(trace2))
+                differing_line = None
+                for idx in range(min_len):
+                    entry1 = trace1[idx]
+                    entry2 = trace2[idx]
+
+                    # Compare line numbers and taken values to identify difference
+                    line1 = entry1.get("line")
+                    line2 = entry2.get("line")
+                    taken1 = entry1.get("taken")
+                    taken2 = entry2.get("taken")
+
+                    if line1 != line2 or taken1 != taken2:
+                        differing_line = line1 if line1 is not None else line2
+                        break
+
+                if differing_line == target_branch:
+                    print("\nCONTROL-FLOW LEAK DETECTED ON TARGET BRANCH!")
                     for var in public_vars:
                         print(f"  Public input ({var}) = {i1.get(var)}")
                     for var in vars_list:
                         if var not in public_vars:
                             print(f"  Secret values: {var} -> {i1.get(var)} vs {i2.get(var)}")
-                    return True
+                    leak_found = True
+                    break
+                else:
+                    print(f"\nControl flow leak detected, but first differing branch at line {differing_line} != target branch {target_branch}. Continuing checks...")
 
-        print("All path files identical — no leak detected.")
-    return False
+        if not leak_found:
+            print("No leak detected on target branch.")
+        else:
+            return True  # Leak found and reported
+
+    return False  # No leaks found across tests
 
 
 def main():
@@ -232,9 +283,9 @@ def main():
     print("Checking for control-flow leaks...")
     print("==============================")
 
-    if detect_control_flow_leak_for_tests(true_tests, "true", vars_list, public_vars, target_branch, c_file_path):
+    if detect_control_flow_leak(true_tests, "true", vars_list, public_vars, target_branch, c_file_path):
         return
-    if detect_control_flow_leak_for_tests(false_tests, "false", vars_list, public_vars, target_branch, c_file_path):
+    if detect_control_flow_leak(false_tests, "false", vars_list, public_vars, target_branch, c_file_path):
         return
 
     print("\nNo control-flow leak detected after checking all constrained inputs.")

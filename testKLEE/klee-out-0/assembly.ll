@@ -1,5 +1,5 @@
-; ModuleID = '/home/james/klee-deps/testKLEE/tests/test25.bc'
-source_filename = "/home/james/klee-deps/testKLEE/tests/test25.c"
+; ModuleID = '/home/james/klee-deps/testKLEE/tests/test2.bc'
+source_filename = "/home/james/klee-deps/testKLEE/tests/test2.c"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-linux-gnu"
 
@@ -15,67 +15,68 @@ define dso_local i32 @test_branch(i32 %0, i32 %1) #0 !dbg !9 {
   call void @llvm.dbg.declare(metadata i32* %3, metadata !14, metadata !DIExpression()), !dbg !15
   store i32 %1, i32* %4, align 4
   call void @llvm.dbg.declare(metadata i32* %4, metadata !16, metadata !DIExpression()), !dbg !17
-  call void @llvm.dbg.declare(metadata i32* %5, metadata !18, metadata !DIExpression()), !dbg !20
-  store i32 0, i32* %5, align 4, !dbg !20
-  br label %6, !dbg !21
+  call void @llvm.dbg.declare(metadata i32* %5, metadata !18, metadata !DIExpression()), !dbg !19
+  store i32 0, i32* %5, align 4, !dbg !19
+  %6 = load i32, i32* %3, align 4, !dbg !20
+  %7 = icmp sgt i32 %6, 0, !dbg !22
+  br i1 %7, label %8, label %11, !dbg !23
 
-6:                                                ; preds = %13, %2
-  %7 = load i32, i32* %5, align 4, !dbg !22
-  %8 = load i32, i32* %4, align 4, !dbg !24
-  %9 = icmp slt i32 %7, %8, !dbg !25
-  br i1 %9, label %10, label %16, !dbg !26
+8:                                                ; preds = %2
+  %9 = load i32, i32* %5, align 4, !dbg !24
+  %10 = add nsw i32 %9, 1, !dbg !24
+  store i32 %10, i32* %5, align 4, !dbg !24
+  br label %14, !dbg !26
 
-10:                                               ; preds = %6
-  %11 = load i32, i32* %3, align 4, !dbg !27
-  %12 = add nsw i32 %11, 1, !dbg !27
-  store i32 %12, i32* %3, align 4, !dbg !27
-  br label %13, !dbg !29
+11:                                               ; preds = %2
+  %12 = load i32, i32* %5, align 4, !dbg !27
+  %13 = add nsw i32 %12, -1, !dbg !27
+  store i32 %13, i32* %5, align 4, !dbg !27
+  br label %14
 
-13:                                               ; preds = %10
-  %14 = load i32, i32* %5, align 4, !dbg !30
-  %15 = add nsw i32 %14, 1, !dbg !30
-  store i32 %15, i32* %5, align 4, !dbg !30
-  br label %6, !dbg !31, !llvm.loop !32
+14:                                               ; preds = %11, %8
+  %15 = load i32, i32* %4, align 4, !dbg !29
+  %16 = icmp sgt i32 %15, 0, !dbg !31
+  br i1 %16, label %17, label %20, !dbg !32
 
-16:                                               ; preds = %6
-  %17 = load i32, i32* %3, align 4, !dbg !35
-  ret i32 %17, !dbg !36
+17:                                               ; preds = %14
+  %18 = load i32, i32* %5, align 4, !dbg !33
+  %19 = add nsw i32 %18, 1, !dbg !33
+  store i32 %19, i32* %5, align 4, !dbg !33
+  br label %23, !dbg !35
+
+20:                                               ; preds = %14
+  %21 = load i32, i32* %5, align 4, !dbg !36
+  %22 = add nsw i32 %21, -1, !dbg !36
+  store i32 %22, i32* %5, align 4, !dbg !36
+  br label %23
+
+23:                                               ; preds = %20, %17
+  %24 = load i32, i32* %5, align 4, !dbg !38
+  ret i32 %24, !dbg !39
 }
 
 ; Function Attrs: nofree nosync nounwind readnone speculatable willreturn
 declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
 
 ; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @main() #0 !dbg !37 {
+define dso_local i32 @main() #0 !dbg !40 {
   %1 = alloca i32, align 4
   %2 = alloca i32, align 4
   %3 = alloca i32, align 4
   store i32 0, i32* %1, align 4
-  call void @llvm.dbg.declare(metadata i32* %2, metadata !40, metadata !DIExpression()), !dbg !41
-  call void @llvm.dbg.declare(metadata i32* %3, metadata !42, metadata !DIExpression()), !dbg !43
-  %4 = bitcast i32* %2 to i8*, !dbg !44
-  call void @klee_make_symbolic(i8* %4, i64 4, i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str, i64 0, i64 0)), !dbg !45
-  %5 = bitcast i32* %3 to i8*, !dbg !46
-  call void @klee_make_symbolic(i8* %5, i64 4, i8* getelementptr inbounds ([7 x i8], [7 x i8]* @.str.1, i64 0, i64 0)), !dbg !47
-  %6 = load i32, i32* %3, align 4, !dbg !48
-  %7 = icmp sge i32 %6, 0, !dbg !49
-  %8 = zext i1 %7 to i32, !dbg !49
-  %9 = sext i32 %8 to i64, !dbg !48
-  call void @klee_assume(i64 %9), !dbg !50
-  %10 = load i32, i32* %3, align 4, !dbg !51
-  %11 = icmp slt i32 %10, 64, !dbg !52
-  %12 = zext i1 %11 to i32, !dbg !52
-  %13 = sext i32 %12 to i64, !dbg !51
-  call void @klee_assume(i64 %13), !dbg !53
-  %14 = load i32, i32* %2, align 4, !dbg !54
-  %15 = load i32, i32* %3, align 4, !dbg !55
-  %16 = call i32 @test_branch(i32 %14, i32 %15), !dbg !56
-  ret i32 0, !dbg !57
+  call void @llvm.dbg.declare(metadata i32* %2, metadata !43, metadata !DIExpression()), !dbg !44
+  call void @llvm.dbg.declare(metadata i32* %3, metadata !45, metadata !DIExpression()), !dbg !46
+  %4 = bitcast i32* %2 to i8*, !dbg !47
+  call void @klee_make_symbolic(i8* %4, i64 4, i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str, i64 0, i64 0)), !dbg !48
+  %5 = bitcast i32* %3 to i8*, !dbg !49
+  call void @klee_make_symbolic(i8* %5, i64 4, i8* getelementptr inbounds ([7 x i8], [7 x i8]* @.str.1, i64 0, i64 0)), !dbg !50
+  %6 = load i32, i32* %2, align 4, !dbg !51
+  %7 = load i32, i32* %3, align 4, !dbg !52
+  %8 = call i32 @test_branch(i32 %6, i32 %7), !dbg !53
+  ret i32 0, !dbg !54
 }
 
 declare dso_local void @klee_make_symbolic(i8*, i64, i8*) #2
-
-declare dso_local void @klee_assume(i64) #2
 
 attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 attributes #1 = { nofree nosync nounwind readnone speculatable willreturn }
@@ -86,7 +87,7 @@ attributes #2 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protect
 !llvm.ident = !{!8}
 
 !0 = distinct !DICompileUnit(language: DW_LANG_C99, file: !1, producer: "Ubuntu clang version 13.0.1-2ubuntu2.2", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, enums: !2, splitDebugInlining: false, nameTableKind: None)
-!1 = !DIFile(filename: "/home/james/klee-deps/testKLEE/tests/test25.c", directory: "/home/james/klee-deps/testKLEE")
+!1 = !DIFile(filename: "/home/james/klee-deps/testKLEE/tests/test2.c", directory: "/home/james/klee-deps/testKLEE")
 !2 = !{}
 !3 = !{i32 7, !"Dwarf Version", i32 4}
 !4 = !{i32 2, !"Debug Info Version", i32 3}
@@ -95,7 +96,7 @@ attributes #2 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protect
 !7 = !{i32 7, !"frame-pointer", i32 2}
 !8 = !{!"Ubuntu clang version 13.0.1-2ubuntu2.2"}
 !9 = distinct !DISubprogram(name: "test_branch", scope: !10, file: !10, line: 15, type: !11, scopeLine: 15, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0, retainedNodes: !2)
-!10 = !DIFile(filename: "tests/test25.c", directory: "/home/james/klee-deps/testKLEE")
+!10 = !DIFile(filename: "tests/test2.c", directory: "/home/james/klee-deps/testKLEE")
 !11 = !DISubroutineType(types: !12)
 !12 = !{!13, !13, !13}
 !13 = !DIBasicType(name: "int", size: 32, encoding: DW_ATE_signed)
@@ -103,43 +104,40 @@ attributes #2 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protect
 !15 = !DILocation(line: 15, column: 21, scope: !9)
 !16 = !DILocalVariable(name: "secret", arg: 2, scope: !9, file: !10, line: 15, type: !13)
 !17 = !DILocation(line: 15, column: 30, scope: !9)
-!18 = !DILocalVariable(name: "i", scope: !19, file: !10, line: 16, type: !13)
-!19 = distinct !DILexicalBlock(scope: !9, file: !10, line: 16, column: 5)
-!20 = !DILocation(line: 16, column: 14, scope: !19)
-!21 = !DILocation(line: 16, column: 10, scope: !19)
-!22 = !DILocation(line: 16, column: 19, scope: !23)
-!23 = distinct !DILexicalBlock(scope: !19, file: !10, line: 16, column: 5)
-!24 = !DILocation(line: 16, column: 23, scope: !23)
-!25 = !DILocation(line: 16, column: 21, scope: !23)
-!26 = !DILocation(line: 16, column: 5, scope: !19)
-!27 = !DILocation(line: 17, column: 12, scope: !28)
-!28 = distinct !DILexicalBlock(scope: !23, file: !10, line: 16, column: 37)
-!29 = !DILocation(line: 18, column: 5, scope: !28)
-!30 = !DILocation(line: 16, column: 33, scope: !23)
-!31 = !DILocation(line: 16, column: 5, scope: !23)
-!32 = distinct !{!32, !26, !33, !34}
-!33 = !DILocation(line: 18, column: 5, scope: !19)
-!34 = !{!"llvm.loop.mustprogress"}
-!35 = !DILocation(line: 19, column: 12, scope: !9)
-!36 = !DILocation(line: 19, column: 5, scope: !9)
-!37 = distinct !DISubprogram(name: "main", scope: !10, file: !10, line: 23, type: !38, scopeLine: 23, spFlags: DISPFlagDefinition, unit: !0, retainedNodes: !2)
-!38 = !DISubroutineType(types: !39)
-!39 = !{!13}
-!40 = !DILocalVariable(name: "pub", scope: !37, file: !10, line: 24, type: !13)
-!41 = !DILocation(line: 24, column: 9, scope: !37)
-!42 = !DILocalVariable(name: "secret", scope: !37, file: !10, line: 24, type: !13)
-!43 = !DILocation(line: 24, column: 14, scope: !37)
-!44 = !DILocation(line: 26, column: 24, scope: !37)
-!45 = !DILocation(line: 26, column: 5, scope: !37)
-!46 = !DILocation(line: 27, column: 24, scope: !37)
-!47 = !DILocation(line: 27, column: 5, scope: !37)
-!48 = !DILocation(line: 28, column: 17, scope: !37)
-!49 = !DILocation(line: 28, column: 24, scope: !37)
-!50 = !DILocation(line: 28, column: 5, scope: !37)
-!51 = !DILocation(line: 29, column: 17, scope: !37)
-!52 = !DILocation(line: 29, column: 24, scope: !37)
-!53 = !DILocation(line: 29, column: 5, scope: !37)
-!54 = !DILocation(line: 31, column: 17, scope: !37)
-!55 = !DILocation(line: 31, column: 22, scope: !37)
-!56 = !DILocation(line: 31, column: 5, scope: !37)
-!57 = !DILocation(line: 32, column: 5, scope: !37)
+!18 = !DILocalVariable(name: "ret", scope: !9, file: !10, line: 16, type: !13)
+!19 = !DILocation(line: 16, column: 9, scope: !9)
+!20 = !DILocation(line: 18, column: 9, scope: !21)
+!21 = distinct !DILexicalBlock(scope: !9, file: !10, line: 18, column: 9)
+!22 = !DILocation(line: 18, column: 13, scope: !21)
+!23 = !DILocation(line: 18, column: 9, scope: !9)
+!24 = !DILocation(line: 19, column: 12, scope: !25)
+!25 = distinct !DILexicalBlock(scope: !21, file: !10, line: 18, column: 18)
+!26 = !DILocation(line: 20, column: 5, scope: !25)
+!27 = !DILocation(line: 21, column: 12, scope: !28)
+!28 = distinct !DILexicalBlock(scope: !21, file: !10, line: 20, column: 12)
+!29 = !DILocation(line: 23, column: 9, scope: !30)
+!30 = distinct !DILexicalBlock(scope: !9, file: !10, line: 23, column: 9)
+!31 = !DILocation(line: 23, column: 16, scope: !30)
+!32 = !DILocation(line: 23, column: 9, scope: !9)
+!33 = !DILocation(line: 24, column: 12, scope: !34)
+!34 = distinct !DILexicalBlock(scope: !30, file: !10, line: 23, column: 21)
+!35 = !DILocation(line: 25, column: 5, scope: !34)
+!36 = !DILocation(line: 26, column: 12, scope: !37)
+!37 = distinct !DILexicalBlock(scope: !30, file: !10, line: 25, column: 12)
+!38 = !DILocation(line: 29, column: 12, scope: !9)
+!39 = !DILocation(line: 29, column: 5, scope: !9)
+!40 = distinct !DISubprogram(name: "main", scope: !10, file: !10, line: 33, type: !41, scopeLine: 33, spFlags: DISPFlagDefinition, unit: !0, retainedNodes: !2)
+!41 = !DISubroutineType(types: !42)
+!42 = !{!13}
+!43 = !DILocalVariable(name: "pub", scope: !40, file: !10, line: 34, type: !13)
+!44 = !DILocation(line: 34, column: 9, scope: !40)
+!45 = !DILocalVariable(name: "secret", scope: !40, file: !10, line: 34, type: !13)
+!46 = !DILocation(line: 34, column: 14, scope: !40)
+!47 = !DILocation(line: 36, column: 24, scope: !40)
+!48 = !DILocation(line: 36, column: 5, scope: !40)
+!49 = !DILocation(line: 37, column: 24, scope: !40)
+!50 = !DILocation(line: 37, column: 5, scope: !40)
+!51 = !DILocation(line: 39, column: 17, scope: !40)
+!52 = !DILocation(line: 39, column: 22, scope: !40)
+!53 = !DILocation(line: 39, column: 5, scope: !40)
+!54 = !DILocation(line: 40, column: 5, scope: !40)

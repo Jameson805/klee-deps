@@ -1,10 +1,16 @@
 {
   "controlFlowTrace": [
     {
-      "condition": "(Slt 2\n      (ReadLSB w32 0 secret))",
-      "filename": "tests/test25.c",
-      "line": 17,
+      "condition": "(Slt 0\n      (ReadLSB w32 0 pub))",
+      "filename": "tests/test2.c",
+      "line": 19,
       "taken": false
+    },
+    {
+      "condition": "(Slt 0\n      (ReadLSB w32 0 secret))",
+      "filename": "tests/test2.c",
+      "line": 24,
+      "taken": true
     }
   ]
 }
