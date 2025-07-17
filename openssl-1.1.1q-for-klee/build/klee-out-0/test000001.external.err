@@ -1,0 +1,11 @@
+Error: failed external call: CRYPTO_THREAD_run_once
+File: openssl-1.1.1q/crypto/init.c
+Line: 630
+assembly.ll line: 45103
+State: 5
+Stack: 
+	#000045103 in OPENSSL_init_crypto(262144, 0) at openssl-1.1.1q/crypto/init.c:630
+	#100046881 in ERR_get_state() at openssl-1.1.1q/crypto/err/err.c:752
+	#200046743 in ERR_put_error(3, 109, 102, 133530164133888, 319) at openssl-1.1.1q/crypto/err/err.c:446
+	#300015026 in BN_mod_exp_mont(132707745005568, 132733514809344, 132716334940160, 132750694678528, 132802234286080, 0) at openssl-1.1.1q/crypto/bn/bn_exp.c:319
+	#400049444 in main() at mod_exp_mont_driver.c:31

@@ -1,0 +1,12 @@
+KLEE: Using STP solver backend
+KLEE: SAT solver: MiniSat
+KLEE: Deterministic allocator: Using quarantine queue size 8
+KLEE: Deterministic allocator: globals (start-address=0x7972ee000000 size=10 GiB)
+KLEE: Deterministic allocator: constants (start-address=0x79706e000000 size=10 GiB)
+KLEE: Deterministic allocator: heap (start-address=0x78706e000000 size=1024 GiB)
+KLEE: Deterministic allocator: stack (start-address=0x78506e000000 size=128 GiB)
+KLEE: ERROR: openssl-1.1.1q/crypto/init.c:630: failed external call: CRYPTO_THREAD_run_once
+KLEE: NOTE: now ignoring this error at this location
+KLEE: ERROR: openssl-1.1.1q/crypto/mem.c:321: failed external call: OPENSSL_cleanse
+KLEE: NOTE: now ignoring this error at this location
+KLEE: halting execution, dumping remaining states
