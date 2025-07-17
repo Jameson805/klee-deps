@@ -1,0 +1,4 @@
+/home/james/klee-deps/klee-controlflow/build/bin/klee --output-dir=klee-out-0 --max-tests=1000 --max-depth=1000 --max-time=1800 --search=nurs:covnew --search=dfs linked.bc
+PID: 11264
+Using monotonic steady clock with 1/1000000000s resolution
+Started: 2025-07-14 21:58:44

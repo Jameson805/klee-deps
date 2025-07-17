@@ -1,0 +1,23 @@
+/home/james/klee-deps/klee-controlflow/build/bin/klee --output-dir=/home/james/klee-deps/testKLEE/klee-out-0 --max-tests=1000 --max-depth=1000 --max-time=60 --search=nurs:covnew --search=dfs /home/james/klee-deps/testKLEE/target-branch-log/test3.bc
+PID: 40613
+Using monotonic steady clock with 1/1000000000s resolution
+Started: 2025-07-07 23:05:32
+BEGIN searcher description
+<InterleavedSearcher> containing 2 searchers:
+WeightedRandomSearcher::CoveringNew
+DFSSearcher
+</InterleavedSearcher>
+END searcher description
+Finished: 2025-07-07 23:06:33
+Elapsed: 00:01:01
+KLEE: done: explored paths = 950
+KLEE: done: avg. constructs per query = 299
+KLEE: done: total queries = 8445
+KLEE: done: valid queries = 7491
+KLEE: done: invalid queries = 954
+KLEE: done: query cex = 8445
+
+KLEE: done: total instructions = 286899
+KLEE: done: completed paths = 28
+KLEE: done: partially completed paths = 922
+KLEE: done: generated tests = 950
