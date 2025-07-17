@@ -1,11 +1,16 @@
-Error: failed external call: CRYPTO_THREAD_run_once
+Error: failed external call: atexit
 File: openssl-1.1.1q/crypto/init.c
-Line: 630
-assembly.ll line: 45103
+Line: 140
+assembly.ll line: 55932
 State: 5
 Stack: 
-	#000045103 in OPENSSL_init_crypto(262144, 0) at openssl-1.1.1q/crypto/init.c:630
-	#100046881 in ERR_get_state() at openssl-1.1.1q/crypto/err/err.c:752
-	#200046743 in ERR_put_error(3, 109, 102, 133530164133888, 319) at openssl-1.1.1q/crypto/err/err.c:446
-	#300015026 in BN_mod_exp_mont(132707745005568, 132733514809344, 132716334940160, 132750694678528, 132802234286080, 0) at openssl-1.1.1q/crypto/bn/bn_exp.c:319
-	#400049444 in main() at mod_exp_mont_driver.c:31
+	#000055932 in ossl_init_register_atexit() at openssl-1.1.1q/crypto/init.c:140
+	#100055672 in ossl_init_register_atexit_ossl_() at openssl-1.1.1q/crypto/init.c:129
+	#200060035 in pthread_once(130696343453696, 130687508152320) at stubs.c:12
+	#300056499 in CRYPTO_THREAD_run_once(130696343453696, 130687508152320) at openssl-1.1.1q/crypto/threads_pthread.c:118
+	#400055355 in OPENSSL_init_crypto(0, 0) at openssl-1.1.1q/crypto/init.c:645
+	#500055222 in ossl_init_thread_start(2) at openssl-1.1.1q/crypto/init.c:461
+	#600057497 in ERR_get_state() at openssl-1.1.1q/crypto/err/err.c:771
+	#700057300 in ERR_put_error(3, 109, 102, 130690806972416, 319) at openssl-1.1.1q/crypto/err/err.c:446
+	#800025252 in BN_mod_exp_mont(129868387844096, 129894157647872, 129876977778688, 129911337517056, 129962877124608, 0) at openssl-1.1.1q/crypto/bn/bn_exp.c:319
+	#900060000 in main() at mod_exp_mont_driver.c:31

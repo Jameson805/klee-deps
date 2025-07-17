@@ -5,18 +5,6 @@ KLEE: WARNING: undefined reference to function: BIO_new_fp
 KLEE: WARNING: undefined reference to function: BIO_s_file
 KLEE: WARNING: undefined reference to function: BIO_snprintf
 KLEE: WARNING: undefined reference to function: BIO_write
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_cleanup_local
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_compare_id
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_get_current_id
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_get_local
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_init_local
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_lock_free
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_lock_new
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_read_lock
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_run_once
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_set_local
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_unlock
-KLEE: WARNING: undefined reference to function: CRYPTO_THREAD_write_lock
 KLEE: WARNING: undefined reference to function: CRYPTO_secure_clear_free
 KLEE: WARNING: undefined reference to function: CRYPTO_secure_malloc_done
 KLEE: WARNING: undefined reference to function: CRYPTO_secure_zalloc
@@ -56,7 +44,6 @@ KLEE: WARNING: undefined reference to function: OPENSSL_LH_free
 KLEE: WARNING: undefined reference to function: OPENSSL_LH_insert
 KLEE: WARNING: undefined reference to function: OPENSSL_LH_new
 KLEE: WARNING: undefined reference to function: OPENSSL_LH_retrieve
-KLEE: WARNING: undefined reference to function: OPENSSL_cleanse
 KLEE: WARNING: undefined reference to function: RAND_bytes
 KLEE: WARNING: undefined reference to function: RAND_priv_bytes
 KLEE: WARNING: undefined reference to function: SHA512_Final
@@ -81,15 +68,17 @@ KLEE: WARNING: undefined reference to function: obj_cleanup_int
 KLEE: WARNING: undefined reference to function: openssl_add_all_ciphers_int
 KLEE: WARNING: undefined reference to function: openssl_add_all_digests_int
 KLEE: WARNING: undefined reference to function: openssl_config_int
-KLEE: WARNING: undefined reference to function: openssl_init_fork_handlers
 KLEE: WARNING: undefined reference to function: openssl_no_config_int
 KLEE: WARNING: undefined reference to function: ossl_store_cleanup_int
+KLEE: WARNING: undefined reference to function: pthread_rwlock_destroy
+KLEE: WARNING: undefined reference to function: pthread_rwlock_init
+KLEE: WARNING: undefined reference to function: pthread_rwlock_rdlock
+KLEE: WARNING: undefined reference to function: pthread_rwlock_unlock
+KLEE: WARNING: undefined reference to function: pthread_rwlock_wrlock
 KLEE: WARNING: undefined reference to function: rand_cleanup_int
 KLEE: WARNING: undefined reference to function: rand_drbg_cleanup_int
 KLEE: WARNING: undefined reference to variable: stderr
-KLEE: WARNING: undefined reference to function: strcpy
-KLEE: WARNING: undefined reference to function: strlen
-KLEE: WARNING: undefined reference to function: vfprintf
 KLEE: WARNING ONCE: Alignment of memory from call "malloc" is not modelled. Using alignment of 8.
-KLEE: WARNING ONCE: calling external: CRYPTO_THREAD_run_once(133535633506304, 133526101950464) at openssl-1.1.1q/crypto/init.c:630 10
-KLEE: WARNING ONCE: calling external: OPENSSL_cleanse(132621845659648, 8) at openssl-1.1.1q/crypto/mem.c:321 9
+KLEE: WARNING ONCE: calling external: pthread_rwlock_init(129945697255424, 0) at openssl-1.1.1q/crypto/threads_pthread.c:34 41
+KLEE: WARNING ONCE: calling external: atexit(130686811897856) at openssl-1.1.1q/crypto/init.c:140 33
+KLEE: WARNING: STP timed out
