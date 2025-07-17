@@ -1,3 +1,0 @@
-i32_add.c line   36 - for (u = 1; u < m; u ++) {
-i32_sub.c line   36 - for (u = 1; u < m; u ++) {
-i32_modpow.c line   59 - ctl = (e[elen - 1 - (k >> 3)] >> (k & 7)) & 1;
