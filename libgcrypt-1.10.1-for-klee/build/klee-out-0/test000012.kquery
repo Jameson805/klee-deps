@@ -1,0 +1,77 @@
+array base[32] : w32 -> w8 = symbolic
+array exp[32] : w32 -> w8 = symbolic
+array mod[32] : w32 -> w8 = symbolic
+(query [(Eq false
+             (Eq 0
+                 (Or w64 (Or w64 (Or w64 (Shl w64 N0:(ReadLSB w64 0 base)
+                                                  56)
+                                         (And w64 (Shl w64 N0 40) 71776119061217280))
+                                 (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)
+                                         (And w64 (Shl w64 N0 8) 1095216660480)))
+                         (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)
+                                         (And w64 (LShr w64 N0 24) 16711680))
+                                 (Or w64 (And w64 (LShr w64 N0 40) 65280)
+                                         (LShr w64 N0 56))))))
+         (Eq 0
+             (Or w64 (Or w64 (Or w64 (Shl w64 N1:(ReadLSB w64 0 exp)
+                                              56)
+                                     (And w64 (Shl w64 N1 40) 71776119061217280))
+                             (Or w64 (And w64 (Shl w64 N1 24) 280375465082880)
+                                     (And w64 (Shl w64 N1 8) 1095216660480)))
+                     (Or w64 (Or w64 (And w64 (LShr w64 N1 8) 4278190080)
+                                     (And w64 (LShr w64 N1 24) 16711680))
+                             (Or w64 (And w64 (LShr w64 N1 40) 65280)
+                                     (LShr w64 N1 56)))))
+         (Eq 0
+             (Or w64 (Or w64 (Or w64 (Shl w64 N2:(ReadLSB w64 8 exp)
+                                              56)
+                                     (And w64 (Shl w64 N2 40) 71776119061217280))
+                             (Or w64 (And w64 (Shl w64 N2 24) 280375465082880)
+                                     (And w64 (Shl w64 N2 8) 1095216660480)))
+                     (Or w64 (Or w64 (And w64 (LShr w64 N2 8) 4278190080)
+                                     (And w64 (LShr w64 N2 24) 16711680))
+                             (Or w64 (And w64 (LShr w64 N2 40) 65280)
+                                     (LShr w64 N2 56)))))
+         (Eq false
+             (Eq 0
+                 (Or w64 (Or w64 (Or w64 (Shl w64 N3:(ReadLSB w64 16 exp)
+                                                  56)
+                                         (And w64 (Shl w64 N3 40) 71776119061217280))
+                                 (Or w64 (And w64 (Shl w64 N3 24) 280375465082880)
+                                         (And w64 (Shl w64 N3 8) 1095216660480)))
+                         (Or w64 (Or w64 (And w64 (LShr w64 N3 8) 4278190080)
+                                         (And w64 (LShr w64 N3 24) 16711680))
+                                 (Or w64 (And w64 (LShr w64 N3 40) 65280)
+                                         (LShr w64 N3 56))))))
+         (Eq 0
+             (Or w64 (Or w64 (Or w64 (Shl w64 N4:(ReadLSB w64 0 mod)
+                                              56)
+                                     (And w64 (Shl w64 N4 40) 71776119061217280))
+                             (Or w64 (And w64 (Shl w64 N4 24) 280375465082880)
+                                     (And w64 (Shl w64 N4 8) 1095216660480)))
+                     (Or w64 (Or w64 (And w64 (LShr w64 N4 8) 4278190080)
+                                     (And w64 (LShr w64 N4 24) 16711680))
+                             (Or w64 (And w64 (LShr w64 N4 40) 65280)
+                                     (LShr w64 N4 56)))))
+         (Eq 0
+             (Or w64 (Or w64 (Or w64 (Shl w64 N5:(ReadLSB w64 8 mod)
+                                              56)
+                                     (And w64 (Shl w64 N5 40) 71776119061217280))
+                             (Or w64 (And w64 (Shl w64 N5 24) 280375465082880)
+                                     (And w64 (Shl w64 N5 8) 1095216660480)))
+                     (Or w64 (Or w64 (And w64 (LShr w64 N5 8) 4278190080)
+                                     (And w64 (LShr w64 N5 24) 16711680))
+                             (Or w64 (And w64 (LShr w64 N5 40) 65280)
+                                     (LShr w64 N5 56)))))
+         (Eq false
+             (Eq 0
+                 (Or w64 (Or w64 (Or w64 (Shl w64 N6:(ReadLSB w64 16 mod)
+                                                  56)
+                                         (And w64 (Shl w64 N6 40) 71776119061217280))
+                                 (Or w64 (And w64 (Shl w64 N6 24) 280375465082880)
+                                         (And w64 (Shl w64 N6 8) 1095216660480)))
+                         (Or w64 (Or w64 (And w64 (LShr w64 N6 8) 4278190080)
+                                         (And w64 (LShr w64 N6 24) 16711680))
+                                 (Or w64 (And w64 (LShr w64 N6 40) 65280)
+                                         (LShr w64 N6 56))))))]
+        false)

@@ -1,7 +1,0 @@
-Error: failed external call: gcry_mpi_scan
-File: driver.c
-Line: 21
-assembly.ll line: 17184
-State: 1
-Stack: 
-	#000017184 in main() at driver.c:21

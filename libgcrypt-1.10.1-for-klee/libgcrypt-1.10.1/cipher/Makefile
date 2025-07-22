@@ -329,14 +329,14 @@ BUILD_FILEVERSION = 1,10,1,44558
 BUILD_REVISION = ae0e5678
 BUILD_TIMESTAMP = <none>
 BUILD_VERSION = 1.10.1.44558
-CC = clang-13
-CCAS = clang-13
+CC = gcc
+CCAS = gcc
 CCASDEPMODE = depmode=gcc3
-CCASFLAGS = -O0 -g
+CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CC_FOR_BUILD = $(CC)
-CFLAGS = -O0 -g -fvisibility=hidden -fno-delete-null-pointer-checks -Wall
-CPP = clang-13 -E
+CFLAGS = -g -O2 -fvisibility=hidden -fno-delete-null-pointer-checks -Wall
+CPP = gcc -E
 CPPFLAGS = 
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
@@ -353,9 +353,9 @@ EGREP = /usr/bin/grep -E
 EXEEXT = 
 EXEEXT_FOR_BUILD = $(EXEEXT)
 FGREP = /usr/bin/grep -F
-GCRYPT_CIPHERS =  arcfour.lo blowfish.lo cast5.lo des.lo rijndael.lo twofish.lo serpent.lo rfc2268.lo seed.lo camellia.lo camellia-glue.lo idea.lo salsa20.lo gost28147.lo chacha20.lo sm4.lo  arcfour-amd64.lo blowfish-amd64.lo cast5-amd64.lo des-amd64.lo rijndael-amd64.lo rijndael-ssse3-amd64.lo rijndael-ssse3-amd64-asm.lo rijndael-vaes.lo rijndael-vaes-avx2-amd64.lo rijndael-aesni.lo rijndael-padlock.lo twofish-amd64.lo twofish-avx2-amd64.lo serpent-sse2-amd64.lo serpent-avx2-amd64.lo camellia-aesni-avx-amd64.lo camellia-aesni-avx2-amd64.lo camellia-vaes-avx2-amd64.lo salsa20-amd64.lo chacha20-amd64-ssse3.lo chacha20-amd64-avx2.lo sm4-aesni-avx-amd64.lo sm4-aesni-avx2-amd64.lo
-GCRYPT_DIGESTS =  crc.lo gostr3411-94.lo stribog.lo md4.lo md5.lo rmd160.lo sha256.lo sha512.lo keccak.lo tiger.lo whirlpool.lo blake2.lo sm3.lo sha1.lo  crc-intel-pclmul.lo sha256-ssse3-amd64.lo sha256-avx-amd64.lo sha256-avx2-bmi2-amd64.lo sha256-intel-shaext.lo sha512-ssse3-amd64.lo sha512-avx-amd64.lo sha512-avx2-bmi2-amd64.lo whirlpool-sse2-amd64.lo blake2b-amd64-avx2.lo blake2s-amd64-avx.lo sm3-avx-bmi2-amd64.lo sha1-ssse3-amd64.lo sha1-avx-amd64.lo sha1-avx-bmi2-amd64.lo sha1-avx2-bmi2-amd64.lo sha1-intel-shaext.lo cipher-gcm-intel-pclmul.lo
-GCRYPT_HWF_MODULES = libgcrypt_la-hwf-x86.lo
+GCRYPT_CIPHERS =  arcfour.lo blowfish.lo cast5.lo des.lo rijndael.lo twofish.lo serpent.lo rfc2268.lo seed.lo camellia.lo camellia-glue.lo idea.lo salsa20.lo gost28147.lo chacha20.lo sm4.lo
+GCRYPT_DIGESTS =  crc.lo gostr3411-94.lo stribog.lo md4.lo md5.lo rmd160.lo sha256.lo sha512.lo keccak.lo tiger.lo whirlpool.lo blake2.lo sm3.lo sha1.lo
+GCRYPT_HWF_MODULES = 
 GCRYPT_KDFS =  scrypt.lo
 GCRYPT_PUBKEY_CIPHERS =  dsa.lo rsa.lo elgamal.lo                           ecc.lo ecc-curves.lo ecc-misc.lo                           ecc-ecdh.lo ecc-ecdsa.lo ecc-eddsa.lo ecc-gost.lo                           ecc-sm2.lo
 GCRYPT_RANDOM =  rndgetentropy.lo
@@ -431,7 +431,7 @@ abs_srcdir = /home/james/klee-deps/libgcrypt-1.10.1-for-klee/libgcrypt-1.10.1/ci
 abs_top_builddir = /home/james/klee-deps/libgcrypt-1.10.1-for-klee/libgcrypt-1.10.1
 abs_top_srcdir = /home/james/klee-deps/libgcrypt-1.10.1-for-klee/libgcrypt-1.10.1
 ac_ct_AR = ar
-ac_ct_CC = clang-13
+ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
 am__include = include
 am__leading_dot = .
@@ -492,8 +492,8 @@ EXTRA_DIST = gost-s-box.c
 CLEANFILES = gost-s-box
 DISTCLEANFILES = gost-sb.h
 noinst_LTLIBRARIES = libcipher.la
-GCRYPT_MODULES =  arcfour.lo blowfish.lo cast5.lo des.lo rijndael.lo twofish.lo serpent.lo rfc2268.lo seed.lo camellia.lo camellia-glue.lo idea.lo salsa20.lo gost28147.lo chacha20.lo sm4.lo  arcfour-amd64.lo blowfish-amd64.lo cast5-amd64.lo des-amd64.lo rijndael-amd64.lo rijndael-ssse3-amd64.lo rijndael-ssse3-amd64-asm.lo rijndael-vaes.lo rijndael-vaes-avx2-amd64.lo rijndael-aesni.lo rijndael-padlock.lo twofish-amd64.lo twofish-avx2-amd64.lo serpent-sse2-amd64.lo serpent-avx2-amd64.lo camellia-aesni-avx-amd64.lo camellia-aesni-avx2-amd64.lo camellia-vaes-avx2-amd64.lo salsa20-amd64.lo chacha20-amd64-ssse3.lo chacha20-amd64-avx2.lo sm4-aesni-avx-amd64.lo sm4-aesni-avx2-amd64.lo  dsa.lo rsa.lo elgamal.lo                           ecc.lo ecc-curves.lo ecc-misc.lo                           ecc-ecdh.lo ecc-ecdsa.lo ecc-eddsa.lo ecc-gost.lo                           ecc-sm2.lo \
-                  crc.lo gostr3411-94.lo stribog.lo md4.lo md5.lo rmd160.lo sha256.lo sha512.lo keccak.lo tiger.lo whirlpool.lo blake2.lo sm3.lo sha1.lo  crc-intel-pclmul.lo sha256-ssse3-amd64.lo sha256-avx-amd64.lo sha256-avx2-bmi2-amd64.lo sha256-intel-shaext.lo sha512-ssse3-amd64.lo sha512-avx-amd64.lo sha512-avx2-bmi2-amd64.lo whirlpool-sse2-amd64.lo blake2b-amd64-avx2.lo blake2s-amd64-avx.lo sm3-avx-bmi2-amd64.lo sha1-ssse3-amd64.lo sha1-avx-amd64.lo sha1-avx-bmi2-amd64.lo sha1-avx2-bmi2-amd64.lo sha1-intel-shaext.lo cipher-gcm-intel-pclmul.lo  scrypt.lo
+GCRYPT_MODULES =  arcfour.lo blowfish.lo cast5.lo des.lo rijndael.lo twofish.lo serpent.lo rfc2268.lo seed.lo camellia.lo camellia-glue.lo idea.lo salsa20.lo gost28147.lo chacha20.lo sm4.lo  dsa.lo rsa.lo elgamal.lo                           ecc.lo ecc-curves.lo ecc-misc.lo                           ecc-ecdh.lo ecc-ecdsa.lo ecc-eddsa.lo ecc-gost.lo                           ecc-sm2.lo \
+                  crc.lo gostr3411-94.lo stribog.lo md4.lo md5.lo rmd160.lo sha256.lo sha512.lo keccak.lo tiger.lo whirlpool.lo blake2.lo sm3.lo sha1.lo  scrypt.lo
 
 libcipher_la_DEPENDENCIES = $(GCRYPT_MODULES)
 libcipher_la_LIBADD = $(GCRYPT_MODULES)

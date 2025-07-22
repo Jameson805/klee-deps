@@ -1,1 +1,1 @@
-../mpi/amd64/mpi-asm-defs.h
+../mpi/generic/mpi-asm-defs.h

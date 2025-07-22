@@ -4,15 +4,22 @@ LD = llvm-link-13
 
 # Paths
 SRC_DIR = libgcrypt-1.10.1
+GPG_ERROR_DIR = libgpg-error-1.44/src
 BUILD_DIR = build
 
-# Driver files
+# Files
 DRIVER_SRCS = driver.c
-DRIVER_BCS = $(patsubst %.c,$(BUILD_DIR)/%.bc,$(DRIVER_SRCS))
+STUB_SRC = stubs.c
 
-# Libgcrypt source files (only MPI used, exact existing files)
+# Only needed libgpg-error files
+LIBGPG_ERROR_SRCS = \
+    $(GPG_ERROR_DIR)/strsource.c \
+    $(GPG_ERROR_DIR)/strerror.c \
+    $(GPG_ERROR_DIR)/code-to-errno.c
+
+# libgcrypt MPI files
 MPI_SRC_DIR = $(SRC_DIR)/mpi
-MPI_SRCS := \
+MPI_SRCS = \
     $(MPI_SRC_DIR)/mpicoder.c \
     $(MPI_SRC_DIR)/mpih-div.c \
     $(MPI_SRC_DIR)/mpih-mul.c \
@@ -27,46 +34,54 @@ MPI_SRCS := \
     $(MPI_SRC_DIR)/mpi-scan.c \
     $(MPI_SRC_DIR)/mpiutil.c
 
-LIBGCRYPT_BCS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/libgcrypt/%.bc,$(MPI_SRCS))
+MPI_SRCS += $(SRC_DIR)/src/visibility.c
+MPI_SRCS += $(SRC_DIR)/src/global.c
+MPI_SRCS += $(SRC_DIR)/src/fips.c
 
-# libgpg-error
-LIBGPG_ERROR_SRC_DIR = libgpg-error-1.44/src
-LIBGPG_ERROR_SRCS = $(LIBGPG_ERROR_SRC_DIR)/*.c
-LIBGPG_ERROR_BCS = $(patsubst $(LIBGPG_ERROR_SRC_DIR)/%.c,$(BUILD_DIR)/libgpg-error/%.bc,$(LIBGPG_ERROR_SRCS))
+# Derived bitcode paths
+DRIVER_BCS = $(patsubst %.c,$(BUILD_DIR)/%.bc,$(DRIVER_SRCS))
+STUB_BC = $(BUILD_DIR)/stub.bc
+GPG_BCS = $(patsubst $(GPG_ERROR_DIR)/%.c,$(BUILD_DIR)/libgpg-error/%.bc,$(LIBGPG_ERROR_SRCS))
+GCRYPT_BCS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/libgcrypt/%.bc,$(MPI_SRCS))
 
-# Final linked output
 FINAL_BC = $(BUILD_DIR)/klee.bc
 
 # Flags
 CFLAGS = -I$(SRC_DIR) -I$(SRC_DIR)/src -I$(SRC_DIR)/mpi \
+         -I$(GPG_ERROR_DIR) \
          -I/home/james/klee-deps/klee-controlflow/include \
          -O0 -Xclang -disable-O0-optnone -emit-llvm -g -c
 
-# Build targets
+# Targets
 .PHONY: all clean
 
 all: $(FINAL_BC)
 
-# Link final bitcode: driver + libgcrypt
-$(FINAL_BC): $(LIBGPG_ERROR_BCS) $(LIBGCRYPT_BCS) $(DRIVER_BCS)
+$(FINAL_BC): $(DRIVER_BCS) $(STUB_BC) $(GPG_BCS) $(GCRYPT_BCS)
 	@echo "LD (llvm-link-13) -> $@"
 	$(LD) $^ -o $@
 
-# Compile libgpg-error
-$(BUILD_DIR)/libgpg-error/%.bc: $(LIBGPG_ERROR_SRC_DIR)/%.c
-	@echo "CC (clang-13) -> $@"
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $< -o $@
-
-# Compile libgcrypt source files to .bc
-$(BUILD_DIR)/libgcrypt/%.bc: $(SRC_DIR)/%.c
-	@echo "CC (clang-13) -> $@"
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $< -o $@
-
-# Compile driver(s)
+# Compile driver and stub
 $(BUILD_DIR)/%.bc: %.c
-	@echo "CC (clang-13) -> $@"
+	@echo "CC -> $@"
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Explicit rule for stub.c
+$(STUB_BC): $(STUB_SRC)
+	@echo "CC -> $@"
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile libgpg-error sources
+$(BUILD_DIR)/libgpg-error/%.bc: $(GPG_ERROR_DIR)/%.c
+	@echo "CC -> $@"
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile libgcrypt sources
+$(BUILD_DIR)/libgcrypt/%.bc: $(SRC_DIR)/%.c
+	@echo "CC -> $@"
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $< -o $@
 

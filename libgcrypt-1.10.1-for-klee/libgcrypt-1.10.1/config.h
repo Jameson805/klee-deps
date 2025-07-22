@@ -13,7 +13,7 @@
 /* #undef AC_APPLE_UNIVERSAL_BUILD */
 
 /* Defined if --disable-asm was used to configure */
-/* #undef ASM_DISABLED */
+#define ASM_DISABLED 1
 
 /* GIT commit id revision used to build this package */
 #define BUILD_REVISION "ae0e5678"
@@ -29,19 +29,19 @@
 #define EGD_SOCKET_NAME ""
 
 /* Enable support for Intel AES-NI instructions. */
-#define ENABLE_AESNI_SUPPORT 1
+/* #undef ENABLE_AESNI_SUPPORT */
 
 /* Enable support for ARMv8 Crypto Extension instructions. */
 /* #undef ENABLE_ARM_CRYPTO_SUPPORT */
 
 /* Enable support for Intel AVX2 instructions. */
-#define ENABLE_AVX2_SUPPORT 1
+/* #undef ENABLE_AVX2_SUPPORT */
 
 /* Enable support for Intel AVX instructions. */
-#define ENABLE_AVX_SUPPORT 1
+/* #undef ENABLE_AVX_SUPPORT */
 
 /* Enable support for Intel DRNG (RDRAND instruction). */
-#define ENABLE_DRNG_SUPPORT 1
+/* #undef ENABLE_DRNG_SUPPORT */
 
 /* Enable forcing 'soft' HW feature bits on (for testing). */
 /* #undef ENABLE_FORCE_SOFT_HWFEATURES */
@@ -56,19 +56,19 @@
 /* #undef ENABLE_NEON_SUPPORT */
 
 /* Enable support for the PadLock engine. */
-#define ENABLE_PADLOCK_SUPPORT 1
+/* #undef ENABLE_PADLOCK_SUPPORT */
 
 /* Enable support for Intel PCLMUL instructions. */
-#define ENABLE_PCLMUL_SUPPORT 1
+/* #undef ENABLE_PCLMUL_SUPPORT */
 
 /* Enable support for POWER 8 (PowerISA 2.07) crypto extension. */
 /* #undef ENABLE_PPC_CRYPTO_SUPPORT */
 
 /* Enable support for Intel SHAEXT instructions. */
-#define ENABLE_SHAEXT_SUPPORT 1
+/* #undef ENABLE_SHAEXT_SUPPORT */
 
 /* Enable support for Intel SSE4.1 instructions. */
-#define ENABLE_SSE41_SUPPORT 1
+/* #undef ENABLE_SSE41_SUPPORT */
 
 /* Define FIPS module version for certification */
 #define FIPS_MODULE_VERSION ""
@@ -129,7 +129,7 @@
 
 /* Defined if underlying assembler is compatible with amd64 assembly
    implementations */
-#define HAVE_COMPATIBLE_GCC_AMD64_PLATFORM_AS 1
+/* #undef HAVE_COMPATIBLE_GCC_AMD64_PLATFORM_AS */
 
 /* Defined if underlying assembler is compatible with ARM assembly
    implementations */
@@ -161,7 +161,7 @@
 /* #undef HAVE_CPU_ARCH_SPARC */
 
 /* Defined for the x86 platforms */
-#define HAVE_CPU_ARCH_X86 1
+/* #undef HAVE_CPU_ARCH_X86 */
 
 /* defined if the system supports a random device */
 #define HAVE_DEV_RANDOM 1
@@ -241,19 +241,19 @@
 /* #undef HAVE_GCC_INLINE_ASM_AARCH64_NEON */
 
 /* Defined if inline assembler supports AVX instructions */
-#define HAVE_GCC_INLINE_ASM_AVX 1
+/* #undef HAVE_GCC_INLINE_ASM_AVX */
 
 /* Defined if inline assembler supports AVX2 instructions */
-#define HAVE_GCC_INLINE_ASM_AVX2 1
+/* #undef HAVE_GCC_INLINE_ASM_AVX2 */
 
 /* Defined if inline assembler supports BMI2 instructions */
-#define HAVE_GCC_INLINE_ASM_BMI2 1
+/* #undef HAVE_GCC_INLINE_ASM_BMI2 */
 
 /* Defined if inline assembler supports NEON instructions */
 /* #undef HAVE_GCC_INLINE_ASM_NEON */
 
 /* Defined if inline assembler supports PCLMUL instructions */
-#define HAVE_GCC_INLINE_ASM_PCLMUL 1
+/* #undef HAVE_GCC_INLINE_ASM_PCLMUL */
 
 /* Defined if inline assembler supports PowerPC AltiVec/VSX/crypto
    instructions */
@@ -269,16 +269,16 @@
 /* #undef HAVE_GCC_INLINE_ASM_S390X_VX */
 
 /* Defined if inline assembler supports SHA Extensions instructions */
-#define HAVE_GCC_INLINE_ASM_SHAEXT 1
+/* #undef HAVE_GCC_INLINE_ASM_SHAEXT */
 
 /* Defined if inline assembler supports SSE4.1 instructions */
-#define HAVE_GCC_INLINE_ASM_SSE41 1
+/* #undef HAVE_GCC_INLINE_ASM_SSE41 */
 
 /* Defined if inline assembler supports SSSE3 instructions */
-#define HAVE_GCC_INLINE_ASM_SSSE3 1
+/* #undef HAVE_GCC_INLINE_ASM_SSSE3 */
 
 /* Defined if inline assembler supports VAES and VPCLMUL instructions */
-#define HAVE_GCC_INLINE_ASM_VAES_VPCLMUL 1
+/* #undef HAVE_GCC_INLINE_ASM_VAES_VPCLMUL */
 
 /* Define to 1 if you have the `getauxval' function. */
 #define HAVE_GETAUXVAL 1
@@ -303,7 +303,7 @@
 
 /* Defined if underlying assembler is compatible with Intel syntax assembly
    implementations */
-#define HAVE_INTEL_SYNTAX_PLATFORM_AS 1
+/* #undef HAVE_INTEL_SYNTAX_PLATFORM_AS */
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1

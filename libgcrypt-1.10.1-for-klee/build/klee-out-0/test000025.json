@@ -1,0 +1,76 @@
+{
+  "controlFlowTrace": [
+    {
+      "branch_id": 50,
+      "col": 5,
+      "condition": "(Eq 0\n     (Or w64 (Or w64 (Or w64 (Shl w64 N0:(ReadLSB w64 0 base)\n                                      56)\n                             (And w64 (Shl w64 N0 40) 71776119061217280))\n                     (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)\n                             (And w64 (Shl w64 N0 8) 1095216660480)))\n             (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)\n                             (And w64 (LShr w64 N0 24) 16711680))\n                     (Or w64 (And w64 (LShr w64 N0 40) 65280)\n                             (LShr w64 N0 56)))))",
+      "filename": "libgcrypt-1.10.1/mpi/mpi-bit.c",
+      "inst_id": 15645,
+      "line": 61,
+      "taken": true
+    },
+    {
+      "branch_id": 1102,
+      "col": 5,
+      "condition": "(Eq 0\n     (Or w64 (Or w64 (Or w64 (Shl w64 N0:(ReadLSB w64 8 base)\n                                      56)\n                             (And w64 (Shl w64 N0 40) 71776119061217280))\n                     (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)\n                             (And w64 (Shl w64 N0 8) 1095216660480)))\n             (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)\n                             (And w64 (LShr w64 N0 24) 16711680))\n                     (Or w64 (And w64 (LShr w64 N0 40) 65280)\n                             (LShr w64 N0 56)))))",
+      "filename": "libgcrypt-1.10.1/mpi/mpi-bit.c",
+      "inst_id": 15645,
+      "line": 61,
+      "taken": false
+    },
+    {
+      "branch_id": 1156,
+      "col": 5,
+      "condition": "(Eq 0\n     (Or w64 (Or w64 (Or w64 (Shl w64 N0:(ReadLSB w64 0 exp)\n                                      56)\n                             (And w64 (Shl w64 N0 40) 71776119061217280))\n                     (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)\n                             (And w64 (Shl w64 N0 8) 1095216660480)))\n             (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)\n                             (And w64 (LShr w64 N0 24) 16711680))\n                     (Or w64 (And w64 (LShr w64 N0 40) 65280)\n                             (LShr w64 N0 56)))))",
+      "filename": "libgcrypt-1.10.1/mpi/mpi-bit.c",
+      "inst_id": 15645,
+      "line": 61,
+      "taken": true
+    },
+    {
+      "branch_id": 1332,
+      "col": 5,
+      "condition": "(Eq 0\n     (Or w64 (Or w64 (Or w64 (Shl w64 N0:(ReadLSB w64 8 exp)\n                                      56)\n                             (And w64 (Shl w64 N0 40) 71776119061217280))\n                     (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)\n                             (And w64 (Shl w64 N0 8) 1095216660480)))\n             (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)\n                             (And w64 (LShr w64 N0 24) 16711680))\n                     (Or w64 (And w64 (LShr w64 N0 40) 65280)\n                             (LShr w64 N0 56)))))",
+      "filename": "libgcrypt-1.10.1/mpi/mpi-bit.c",
+      "inst_id": 15645,
+      "line": 61,
+      "taken": false
+    },
+    {
+      "branch_id": 1386,
+      "col": 5,
+      "condition": "(Eq 0\n     (Or w64 (Or w64 (Or w64 (Shl w64 N0:(ReadLSB w64 0 mod)\n                                      56)\n                             (And w64 (Shl w64 N0 40) 71776119061217280))\n                     (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)\n                             (And w64 (Shl w64 N0 8) 1095216660480)))\n             (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)\n                             (And w64 (LShr w64 N0 24) 16711680))\n                     (Or w64 (And w64 (LShr w64 N0 40) 65280)\n                             (LShr w64 N0 56)))))",
+      "filename": "libgcrypt-1.10.1/mpi/mpi-bit.c",
+      "inst_id": 15645,
+      "line": 61,
+      "taken": true
+    },
+    {
+      "branch_id": 1412,
+      "col": 5,
+      "condition": "(Eq 0\n     (Or w64 (Or w64 (Or w64 (Shl w64 N0:(ReadLSB w64 8 mod)\n                                      56)\n                             (And w64 (Shl w64 N0 40) 71776119061217280))\n                     (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)\n                             (And w64 (Shl w64 N0 8) 1095216660480)))\n             (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)\n                             (And w64 (LShr w64 N0 24) 16711680))\n                     (Or w64 (And w64 (LShr w64 N0 40) 65280)\n                             (LShr w64 N0 56)))))",
+      "filename": "libgcrypt-1.10.1/mpi/mpi-bit.c",
+      "inst_id": 15645,
+      "line": 61,
+      "taken": true
+    },
+    {
+      "branch_id": 1438,
+      "col": 5,
+      "condition": "(Eq 0\n     (Or w64 (Or w64 (Or w64 (Shl w64 N0:(ReadLSB w64 16 mod)\n                                      56)\n                             (And w64 (Shl w64 N0 40) 71776119061217280))\n                     (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)\n                             (And w64 (Shl w64 N0 8) 1095216660480)))\n             (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)\n                             (And w64 (LShr w64 N0 24) 16711680))\n                     (Or w64 (And w64 (LShr w64 N0 40) 65280)\n                             (LShr w64 N0 56)))))",
+      "filename": "libgcrypt-1.10.1/mpi/mpi-bit.c",
+      "inst_id": 15645,
+      "line": 61,
+      "taken": false
+    },
+    {
+      "branch_id": 1448,
+      "col": 3,
+      "condition": "(Eq false\n     (Eq 0\n         (Or w64 (Or w64 (Or w64 (Shl w64 N0:(ReadLSB w64 8 exp)\n                                          56)\n                                 (And w64 (Shl w64 N0 40) 71776119061217280))\n                         (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)\n                                 (And w64 (Shl w64 N0 8) 1095216660480)))\n                 (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)\n                                 (And w64 (LShr w64 N0 24) 16711680))\n                         (Or w64 (And w64 (LShr w64 N0 40) 65280)\n                                 (LShr w64 N0 56))))))",
+      "filename": "libgcrypt-1.10.1/mpi/mpi-pow.c",
+      "inst_id": 18742,
+      "line": 440,
+      "taken": true
+    }
+  ]
+}
