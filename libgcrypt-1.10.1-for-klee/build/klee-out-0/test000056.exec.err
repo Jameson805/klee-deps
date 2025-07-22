@@ -1,9 +1,0 @@
-Error: external call with symbolic argument: __asm__53
-File: libgcrypt-1.10.1/mpi/mpi-pow.c
-Line: 483
-assembly.ll line: 14185
-State: 88
-Stack: 
-	#000014185 in _gcry_mpi_powm(122681955450880, 122673365516288, 122690545385472, 122699135320064) at libgcrypt-1.10.1/mpi/mpi-pow.c:483
-	#100019393 in gcry_mpi_powm(122681955450880, 122673365516288, 122690545385472, 122699135320064) at libgcrypt-1.10.1/src/visibility.c:461
-	#200000267 in main() at driver.c:31

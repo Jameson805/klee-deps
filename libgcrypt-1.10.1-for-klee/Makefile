@@ -19,20 +19,7 @@ LIBGPG_ERROR_SRCS = \
 
 # libgcrypt MPI files
 MPI_SRC_DIR = $(SRC_DIR)/mpi
-MPI_SRCS = \
-    $(MPI_SRC_DIR)/mpicoder.c \
-    $(MPI_SRC_DIR)/mpih-div.c \
-    $(MPI_SRC_DIR)/mpih-mul.c \
-    $(MPI_SRC_DIR)/mpi-add.c \
-    $(MPI_SRC_DIR)/mpi-bit.c \
-    $(MPI_SRC_DIR)/mpi-cmp.c \
-    $(MPI_SRC_DIR)/mpi-div.c \
-    $(MPI_SRC_DIR)/mpi-gcd.c \
-    $(MPI_SRC_DIR)/mpi-inv.c \
-    $(MPI_SRC_DIR)/mpi-mul.c \
-    $(MPI_SRC_DIR)/mpi-pow.c \
-    $(MPI_SRC_DIR)/mpi-scan.c \
-    $(MPI_SRC_DIR)/mpiutil.c
+MPI_SRCS = $(wildcard MPI_SRC_DIR/*.c)
 
 MPI_SRCS += $(SRC_DIR)/src/visibility.c
 MPI_SRCS += $(SRC_DIR)/src/global.c
