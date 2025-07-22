@@ -7,13 +7,6 @@
 #define SYM_SIZE 32
 
 int main() {
-    // Initialize libgcrypt (required)
-    if (!gcry_check_version(GCRYPT_VERSION)) {
-        return 1;
-    }
-    gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
-    gcry_control(GCRYCTL_INITIALIZATION_FINISHED, 0);
-
     // Allocate symbolic buffers for base, exponent, and modulus
     unsigned char base_buf[SYM_SIZE];
     unsigned char exp_buf[SYM_SIZE];

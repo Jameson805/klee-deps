@@ -10,41 +10,30 @@ BUILD_DIR = build
 DRIVER_SRCS = driver.c
 DRIVER_BCS = $(patsubst %.c,$(BUILD_DIR)/%.bc,$(DRIVER_SRCS))
 
-# Libgcrypt source files (only MPI used)
+# Libgcrypt source files (only MPI used, exact existing files)
 MPI_SRC_DIR = $(SRC_DIR)/mpi
 MPI_SRCS := \
     $(MPI_SRC_DIR)/mpicoder.c \
     $(MPI_SRC_DIR)/mpih-div.c \
     $(MPI_SRC_DIR)/mpih-mul.c \
-    $(MPI_SRC_DIR)/mpih-mul1.c \
-    $(MPI_SRC_DIR)/mpih-mul2.c \
-    $(MPI_SRC_DIR)/mpih-mul3.c \
-    $(MPI_SRC_DIR)/mpih-mul4.c \
-    $(MPI_SRC_DIR)/mpih-sub.c \
-    $(MPI_SRC_DIR)/mpn-add.c \
-    $(MPI_SRC_DIR)/mpn-and.c \
-    $(MPI_SRC_DIR)/mpn-gcd.c \
-    $(MPI_SRC_DIR)/mpn-mul.c \
-    $(MPI_SRC_DIR)/mpn-powm.c \
-    $(MPI_SRC_DIR)/mpn-sub.c \
     $(MPI_SRC_DIR)/mpi-add.c \
     $(MPI_SRC_DIR)/mpi-bit.c \
     $(MPI_SRC_DIR)/mpi-cmp.c \
     $(MPI_SRC_DIR)/mpi-div.c \
     $(MPI_SRC_DIR)/mpi-gcd.c \
+    $(MPI_SRC_DIR)/mpi-inv.c \
     $(MPI_SRC_DIR)/mpi-mul.c \
     $(MPI_SRC_DIR)/mpi-pow.c \
     $(MPI_SRC_DIR)/mpi-scan.c \
-    $(MPI_SRC_DIR)/mpi-util.c \
-    $(MPI_SRC_DIR)/mpi-inv.c
+    $(MPI_SRC_DIR)/mpiutil.c
 
 LIBGCRYPT_BCS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/libgcrypt/%.bc,$(MPI_SRCS))
 
 # Final linked output
-FINAL_BC = $(BUILD_DIR)/klee_powm.bc
+FINAL_BC = $(BUILD_DIR)/klee.bc
 
 # Flags
-CFLAGS = -I$(SRC_DIR)/src -I$(SRC_DIR)/mpi \
+CFLAGS = -I$(SRC_DIR) -I$(SRC_DIR)/src -I$(SRC_DIR)/mpi \
          -I/home/james/klee-deps/klee-controlflow/include \
          -O0 -Xclang -disable-O0-optnone -emit-llvm -g -c
 
