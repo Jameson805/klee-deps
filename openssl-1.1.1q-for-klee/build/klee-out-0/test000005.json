@@ -25,19 +25,28 @@
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
       "inst_id": 41783,
       "line": 445,
+      "taken": true
+    },
+    {
+      "branch_id": 16963,
+      "col": 5,
+      "condition": "(Eq 0 (Read w8 1 exp_buf))",
+      "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
+      "inst_id": 41783,
+      "line": 445,
       "taken": false
     },
     {
-      "branch_id": 432,
+      "branch_id": 17078,
       "col": 17,
-      "condition": "(Eq false\n     (Eq 0\n         (Or w64 (Shl w64 (Or w64 (Shl w64 (Or w64 (Shl w64 (Or w64 (Shl w64 (Or w64 (Shl w64 (Or w64 (Shl w64 (Or w64 (Shl w64 (ZExt w64 (Read w8 0 exp_buf))\n                                                                                                                                8)\n                                                                                                                       (ZExt w64 (Read w8 1 exp_buf)))\n                                                                                                               8)\n                                                                                                      (ZExt w64 (Read w8 2 exp_buf)))\n                                                                                              8)\n                                                                                     (ZExt w64 (Read w8 3 exp_buf)))\n                                                                             8)\n                                                                    (ZExt w64 (Read w8 4 exp_buf)))\n                                                            8)\n                                                   (ZExt w64 (Read w8 5 exp_buf)))\n                                           8)\n                                  (ZExt w64 (Read w8 6 exp_buf)))\n                          8)\n                 (ZExt w64 (Read w8 7 exp_buf)))))",
+      "condition": "(Eq false\n     (Eq 0\n         (Or w64 (Shl w64 (Or w64 (Shl w64 (Or w64 (Shl w64 (Or w64 (Shl w64 (Or w64 (Shl w64 (Or w64 (Shl w64 (ZExt w64 (Read w8 1 exp_buf))\n                                                                                                               8)\n                                                                                                      (ZExt w64 (Read w8 2 exp_buf)))\n                                                                                              8)\n                                                                                     (ZExt w64 (Read w8 3 exp_buf)))\n                                                                             8)\n                                                                    (ZExt w64 (Read w8 4 exp_buf)))\n                                                            8)\n                                                   (ZExt w64 (Read w8 5 exp_buf)))\n                                           8)\n                                  (ZExt w64 (Read w8 6 exp_buf)))\n                          8)\n                 (ZExt w64 (Read w8 7 exp_buf)))))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
       "inst_id": 41890,
       "line": 1012,
       "taken": true
     },
     {
-      "branch_id": 437,
+      "branch_id": 17083,
       "col": 5,
       "condition": "(Eq 0 (Read w8 0 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -46,7 +55,7 @@
       "taken": true
     },
     {
-      "branch_id": 1719,
+      "branch_id": 18365,
       "col": 5,
       "condition": "(Eq 0 (Read w8 1 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -55,7 +64,7 @@
       "taken": true
     },
     {
-      "branch_id": 3006,
+      "branch_id": 19652,
       "col": 5,
       "condition": "(Eq 0 (Read w8 2 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -64,7 +73,7 @@
       "taken": true
     },
     {
-      "branch_id": 4291,
+      "branch_id": 20937,
       "col": 5,
       "condition": "(Eq 0 (Read w8 3 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -73,7 +82,7 @@
       "taken": true
     },
     {
-      "branch_id": 5574,
+      "branch_id": 22220,
       "col": 5,
       "condition": "(Eq 0 (Read w8 4 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -82,7 +91,7 @@
       "taken": true
     },
     {
-      "branch_id": 6848,
+      "branch_id": 23494,
       "col": 5,
       "condition": "(Eq 0 (Read w8 5 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -91,7 +100,7 @@
       "taken": true
     },
     {
-      "branch_id": 8120,
+      "branch_id": 24766,
       "col": 5,
       "condition": "(Eq 0 (Read w8 6 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -100,7 +109,7 @@
       "taken": true
     },
     {
-      "branch_id": 9390,
+      "branch_id": 26036,
       "col": 5,
       "condition": "(Eq 0 (Read w8 7 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -109,7 +118,7 @@
       "taken": true
     },
     {
-      "branch_id": 10658,
+      "branch_id": 27304,
       "col": 5,
       "condition": "(Eq 0 (Read w8 8 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -118,7 +127,7 @@
       "taken": true
     },
     {
-      "branch_id": 11924,
+      "branch_id": 28566,
       "col": 5,
       "condition": "(Eq 0 (Read w8 9 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -127,7 +136,7 @@
       "taken": true
     },
     {
-      "branch_id": 13188,
+      "branch_id": 29830,
       "col": 5,
       "condition": "(Eq 0 (Read w8 10 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
@@ -136,18 +145,9 @@
       "taken": true
     },
     {
-      "branch_id": 14450,
+      "branch_id": 31092,
       "col": 5,
       "condition": "(Eq 0 (Read w8 11 mod_buf))",
-      "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
-      "inst_id": 41783,
-      "line": 445,
-      "taken": true
-    },
-    {
-      "branch_id": 15710,
-      "col": 5,
-      "condition": "(Eq 0 (Read w8 12 mod_buf))",
       "filename": "openssl-1.1.1q/crypto/bn/bn_lib.c",
       "inst_id": 41783,
       "line": 445,

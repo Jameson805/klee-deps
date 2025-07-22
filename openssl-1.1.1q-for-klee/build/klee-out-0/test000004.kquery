@@ -3,8 +3,9 @@ array exp_buf[32] : w32 -> w8 = symbolic
 array mod_buf[32] : w32 -> w8 = symbolic
 (query [(Eq false
              (Eq 0 (Read w8 0 base_buf)))
+         (Eq 0 (Read w8 0 exp_buf))
          (Eq false
-             (Eq 0 (Read w8 0 exp_buf)))
+             (Eq 0 (Read w8 1 exp_buf)))
          (Eq 0 (Read w8 0 mod_buf))
          (Eq 0 (Read w8 1 mod_buf))
          (Eq 0 (Read w8 2 mod_buf))
@@ -13,10 +14,6 @@ array mod_buf[32] : w32 -> w8 = symbolic
          (Eq 0 (Read w8 5 mod_buf))
          (Eq 0 (Read w8 6 mod_buf))
          (Eq 0 (Read w8 7 mod_buf))
-         (Eq 0 (Read w8 8 mod_buf))
-         (Eq 0 (Read w8 9 mod_buf))
-         (Eq 0 (Read w8 10 mod_buf))
-         (Eq 0 (Read w8 11 mod_buf))
-         (Eq 0 (Read w8 12 mod_buf))
-         (Eq 0 (Read w8 13 mod_buf))]
+         (Eq false
+             (Eq 0 (Read w8 8 mod_buf)))]
         false)

@@ -1,4 +1,20 @@
-/home/james/klee-deps/klee-controlflow/build/bin/klee --search=dfs --max-tests=64 --max-depth=16 --max-solver-time=5s --max-memory=2048 build/klee.bc
-PID: 821
+/home/james/klee-deps/klee-controlflow/build/bin/klee --search=dfs --max-tests=64 --max-depth=16 --max-solver-time=5s --max-memory=2048 build/klee_recp.bc
+PID: 60350
 Using monotonic steady clock with 1/1000000000s resolution
-Started: 2025-07-17 16:18:23
+Started: 2025-07-21 22:21:07
+BEGIN searcher description
+DFSSearcher
+END searcher description
+Finished: 2025-07-21 22:48:34
+Elapsed: 00:27:27
+KLEE: done: explored paths = 41
+KLEE: done: avg. constructs per query = 153
+KLEE: done: total queries = 1262
+KLEE: done: valid queries = 1197
+KLEE: done: invalid queries = 32
+KLEE: done: query cex = 1262
+
+KLEE: done: total instructions = 637586
+KLEE: done: completed paths = 0
+KLEE: done: partially completed paths = 41
+KLEE: done: generated tests = 10

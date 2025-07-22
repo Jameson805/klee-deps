@@ -1,4 +1,4 @@
-; ModuleID = 'build/klee.bc'
+; ModuleID = 'build/klee_recp.bc'
 source_filename = "llvm-link"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-linux-gnu"
@@ -59997,7 +59997,7 @@ define dso_local i32 @main() #0 !dbg !29681 {
   %34 = load %struct.bignum_st*, %struct.bignum_st** %3, align 8, !dbg !29726
   %35 = load %struct.bignum_st*, %struct.bignum_st** %4, align 8, !dbg !29727
   %36 = load %struct.bignum_ctx*, %struct.bignum_ctx** %6, align 8, !dbg !29728
-  %37 = call i32 @BN_mod_exp_mont(%struct.bignum_st* %32, %struct.bignum_st* %33, %struct.bignum_st* %34, %struct.bignum_st* %35, %struct.bignum_ctx* %36, %struct.bn_mont_ctx_st* null), !dbg !29729
+  %37 = call i32 @BN_mod_exp_recp(%struct.bignum_st* %32, %struct.bignum_st* %33, %struct.bignum_st* %34, %struct.bignum_st* %35, %struct.bignum_ctx* %36), !dbg !29729
   %38 = load %struct.bignum_st*, %struct.bignum_st** %2, align 8, !dbg !29730
   call void @BN_free(%struct.bignum_st* %38), !dbg !29731
   %39 = load %struct.bignum_st*, %struct.bignum_st** %3, align 8, !dbg !29732
@@ -61113,7 +61113,7 @@ attributes #17 = { noreturn }
 !763 = !DIDerivedType(tag: DW_TAG_typedef, name: "BIO", file: !8, line: 79, baseType: !764)
 !764 = !DICompositeType(tag: DW_TAG_structure_type, name: "bio_st", file: !8, line: 79, flags: DIFlagFwdDecl)
 !765 = distinct !DICompileUnit(language: DW_LANG_C99, file: !766, producer: "Ubuntu clang version 13.0.1-2ubuntu2.2", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, enums: !11, splitDebugInlining: false, nameTableKind: None)
-!766 = !DIFile(filename: "mod_exp_mont_driver.c", directory: "/home/james/klee-deps/openssl-1.1.1q-for-klee")
+!766 = !DIFile(filename: "mod_exp_recp_driver.c", directory: "/home/james/klee-deps/openssl-1.1.1q-for-klee")
 !767 = distinct !DICompileUnit(language: DW_LANG_C99, file: !768, producer: "Ubuntu clang version 13.0.1-2ubuntu2.2", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, enums: !11, retainedTypes: !161, splitDebugInlining: false, nameTableKind: None)
 !768 = !DIFile(filename: "stubs.c", directory: "/home/james/klee-deps/openssl-1.1.1q-for-klee")
 !769 = distinct !DICompileUnit(language: DW_LANG_C99, file: !770, producer: "Ubuntu clang version 13.0.1-2ubuntu2.2", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, enums: !11, splitDebugInlining: false, nameTableKind: None)
