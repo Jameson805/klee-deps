@@ -29,6 +29,11 @@ MPI_SRCS := \
 
 LIBGCRYPT_BCS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/libgcrypt/%.bc,$(MPI_SRCS))
 
+# libgpg-error
+LIBGPG_ERROR_SRC_DIR = libgpg-error-1.44/src
+LIBGPG_ERROR_SRCS = $(LIBGPG_ERROR_SRC_DIR)/*.c
+LIBGPG_ERROR_BCS = $(patsubst $(LIBGPG_ERROR_SRC_DIR)/%.c,$(BUILD_DIR)/libgpg-error/%.bc,$(LIBGPG_ERROR_SRCS))
+
 # Final linked output
 FINAL_BC = $(BUILD_DIR)/klee.bc
 
@@ -43,9 +48,15 @@ CFLAGS = -I$(SRC_DIR) -I$(SRC_DIR)/src -I$(SRC_DIR)/mpi \
 all: $(FINAL_BC)
 
 # Link final bitcode: driver + libgcrypt
-$(FINAL_BC): $(LIBGCRYPT_BCS) $(DRIVER_BCS)
+$(FINAL_BC): $(LIBGPG_ERROR_BCS) $(LIBGCRYPT_BCS) $(DRIVER_BCS)
 	@echo "LD (llvm-link-13) -> $@"
 	$(LD) $^ -o $@
+
+# Compile libgpg-error
+$(BUILD_DIR)/libgpg-error/%.bc: $(LIBGPG_ERROR_SRC_DIR)/%.c
+	@echo "CC (clang-13) -> $@"
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $< -o $@
 
 # Compile libgcrypt source files to .bc
 $(BUILD_DIR)/libgcrypt/%.bc: $(SRC_DIR)/%.c
