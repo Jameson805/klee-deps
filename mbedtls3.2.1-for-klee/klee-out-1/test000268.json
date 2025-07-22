@@ -1,0 +1,130 @@
+{
+  "controlFlowTrace": [
+    {
+      "branch_id": 46,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 97,
+      "col": 42,
+      "condition": "(Sle (Select w32 (Slt (ReadLSB w64 0 N)\n                       0)\n                  4294967295\n                  1)\n      0)",
+      "filename": "library/bignum.c",
+      "inst_id": 12606,
+      "line": 1985,
+      "taken": false
+    },
+    {
+      "branch_id": 98,
+      "col": 9,
+      "condition": "(Eq 0\n     (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                               0)\n                          (Sub w64 0 N0)\n                          N0)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 62564,
+      "line": 1985,
+      "taken": false
+    },
+    {
+      "branch_id": 100,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 92630,
+      "col": 9,
+      "condition": "(Slt (Select w32 (Slt (ReadLSB w64 0 E)\n                       0)\n                  4294967295\n                  1)\n      0)",
+      "filename": "library/bignum.c",
+      "inst_id": 63073,
+      "line": 1988,
+      "taken": false
+    },
+    {
+      "branch_id": 92634,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  9223372036854775808)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92636,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4611686018427387904)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92638,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  2305843009213693952)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92640,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  1152921504606846976)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92642,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  576460752303423488)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92644,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  288230376151711744)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92646,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  144115188075855872)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92648,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  72057594037927936)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92650,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  36028797018963968)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": true
+    }
+  ]
+}

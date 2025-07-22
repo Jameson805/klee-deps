@@ -1,0 +1,1435 @@
+{
+  "controlFlowTrace": [
+    {
+      "branch_id": 46,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 97,
+      "col": 42,
+      "condition": "(Sle (Select w32 (Slt (ReadLSB w64 0 N)\n                       0)\n                  4294967295\n                  1)\n      0)",
+      "filename": "library/bignum.c",
+      "inst_id": 12606,
+      "line": 1985,
+      "taken": false
+    },
+    {
+      "branch_id": 98,
+      "col": 9,
+      "condition": "(Eq 0\n     (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                               0)\n                          (Sub w64 0 N0)\n                          N0)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 62564,
+      "line": 1985,
+      "taken": false
+    },
+    {
+      "branch_id": 100,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 92630,
+      "col": 9,
+      "condition": "(Slt (Select w32 (Slt (ReadLSB w64 0 E)\n                       0)\n                  4294967295\n                  1)\n      0)",
+      "filename": "library/bignum.c",
+      "inst_id": 63073,
+      "line": 1988,
+      "taken": false
+    },
+    {
+      "branch_id": 92634,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  9223372036854775808)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92636,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4611686018427387904)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92638,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  2305843009213693952)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92640,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  1152921504606846976)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92642,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  576460752303423488)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92644,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  288230376151711744)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92646,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  144115188075855872)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92648,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  72057594037927936)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92650,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  36028797018963968)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92652,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  18014398509481984)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92654,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  9007199254740992)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92656,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4503599627370496)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92658,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  2251799813685248)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92660,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  1125899906842624)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92662,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  562949953421312)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92664,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  281474976710656)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92666,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  140737488355328)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92668,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  70368744177664)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92670,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  35184372088832)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92672,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  17592186044416)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92674,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  8796093022208)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 92676,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4398046511104)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": true
+    },
+    {
+      "branch_id": 123378,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  9223372036854775808)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 123380,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4611686018427387904)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": true
+    },
+    {
+      "branch_id": 137426,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  9223372036854775808)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137428,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4611686018427387904)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137430,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  2305843009213693952)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137432,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  1152921504606846976)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137434,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  576460752303423488)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137436,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  288230376151711744)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137438,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  144115188075855872)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137440,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  72057594037927936)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137442,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  36028797018963968)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137444,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  18014398509481984)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137446,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  9007199254740992)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137448,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4503599627370496)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137450,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  2251799813685248)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137452,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  1125899906842624)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137454,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  562949953421312)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137456,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  281474976710656)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137458,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  140737488355328)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137460,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  70368744177664)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137462,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  35184372088832)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137464,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  17592186044416)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137466,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  8796093022208)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137468,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4398046511104)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": true
+    },
+    {
+      "branch_id": 137487,
+      "col": 9,
+      "condition": "(Eq 4294967295\n     (Select w32 (Slt (ReadLSB w64 0 A)\n                      0)\n                 4294967295\n                 1))",
+      "filename": "library/bignum.c",
+      "inst_id": 54030,
+      "line": 2028,
+      "taken": false
+    },
+    {
+      "branch_id": 137668,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 137674,
+      "col": 9,
+      "condition": "(Slt (Select w32 (Slt (ReadLSB w64 0 N)\n                       0)\n                  4294967295\n                  1)\n      0)",
+      "filename": "library/bignum.c",
+      "inst_id": 39057,
+      "line": 1753,
+      "taken": false
+    },
+    {
+      "branch_id": 137676,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 137682,
+      "col": 9,
+      "condition": "(Eq 0\n     (Select w32 (Slt (ReadLSB w64 0 N)\n                      0)\n                 4294967295\n                 1))",
+      "filename": "library/bignum.c",
+      "inst_id": 41587,
+      "line": 1609,
+      "taken": false
+    },
+    {
+      "branch_id": 137686,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": true
+    },
+    {
+      "branch_id": 137803,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  9223372036854775808)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137805,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4611686018427387904)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": true
+    },
+    {
+      "branch_id": 137810,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  9223372036854775808)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": false
+    },
+    {
+      "branch_id": 137812,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                   0)\n                              (Sub w64 0 N0)\n                              N0)\n                  4611686018427387904)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": true
+    },
+    {
+      "branch_id": 137849,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 135418,
+      "line": 1081,
+      "taken": true
+    },
+    {
+      "branch_id": 137858,
+      "col": 13,
+      "condition": "(Ult (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                       0)\n                  (Sub w64 0 N0)\n                  N0)\n      1)",
+      "filename": "library/bignum.c",
+      "inst_id": 48077,
+      "line": 1095,
+      "taken": false
+    },
+    {
+      "branch_id": 137859,
+      "col": 13,
+      "condition": "(Ult 1\n      (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                       0)\n                  (Sub w64 0 N0)\n                  N0))",
+      "filename": "library/bignum.c",
+      "inst_id": 135357,
+      "line": 1096,
+      "taken": true
+    },
+    {
+      "branch_id": 137872,
+      "col": 13,
+      "condition": "(Ule (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                       0)\n                  (Sub w64 0 N0)\n                  N0)\n      1)",
+      "filename": "library/bignum.c",
+      "inst_id": 135458,
+      "line": 1662,
+      "taken": false
+    },
+    {
+      "branch_id": 137873,
+      "col": 16,
+      "condition": "(Eq 0\n     (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                      0)\n                 (Sub w64 0 N0)\n                 N0))",
+      "filename": "library/bignum.c",
+      "inst_id": 12989,
+      "line": 1520,
+      "taken": false
+    },
+    {
+      "branch_id": 137874,
+      "col": 9,
+      "condition": "(Ule (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                       0)\n                  (Sub w64 0 N0)\n                  N0)\n      1)",
+      "filename": "library/bignum.c",
+      "inst_id": 46231,
+      "line": 1520,
+      "taken": false
+    },
+    {
+      "branch_id": 137875,
+      "col": 7,
+      "condition": "(Eq 0\n     (Extract w64 0 (ZExt w128 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                0)\n                                           (Sub w64 0 N0)\n                                           N0))))",
+      "filename": "runtime/Intrinsic/klee_div_zero_check.c",
+      "inst_id": 9,
+      "line": 13,
+      "taken": false
+    },
+    {
+      "branch_id": 137932,
+      "col": 5,
+      "condition": "(Eq 0\n     (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                      0)\n                 (Sub w64 0 N0)\n                 N0))",
+      "filename": "library/bignum.c",
+      "inst_id": 25329,
+      "line": 1472,
+      "taken": false
+    },
+    {
+      "branch_id": 137933,
+      "col": 16,
+      "condition": "(Eq 0\n     (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                      N0:(UDiv w128 18446744073709551616\n                                                    (ZExt w128 (Select w64 (Slt N1:(ReadLSB w64 0 N)\n                                                                                0)\n                                                                           (Sub w64 0 N1)\n                                                                           N1))))\n                                 18446744073709551615\n                                 N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 104763,
+      "line": 1476,
+      "taken": false
+    },
+    {
+      "branch_id": 137949,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N2:(Mul w128 N3:(ZExt w128 N4:(Select w64 (Slt N5:(ReadLSB w64 0 N)\n                                                                                                                                0)\n                                                                                                                           (Sub w64 0 N5)\n                                                                                                                           N5))\n                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N6:(UDiv w128 18446744073709551616 N3))\n                                                                                                                                              18446744073709551615\n                                                                                                                                              N6)))))\n                                                                                 64))\n                                                       (SExt w64 (ZExt w32 (Ult N7:(Extract w64 0 N2) 0))))\n                                              (SExt w64 (ZExt w32 (Ult (Add w64 N7 N4) N4))))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": false
+    },
+    {
+      "branch_id": 137951,
+      "col": 13,
+      "condition": "(Ult N0:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N1:(Mul w128 N2:(ZExt w128 N3:(Select w64 (Slt N4:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N4)\n                                                                                               N4))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615 N5:(UDiv w128 18446744073709551616 N2))\n                                                                                                                  18446744073709551615\n                                                                                                                  N5)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N6:(Extract w64 0 N1) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N6 N3) N3))))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": false
+    },
+    {
+      "branch_id": 137953,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Add w64 (Extract w64 0 (LShr w128 N0:(Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N3)\n                                                                                               N3))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N1))\n                                                                                                                  18446744073709551615\n                                                                                                                  N4)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N5:(Extract w64 0 N0) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N5 N2) N2))))))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": false
+    },
+    {
+      "branch_id": 137955,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 137967,
+      "col": 5,
+      "condition": "(Eq 0\n     (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                      0)\n                 (Sub w64 0 N0)\n                 N0))",
+      "filename": "library/bignum.c",
+      "inst_id": 25329,
+      "line": 1472,
+      "taken": false
+    },
+    {
+      "branch_id": 137968,
+      "col": 16,
+      "condition": "(Eq 0\n     (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                      N0:(UDiv w128 18446744073709551616\n                                                    (ZExt w128 (Select w64 (Slt N1:(ReadLSB w64 0 N)\n                                                                                0)\n                                                                           (Sub w64 0 N1)\n                                                                           N1))))\n                                 18446744073709551615\n                                 N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 104763,
+      "line": 1476,
+      "taken": false
+    },
+    {
+      "branch_id": 138034,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(SExt w64 (ZExt w32 (Ult N2:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N3:(Mul w128 N4:(ZExt w128 N5:(Select w64 (Slt N6:(ReadLSB w64 0 N)\n                                                                                                                                                            0)\n                                                                                                                                                       (Sub w64 0 N6)\n                                                                                                                                                       N6))\n                                                                                                                          (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                              (Extract w64 0 (Select w128 (Ult 18446744073709551615 N7:(UDiv w128 18446744073709551616 N4))\n                                                                                                                                                                          18446744073709551615\n                                                                                                                                                                          N7)))))\n                                                                                                             64))\n                                                                                   (SExt w64 (ZExt w32 (Ult N8:(Extract w64 0 N3) 0))))\n                                                                          (SExt w64 (ZExt w32 (Ult (Add w64 N8 N5) N5))))\n                                                              N2)))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 87633,
+      "line": 384,
+      "taken": false
+    },
+    {
+      "branch_id": 138036,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N2:(Mul w128 N3:(ZExt w128 N4:(Select w64 (Slt N5:(ReadLSB w64 0 N)\n                                                                                                                                0)\n                                                                                                                           (Sub w64 0 N5)\n                                                                                                                           N5))\n                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N6:(UDiv w128 18446744073709551616 N3))\n                                                                                                                                              18446744073709551615\n                                                                                                                                              N6)))))\n                                                                                 64))\n                                                       (SExt w64 (ZExt w32 (Ult N7:(Extract w64 0 N2) 0))))\n                                              (SExt w64 (ZExt w32 (Ult (Add w64 N7 N4) N4))))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 87633,
+      "line": 384,
+      "taken": false
+    },
+    {
+      "branch_id": 138038,
+      "col": 13,
+      "condition": "(Ult N0:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N1:(Mul w128 N2:(ZExt w128 N3:(Select w64 (Slt N4:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N4)\n                                                                                               N4))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615 N5:(UDiv w128 18446744073709551616 N2))\n                                                                                                                  18446744073709551615\n                                                                                                                  N5)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N6:(Extract w64 0 N1) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N6 N3) N3))))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 87633,
+      "line": 384,
+      "taken": false
+    },
+    {
+      "branch_id": 138040,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Add w64 (Extract w64 0 (LShr w128 N0:(Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N3)\n                                                                                               N3))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N1))\n                                                                                                                  18446744073709551615\n                                                                                                                  N4)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N5:(Extract w64 0 N0) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N5 N2) N2))))))",
+      "filename": "library/bignum.c",
+      "inst_id": 87633,
+      "line": 384,
+      "taken": false
+    },
+    {
+      "branch_id": 138043,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                                      0)\n                                                                                 (Sub w64 0 N2)\n                                                                                 N2))\n                                                    (ZExt w128 (Add w64 18446744073709551615\n                                                                        (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                                    18446744073709551615\n                                                                                                    N3))))))\n                           N1)\n                  9223372036854775808)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": true
+    },
+    {
+      "branch_id": 138059,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N2:(Mul w128 N3:(ZExt w128 N4:(Select w64 (Slt N5:(ReadLSB w64 0 N)\n                                                                                                                                0)\n                                                                                                                           (Sub w64 0 N5)\n                                                                                                                           N5))\n                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N6:(UDiv w128 18446744073709551616 N3))\n                                                                                                                                              18446744073709551615\n                                                                                                                                              N6)))))\n                                                                                 64))\n                                                       (SExt w64 (ZExt w32 (Ult N7:(Extract w64 0 N2) 0))))\n                                              (SExt w64 (ZExt w32 (Ult (Add w64 N7 N4) N4))))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": false
+    },
+    {
+      "branch_id": 138061,
+      "col": 13,
+      "condition": "(Ult N0:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N1:(Mul w128 N2:(ZExt w128 N3:(Select w64 (Slt N4:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N4)\n                                                                                               N4))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615 N5:(UDiv w128 18446744073709551616 N2))\n                                                                                                                  18446744073709551615\n                                                                                                                  N5)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N6:(Extract w64 0 N1) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N6 N3) N3))))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": false
+    },
+    {
+      "branch_id": 138063,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Add w64 (Extract w64 0 (LShr w128 N0:(Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N3)\n                                                                                               N3))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N1))\n                                                                                                                  18446744073709551615\n                                                                                                                  N4)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N5:(Extract w64 0 N0) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N5 N2) N2))))))",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": false
+    },
+    {
+      "branch_id": 138065,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": true
+    },
+    {
+      "branch_id": 138070,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N2:(Mul w128 N3:(ZExt w128 N4:(Select w64 (Slt N5:(ReadLSB w64 0 N)\n                                                                                                                                0)\n                                                                                                                           (Sub w64 0 N5)\n                                                                                                                           N5))\n                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N6:(UDiv w128 18446744073709551616 N3))\n                                                                                                                                              18446744073709551615\n                                                                                                                                              N6)))))\n                                                                                 64))\n                                                       (SExt w64 (ZExt w32 (Ult N7:(Extract w64 0 N2) 0))))\n                                              (SExt w64 (ZExt w32 (Ult (Add w64 N7 N4) N4))))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 54615,
+      "line": 1225,
+      "taken": false
+    },
+    {
+      "branch_id": 138072,
+      "col": 13,
+      "condition": "(Ult N0:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N1:(Mul w128 N2:(ZExt w128 N3:(Select w64 (Slt N4:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N4)\n                                                                                               N4))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615 N5:(UDiv w128 18446744073709551616 N2))\n                                                                                                                  18446744073709551615\n                                                                                                                  N5)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N6:(Extract w64 0 N1) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N6 N3) N3))))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 54615,
+      "line": 1225,
+      "taken": false
+    },
+    {
+      "branch_id": 138074,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Add w64 (Extract w64 0 (LShr w128 N0:(Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N3)\n                                                                                               N3))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N1))\n                                                                                                                  18446744073709551615\n                                                                                                                  N4)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N5:(Extract w64 0 N0) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N5 N2) N2))))))",
+      "filename": "library/bignum.c",
+      "inst_id": 54615,
+      "line": 1225,
+      "taken": false
+    },
+    {
+      "branch_id": 138076,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 54615,
+      "line": 1225,
+      "taken": true
+    },
+    {
+      "branch_id": 138095,
+      "col": 9,
+      "condition": "(Ult 0\n      (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                          0)\n                                                                     (Sub w64 0 N2)\n                                                                     N2))\n                                        (ZExt w128 (Add w64 18446744073709551615\n                                                            (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                        18446744073709551615\n                                                                                        N3))))))\n               N1))",
+      "filename": "library/bignum.c",
+      "inst_id": 34816,
+      "line": 1245,
+      "taken": true
+    },
+    {
+      "branch_id": 138104,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 138112,
+      "col": 13,
+      "condition": "(Ule N0:(Select w64 (Slt N1:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N1)\n                     N1)\n      (Sub w64 0\n               (Add w64 (Extract w64 0 (Mul w128 N2:(ZExt w128 N0)\n                                                 (ZExt w128 (Add w64 18446744073709551615\n                                                                     (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N2))\n                                                                                                 18446744073709551615\n                                                                                                 N3))))))\n                        N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 135458,
+      "line": 1662,
+      "taken": false
+    },
+    {
+      "branch_id": 138113,
+      "col": 16,
+      "condition": "(Eq 0\n     (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                      0)\n                 (Sub w64 0 N0)\n                 N0))",
+      "filename": "library/bignum.c",
+      "inst_id": 12989,
+      "line": 1520,
+      "taken": false
+    },
+    {
+      "branch_id": 138114,
+      "col": 9,
+      "condition": "(Ule N0:(Select w64 (Slt N1:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N1)\n                     N1)\n      (Sub w64 0\n               (Add w64 (Extract w64 0 (Mul w128 N2:(ZExt w128 N0)\n                                                 (ZExt w128 (Add w64 18446744073709551615\n                                                                     (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N2))\n                                                                                                 18446744073709551615\n                                                                                                 N3))))))\n                        N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 46231,
+      "line": 1520,
+      "taken": false
+    },
+    {
+      "branch_id": 138115,
+      "col": 7,
+      "condition": "(Eq 0\n     (Extract w64 0 (ZExt w128 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                0)\n                                           (Sub w64 0 N0)\n                                           N0))))",
+      "filename": "runtime/Intrinsic/klee_div_zero_check.c",
+      "inst_id": 9,
+      "line": 13,
+      "taken": false
+    },
+    {
+      "branch_id": 138172,
+      "col": 5,
+      "condition": "(Eq 0\n     (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                      0)\n                 (Sub w64 0 N0)\n                 N0))",
+      "filename": "library/bignum.c",
+      "inst_id": 25329,
+      "line": 1472,
+      "taken": false
+    },
+    {
+      "branch_id": 138173,
+      "col": 16,
+      "condition": "(Eq 0\n     (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                      N0:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                  (Add w64 (Extract w64 0 (Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                                                                      0)\n                                                                                                                                                 (Sub w64 0 N3)\n                                                                                                                                                 N3))\n                                                                                                                    (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                        (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N1))\n                                                                                                                                                                    18446744073709551615\n                                                                                                                                                                    N4))))))\n                                                                                           N2)))\n                                                              64)\n                                                    N1))\n                                 18446744073709551615\n                                 N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 104763,
+      "line": 1476,
+      "taken": false
+    },
+    {
+      "branch_id": 138189,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N2:(Mul w128 N3:(ZExt w128 N4:(Select w64 (Slt N5:(ReadLSB w64 0 N)\n                                                                                                                                0)\n                                                                                                                           (Sub w64 0 N5)\n                                                                                                                           N5))\n                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                                                   N6:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                                               (Add w64 (Extract w64 0 (Mul w128 N3\n                                                                                                                                                                                                                                 (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                                                     (Extract w64 0 (Select w128 (Ult 18446744073709551615 N7:(UDiv w128 18446744073709551616 N3))\n                                                                                                                                                                                                                                                                                 18446744073709551615\n                                                                                                                                                                                                                                                                                 N7))))))\n                                                                                                                                                                                                        N4)))\n                                                                                                                                                                           64)\n                                                                                                                                                                 N3))\n                                                                                                                                              18446744073709551615\n                                                                                                                                              N6)))))\n                                                                                 64))\n                                                       (SExt w64 (ZExt w32 (Ult N8:(Extract w64 0 N2) 0))))\n                                              (SExt w64 (ZExt w32 (Ult (Add w64 N8 N4) N4))))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": false
+    },
+    {
+      "branch_id": 138191,
+      "col": 13,
+      "condition": "(Ult N0:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N1:(Mul w128 N2:(ZExt w128 N3:(Select w64 (Slt N4:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N4)\n                                                                                               N4))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                       N5:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                   (Add w64 (Extract w64 0 (Mul w128 N2\n                                                                                                                                                                                                     (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                         (Extract w64 0 (Select w128 (Ult 18446744073709551615 N6:(UDiv w128 18446744073709551616 N2))\n                                                                                                                                                                                                                                                     18446744073709551615\n                                                                                                                                                                                                                                                     N6))))))\n                                                                                                                                                                            N3)))\n                                                                                                                                               64)\n                                                                                                                                     N2))\n                                                                                                                  18446744073709551615\n                                                                                                                  N5)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N7:(Extract w64 0 N1) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N7 N3) N3))))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": false
+    },
+    {
+      "branch_id": 138193,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Add w64 (Extract w64 0 (LShr w128 N0:(Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N3)\n                                                                                               N3))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                       N4:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                   (Add w64 (Extract w64 0 (Mul w128 N1\n                                                                                                                                                                                                     (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                         (Extract w64 0 (Select w128 (Ult 18446744073709551615 N5:(UDiv w128 18446744073709551616 N1))\n                                                                                                                                                                                                                                                     18446744073709551615\n                                                                                                                                                                                                                                                     N5))))))\n                                                                                                                                                                            N2)))\n                                                                                                                                               64)\n                                                                                                                                     N1))\n                                                                                                                  18446744073709551615\n                                                                                                                  N4)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N6:(Extract w64 0 N0) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N6 N2) N2))))))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": false
+    },
+    {
+      "branch_id": 138195,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                            (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                              18446744073709551615\n                                                                                                                                                                                                                              N4))))))\n                                                                                                                                                     N1)))\n                                                                                                                        64)\n                                                                                                              N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 138197,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 135418,
+      "line": 1081,
+      "taken": true
+    },
+    {
+      "branch_id": 138207,
+      "col": 5,
+      "condition": "(Eq 0\n     (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                      0)\n                 (Sub w64 0 N0)\n                 N0))",
+      "filename": "library/bignum.c",
+      "inst_id": 25329,
+      "line": 1472,
+      "taken": false
+    },
+    {
+      "branch_id": 138208,
+      "col": 16,
+      "condition": "(Eq 0\n     (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                      N0:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                  (Add w64 (Extract w64 0 (Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                                                                      0)\n                                                                                                                                                 (Sub w64 0 N3)\n                                                                                                                                                 N3))\n                                                                                                                    (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                        (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N1))\n                                                                                                                                                                    18446744073709551615\n                                                                                                                                                                    N4))))))\n                                                                                           N2)))\n                                                              64)\n                                                    N1))\n                                 18446744073709551615\n                                 N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 104763,
+      "line": 1476,
+      "taken": false
+    },
+    {
+      "branch_id": 138274,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(SExt w64 (ZExt w32 (Ult N2:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N3:(Mul w128 N4:(ZExt w128 N5:(Select w64 (Slt N6:(ReadLSB w64 0 N)\n                                                                                                                                                            0)\n                                                                                                                                                       (Sub w64 0 N6)\n                                                                                                                                                       N6))\n                                                                                                                          (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                              (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                                                                               N7:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                                                                           (Add w64 (Extract w64 0 (Mul w128 N4\n                                                                                                                                                                                                                                                             (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                                                                                 (Extract w64 0 (Select w128 (Ult 18446744073709551615 N8:(UDiv w128 18446744073709551616 N4))\n                                                                                                                                                                                                                                                                                                             18446744073709551615\n                                                                                                                                                                                                                                                                                                             N8))))))\n                                                                                                                                                                                                                                    N5)))\n                                                                                                                                                                                                       64)\n                                                                                                                                                                                             N4))\n                                                                                                                                                                          18446744073709551615\n                                                                                                                                                                          N7)))))\n                                                                                                             64))\n                                                                                   (SExt w64 (ZExt w32 (Ult N9:(Extract w64 0 N3) 0))))\n                                                                          (SExt w64 (ZExt w32 (Ult (Add w64 N9 N5) N5))))\n                                                              N2)))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 87633,
+      "line": 384,
+      "taken": false
+    },
+    {
+      "branch_id": 138276,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N2:(Mul w128 N3:(ZExt w128 N4:(Select w64 (Slt N5:(ReadLSB w64 0 N)\n                                                                                                                                0)\n                                                                                                                           (Sub w64 0 N5)\n                                                                                                                           N5))\n                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                                                   N6:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                                               (Add w64 (Extract w64 0 (Mul w128 N3\n                                                                                                                                                                                                                                 (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                                                     (Extract w64 0 (Select w128 (Ult 18446744073709551615 N7:(UDiv w128 18446744073709551616 N3))\n                                                                                                                                                                                                                                                                                 18446744073709551615\n                                                                                                                                                                                                                                                                                 N7))))))\n                                                                                                                                                                                                        N4)))\n                                                                                                                                                                           64)\n                                                                                                                                                                 N3))\n                                                                                                                                              18446744073709551615\n                                                                                                                                              N6)))))\n                                                                                 64))\n                                                       (SExt w64 (ZExt w32 (Ult N8:(Extract w64 0 N2) 0))))\n                                              (SExt w64 (ZExt w32 (Ult (Add w64 N8 N4) N4))))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 87633,
+      "line": 384,
+      "taken": false
+    },
+    {
+      "branch_id": 138278,
+      "col": 13,
+      "condition": "(Ult N0:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N1:(Mul w128 N2:(ZExt w128 N3:(Select w64 (Slt N4:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N4)\n                                                                                               N4))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                       N5:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                   (Add w64 (Extract w64 0 (Mul w128 N2\n                                                                                                                                                                                                     (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                         (Extract w64 0 (Select w128 (Ult 18446744073709551615 N6:(UDiv w128 18446744073709551616 N2))\n                                                                                                                                                                                                                                                     18446744073709551615\n                                                                                                                                                                                                                                                     N6))))))\n                                                                                                                                                                            N3)))\n                                                                                                                                               64)\n                                                                                                                                     N2))\n                                                                                                                  18446744073709551615\n                                                                                                                  N5)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N7:(Extract w64 0 N1) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N7 N3) N3))))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 87633,
+      "line": 384,
+      "taken": false
+    },
+    {
+      "branch_id": 138280,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Add w64 (Extract w64 0 (LShr w128 N0:(Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N3)\n                                                                                               N3))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                       N4:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                   (Add w64 (Extract w64 0 (Mul w128 N1\n                                                                                                                                                                                                     (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                         (Extract w64 0 (Select w128 (Ult 18446744073709551615 N5:(UDiv w128 18446744073709551616 N1))\n                                                                                                                                                                                                                                                     18446744073709551615\n                                                                                                                                                                                                                                                     N5))))))\n                                                                                                                                                                            N2)))\n                                                                                                                                               64)\n                                                                                                                                     N1))\n                                                                                                                  18446744073709551615\n                                                                                                                  N4)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N6:(Extract w64 0 N0) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N6 N2) N2))))))",
+      "filename": "library/bignum.c",
+      "inst_id": 87633,
+      "line": 384,
+      "taken": false
+    },
+    {
+      "branch_id": 138283,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (And w64 (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                                      0)\n                                                                                 (Sub w64 0 N2)\n                                                                                 N2))\n                                                    (ZExt w128 (Add w64 18446744073709551615\n                                                                        (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                         N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                     (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                                       (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                           (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                                       18446744073709551615\n                                                                                                                                                                                                                                       N4))))))\n                                                                                                                                                              N1)))\n                                                                                                                                 64)\n                                                                                                                       N0))\n                                                                                                    18446744073709551615\n                                                                                                    N3))))))\n                           N1)\n                  9223372036854775808)))",
+      "filename": "library/bignum.c",
+      "inst_id": 173891,
+      "line": 365,
+      "taken": true
+    },
+    {
+      "branch_id": 138292,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 69693,
+      "line": 1045,
+      "taken": true
+    },
+    {
+      "branch_id": 138294,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(SExt w64 (ZExt w32 (Ult N2:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N3:(Mul w128 N4:(ZExt w128 N5:(Select w64 (Slt N6:(ReadLSB w64 0 N)\n                                                                                                                                                            0)\n                                                                                                                                                       (Sub w64 0 N6)\n                                                                                                                                                       N6))\n                                                                                                                          (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                              (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                                                                               N7:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                                                                           (Add w64 (Extract w64 0 (Mul w128 N4\n                                                                                                                                                                                                                                                             (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                                                                                 (Extract w64 0 (Select w128 (Ult 18446744073709551615 N8:(UDiv w128 18446744073709551616 N4))\n                                                                                                                                                                                                                                                                                                             18446744073709551615\n                                                                                                                                                                                                                                                                                                             N8))))))\n                                                                                                                                                                                                                                    N5)))\n                                                                                                                                                                                                       64)\n                                                                                                                                                                                             N4))\n                                                                                                                                                                          18446744073709551615\n                                                                                                                                                                          N7)))))\n                                                                                                             64))\n                                                                                   (SExt w64 (ZExt w32 (Ult N9:(Extract w64 0 N3) 0))))\n                                                                          (SExt w64 (ZExt w32 (Ult (Add w64 N9 N5) N5))))\n                                                              N2)))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": false
+    },
+    {
+      "branch_id": 138296,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N2:(Mul w128 N3:(ZExt w128 N4:(Select w64 (Slt N5:(ReadLSB w64 0 N)\n                                                                                                                                0)\n                                                                                                                           (Sub w64 0 N5)\n                                                                                                                           N5))\n                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                                                   N6:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                                               (Add w64 (Extract w64 0 (Mul w128 N3\n                                                                                                                                                                                                                                 (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                                                     (Extract w64 0 (Select w128 (Ult 18446744073709551615 N7:(UDiv w128 18446744073709551616 N3))\n                                                                                                                                                                                                                                                                                 18446744073709551615\n                                                                                                                                                                                                                                                                                 N7))))))\n                                                                                                                                                                                                        N4)))\n                                                                                                                                                                           64)\n                                                                                                                                                                 N3))\n                                                                                                                                              18446744073709551615\n                                                                                                                                              N6)))))\n                                                                                 64))\n                                                       (SExt w64 (ZExt w32 (Ult N8:(Extract w64 0 N2) 0))))\n                                              (SExt w64 (ZExt w32 (Ult (Add w64 N8 N4) N4))))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": false
+    },
+    {
+      "branch_id": 138298,
+      "col": 13,
+      "condition": "(Ult N0:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N1:(Mul w128 N2:(ZExt w128 N3:(Select w64 (Slt N4:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N4)\n                                                                                               N4))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                       N5:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                   (Add w64 (Extract w64 0 (Mul w128 N2\n                                                                                                                                                                                                     (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                         (Extract w64 0 (Select w128 (Ult 18446744073709551615 N6:(UDiv w128 18446744073709551616 N2))\n                                                                                                                                                                                                                                                     18446744073709551615\n                                                                                                                                                                                                                                                     N6))))))\n                                                                                                                                                                            N3)))\n                                                                                                                                               64)\n                                                                                                                                     N2))\n                                                                                                                  18446744073709551615\n                                                                                                                  N5)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N7:(Extract w64 0 N1) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N7 N3) N3))))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": false
+    },
+    {
+      "branch_id": 138300,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Add w64 (Extract w64 0 (LShr w128 N0:(Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N3)\n                                                                                               N3))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                       N4:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                   (Add w64 (Extract w64 0 (Mul w128 N1\n                                                                                                                                                                                                     (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                         (Extract w64 0 (Select w128 (Ult 18446744073709551615 N5:(UDiv w128 18446744073709551616 N1))\n                                                                                                                                                                                                                                                     18446744073709551615\n                                                                                                                                                                                                                                                     N5))))))\n                                                                                                                                                                            N2)))\n                                                                                                                                               64)\n                                                                                                                                     N1))\n                                                                                                                  18446744073709551615\n                                                                                                                  N4)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N6:(Extract w64 0 N0) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N6 N2) N2))))))",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": false
+    },
+    {
+      "branch_id": 138302,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                            (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                              18446744073709551615\n                                                                                                                                                                                                                              N4))))))\n                                                                                                                                                     N1)))\n                                                                                                                        64)\n                                                                                                              N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 132596,
+      "line": 1049,
+      "taken": true
+    },
+    {
+      "branch_id": 138307,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(SExt w64 (ZExt w32 (Ult N2:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N3:(Mul w128 N4:(ZExt w128 N5:(Select w64 (Slt N6:(ReadLSB w64 0 N)\n                                                                                                                                                            0)\n                                                                                                                                                       (Sub w64 0 N6)\n                                                                                                                                                       N6))\n                                                                                                                          (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                              (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                                                                               N7:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                                                                           (Add w64 (Extract w64 0 (Mul w128 N4\n                                                                                                                                                                                                                                                             (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                                                                                 (Extract w64 0 (Select w128 (Ult 18446744073709551615 N8:(UDiv w128 18446744073709551616 N4))\n                                                                                                                                                                                                                                                                                                             18446744073709551615\n                                                                                                                                                                                                                                                                                                             N8))))))\n                                                                                                                                                                                                                                    N5)))\n                                                                                                                                                                                                       64)\n                                                                                                                                                                                             N4))\n                                                                                                                                                                          18446744073709551615\n                                                                                                                                                                          N7)))))\n                                                                                                             64))\n                                                                                   (SExt w64 (ZExt w32 (Ult N9:(Extract w64 0 N3) 0))))\n                                                                          (SExt w64 (ZExt w32 (Ult (Add w64 N9 N5) N5))))\n                                                              N2)))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 54615,
+      "line": 1225,
+      "taken": false
+    },
+    {
+      "branch_id": 138309,
+      "col": 13,
+      "condition": "(Ult N0:(SExt w64 (ZExt w32 (Ult N1:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N2:(Mul w128 N3:(ZExt w128 N4:(Select w64 (Slt N5:(ReadLSB w64 0 N)\n                                                                                                                                0)\n                                                                                                                           (Sub w64 0 N5)\n                                                                                                                           N5))\n                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                                                   N6:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                                               (Add w64 (Extract w64 0 (Mul w128 N3\n                                                                                                                                                                                                                                 (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                                                     (Extract w64 0 (Select w128 (Ult 18446744073709551615 N7:(UDiv w128 18446744073709551616 N3))\n                                                                                                                                                                                                                                                                                 18446744073709551615\n                                                                                                                                                                                                                                                                                 N7))))))\n                                                                                                                                                                                                        N4)))\n                                                                                                                                                                           64)\n                                                                                                                                                                 N3))\n                                                                                                                                              18446744073709551615\n                                                                                                                                              N6)))))\n                                                                                 64))\n                                                       (SExt w64 (ZExt w32 (Ult N8:(Extract w64 0 N2) 0))))\n                                              (SExt w64 (ZExt w32 (Ult (Add w64 N8 N4) N4))))\n                                  N1)))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 54615,
+      "line": 1225,
+      "taken": false
+    },
+    {
+      "branch_id": 138311,
+      "col": 13,
+      "condition": "(Ult N0:(Add w64 (Add w64 (Extract w64 0 (LShr w128 N1:(Mul w128 N2:(ZExt w128 N3:(Select w64 (Slt N4:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N4)\n                                                                                               N4))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                       N5:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                   (Add w64 (Extract w64 0 (Mul w128 N2\n                                                                                                                                                                                                     (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                         (Extract w64 0 (Select w128 (Ult 18446744073709551615 N6:(UDiv w128 18446744073709551616 N2))\n                                                                                                                                                                                                                                                     18446744073709551615\n                                                                                                                                                                                                                                                     N6))))))\n                                                                                                                                                                            N3)))\n                                                                                                                                               64)\n                                                                                                                                     N2))\n                                                                                                                  18446744073709551615\n                                                                                                                  N5)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N7:(Extract w64 0 N1) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N7 N3) N3))))\n      N0)",
+      "filename": "library/bignum.c",
+      "inst_id": 54615,
+      "line": 1225,
+      "taken": false
+    },
+    {
+      "branch_id": 138313,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Add w64 (Extract w64 0 (LShr w128 N0:(Mul w128 N1:(ZExt w128 N2:(Select w64 (Slt N3:(ReadLSB w64 0 N)\n                                                                                                    0)\n                                                                                               (Sub w64 0 N3)\n                                                                                               N3))\n                                                                  (ZExt w128 (Add w64 18446744073709551615\n                                                                                      (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                                       N4:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                                   (Add w64 (Extract w64 0 (Mul w128 N1\n                                                                                                                                                                                                     (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                                         (Extract w64 0 (Select w128 (Ult 18446744073709551615 N5:(UDiv w128 18446744073709551616 N1))\n                                                                                                                                                                                                                                                     18446744073709551615\n                                                                                                                                                                                                                                                     N5))))))\n                                                                                                                                                                            N2)))\n                                                                                                                                               64)\n                                                                                                                                     N1))\n                                                                                                                  18446744073709551615\n                                                                                                                  N4)))))\n                                                     64))\n                           (SExt w64 (ZExt w32 (Ult N6:(Extract w64 0 N0) 0))))\n                  (SExt w64 (ZExt w32 (Ult (Add w64 N6 N2) N2))))))",
+      "filename": "library/bignum.c",
+      "inst_id": 54615,
+      "line": 1225,
+      "taken": false
+    },
+    {
+      "branch_id": 138315,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                            (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                              18446744073709551615\n                                                                                                                                                                                                                              N4))))))\n                                                                                                                                                     N1)))\n                                                                                                                        64)\n                                                                                                              N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 54615,
+      "line": 1225,
+      "taken": true
+    },
+    {
+      "branch_id": 138341,
+      "col": 9,
+      "condition": "(Ult 0\n      (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                          0)\n                                                                     (Sub w64 0 N2)\n                                                                     N2))\n                                        (ZExt w128 (Add w64 18446744073709551615\n                                                            (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                             N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                         (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                           (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                           18446744073709551615\n                                                                                                                                                                                                                           N4))))))\n                                                                                                                                                  N1)))\n                                                                                                                     64)\n                                                                                                           N0))\n                                                                                        18446744073709551615\n                                                                                        N3))))))\n               N1))",
+      "filename": "library/bignum.c",
+      "inst_id": 34816,
+      "line": 1245,
+      "taken": true
+    },
+    {
+      "branch_id": 138343,
+      "col": 9,
+      "condition": "(Eq 0\n     (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                         0)\n                                                                    (Sub w64 0 N2)\n                                                                    N2))\n                                       (ZExt w128 (Add w64 18446744073709551615\n                                                           (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                       18446744073709551615\n                                                                                       N3))))))\n              N1))",
+      "filename": "library/bignum.c",
+      "inst_id": 65502,
+      "line": 1248,
+      "taken": false
+    },
+    {
+      "branch_id": 138350,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 18446744073709551615\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": false
+    },
+    {
+      "branch_id": 138352,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                            (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                              18446744073709551615\n                                                                                                                                                                                                                              N4))))))\n                                                                                                                                                     N1)))\n                                                                                                                        64)\n                                                                                                              N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 138372,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 18446744073709551615\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615 N3:(UDiv w128 18446744073709551616 N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 70246,
+      "line": 238,
+      "taken": false
+    },
+    {
+      "branch_id": 138407,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                            (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                              18446744073709551615\n                                                                                                                                                                                                                              N4))))))\n                                                                                                                                                     N1)))\n                                                                                                                        64)\n                                                                                                              N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 138590,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                            (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                              18446744073709551615\n                                                                                                                                                                                                                              N4))))))\n                                                                                                                                                     N1)))\n                                                                                                                        64)\n                                                                                                              N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 138602,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                             0)\n                                                                        (Sub w64 0 N2)\n                                                                        N2))\n                                           (ZExt w128 (Add w64 18446744073709551615\n                                                               (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                            (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                              (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                  (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                              18446744073709551615\n                                                                                                                                                                                                                              N4))))))\n                                                                                                                                                     N1)))\n                                                                                                                        64)\n                                                                                                              N0))\n                                                                                           18446744073709551615\n                                                                                           N3))))))\n                  N1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": true
+    },
+    {
+      "branch_id": 138604,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 135418,
+      "line": 1081,
+      "taken": true
+    },
+    {
+      "branch_id": 138609,
+      "col": 9,
+      "condition": "(Slt (Select w32 (Slt (ReadLSB w64 0 N)\n                       0)\n                  4294967295\n                  1)\n      0)",
+      "filename": "library/bignum.c",
+      "inst_id": 48133,
+      "line": 1090,
+      "taken": false
+    },
+    {
+      "branch_id": 138610,
+      "col": 18,
+      "condition": "(Slt 0\n      (Select w32 (Slt (ReadLSB w64 0 N)\n                       0)\n                  4294967295\n                  1))",
+      "filename": "library/bignum.c",
+      "inst_id": 82416,
+      "line": 1091,
+      "taken": true
+    },
+    {
+      "branch_id": 138613,
+      "col": 13,
+      "condition": "(Ult N0:(Select w64 (Slt N1:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N1)\n                     N1)\n      (Sub w64 0\n               (Add w64 (Extract w64 0 (Mul w128 N2:(ZExt w128 N0)\n                                                 (ZExt w128 (Add w64 18446744073709551615\n                                                                     (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                      N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                  (Add w64 (Extract w64 0 (Mul w128 N2\n                                                                                                                                                                                    (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                        (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N2))\n                                                                                                                                                                                                                                    18446744073709551615\n                                                                                                                                                                                                                                    N4))))))\n                                                                                                                                                           N0)))\n                                                                                                                              64)\n                                                                                                                    N2))\n                                                                                                 18446744073709551615\n                                                                                                 N3))))))\n                        N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48077,
+      "line": 1095,
+      "taken": false
+    },
+    {
+      "branch_id": 138614,
+      "col": 13,
+      "condition": "(Ult (Sub w64 0\n               (Add w64 (Extract w64 0 (Mul w128 N0:(ZExt w128 N1:(Select w64 (Slt N2:(ReadLSB w64 0 N)\n                                                                                   0)\n                                                                              (Sub w64 0 N2)\n                                                                              N2))\n                                                 (ZExt w128 (Add w64 18446744073709551615\n                                                                     (Extract w64 0 (Select w128 (Ult 18446744073709551615\n                                                                                                      N3:(UDiv w128 (Shl w128 (ZExt w128 (Sub w64 0\n                                                                                                                                                  (Add w64 (Extract w64 0 (Mul w128 N0\n                                                                                                                                                                                    (ZExt w128 (Add w64 18446744073709551615\n                                                                                                                                                                                                        (Extract w64 0 (Select w128 (Ult 18446744073709551615 N4:(UDiv w128 18446744073709551616 N0))\n                                                                                                                                                                                                                                    18446744073709551615\n                                                                                                                                                                                                                                    N4))))))\n                                                                                                                                                           N1)))\n                                                                                                                              64)\n                                                                                                                    N0))\n                                                                                                 18446744073709551615\n                                                                                                 N3))))))\n                        N1))\n      N1)",
+      "filename": "library/bignum.c",
+      "inst_id": 135357,
+      "line": 1096,
+      "taken": true
+    },
+    {
+      "branch_id": 138619,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 A)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 48265,
+      "line": 1077,
+      "taken": false
+    },
+    {
+      "branch_id": 138622,
+      "col": 13,
+      "condition": "(Eq false\n     (Eq 0\n         (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                          0)\n                     (Sub w64 0 N0)\n                     N0)))",
+      "filename": "library/bignum.c",
+      "inst_id": 135418,
+      "line": 1081,
+      "taken": true
+    },
+    {
+      "branch_id": 138626,
+      "col": 9,
+      "condition": "(Sle 0\n      (Sub w32 0\n               (Select w32 (Slt (ReadLSB w64 0 N)\n                                0)\n                           4294967295\n                           1)))",
+      "filename": "library/bignum.c",
+      "inst_id": 101517,
+      "line": 2053,
+      "taken": false
+    },
+    {
+      "branch_id": 139240,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        63)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139243,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        62)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139246,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        61)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139249,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        60)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139252,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        59)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139255,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        58)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139258,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        57)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139261,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        56)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139264,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        55)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139267,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        54)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139270,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        53)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139273,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        52)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139276,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        51)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139279,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        50)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139282,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        49)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139285,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        48)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139288,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        47)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139291,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        46)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139294,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        45)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139297,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        44)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139300,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        43)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": true
+    },
+    {
+      "branch_id": 139303,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        42)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 49924,
+      "line": 2124,
+      "taken": false
+    },
+    {
+      "branch_id": 139645,
+      "col": 21,
+      "condition": "(Eq 0\n     (And w64 (LShr w64 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0)\n                        39)\n              1))",
+      "filename": "library/bignum.c",
+      "inst_id": 101989,
+      "line": 2127,
+      "taken": true
+    }
+  ]
+}

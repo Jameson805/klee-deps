@@ -1,0 +1,13 @@
+Error: Query timed out (fork).
+File: library/bignum.c
+Line: 365
+assembly.ll line: 16981
+State: 54
+Stack: 
+	#000016981 in mbedtls_clz(symbolic) at library/bignum.c:365
+	#100016943 in mbedtls_mpi_bitlen(129652356022272) at library/bignum.c:387
+	#200020233 in mbedtls_mpi_shift_l(129652356022272, 64) at library/bignum.c:953
+	#300020067 in mbedtls_mpi_div_mpi(0, 129655040376832, 129655040376832, 129653966635008) at library/bignum.c:1687
+	#400021846 in mbedtls_mpi_mod_mpi(129655040376832, 129655040376832, 129653966635008) at library/bignum.c:1756
+	#500022115 in mbedtls_mpi_exp_mod(129648597925888, 129651819151360, 129649671667712, 129653966635008, 0) at library/bignum.c:2042
+	#600003278 in main() at main.c:79
