@@ -7,7 +7,7 @@ LD=llvm-link-13 # Used only for the klee target
 SOURCES = main.c $(wildcard library/*.c)
 
 # Base CFLAGS for all targets
-BASE_CFLAGS = -isystem include/mbedtls -isystem library -I include -I /home/james/klee-deps/klee-controlflow/include -O0 -Xclang -disable-O0-optnone -g
+BASE_CFLAGS = -isystem include/mbedtls -isystem library -I include -I /home/theta-lin/klee-controlflow/include -O0 -Xclang -disable-O0-optnone -g
 
 # Linker flags (currently empty)
 LDFLAGS =
