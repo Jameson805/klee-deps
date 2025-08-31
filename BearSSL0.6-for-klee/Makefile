@@ -1,30 +1,25 @@
-# CC=../../../../../build/bin/clang
-# LD=../../../../../build/bin/llvm-link
-
-# CFLAGS=-isystem include -I include -O0 -g -emit-llvm
-
 CC=clang
 LD=llvm-link
 
-# CFLAGS=-isystem include -I include -I /project/root-top/include -emit-llvm -c -g -O0 -Xclang -disable-O0-optnone
 CFLAGS=-isystem include -I include -I /home/theta-lin/klee-controlflow/include -emit-llvm -c -g -O0 -Xclang -disable-O0-optnone
 
 clean:
-	rm *.bc *.ll
+	rm *.bc
 
-test1.bc : i32_modpow.bc
-	$(LD) $^ -o $@
+# test1.bc : i32_modpow.bc
+# 	$(LD) $^ -o $@
 
-test2.bc: i32_add.bc i32_bitlen.bc i32_decmod.bc i32_decode.bc i32_decred.bc i32_div32.bc i32_encode.bc i32_fmont.bc i32_iszero.bc i32_modpow.bc i32_montmul.bc i32_mulacc.bc i32_muladd.bc i32_ninv32.bc i32_reduce.bc i32_sub.bc i32_tmont.bc ccopy.bc
-	$(LD) $^ -o $@
+# test2.bc: i32_add.bc i32_bitlen.bc i32_decmod.bc i32_decode.bc i32_decred.bc i32_div32.bc i32_encode.bc i32_fmont.bc i32_iszero.bc i32_modpow.bc i32_montmul.bc i32_mulacc.bc i32_muladd.bc i32_ninv32.bc i32_reduce.bc i32_sub.bc i32_tmont.bc ccopy.bc
+# 	$(LD) $^ -o $@
 
-testall.bc : i32_add.bc i32_bitlen.bc i32_decmod.bc i32_decode.bc i32_decred.bc i32_div32.bc i32_encode.bc i32_fmont.bc i32_iszero.bc i32_modpow.bc i32_montmul.bc i32_mulacc.bc i32_muladd.bc i32_ninv32.bc i32_reduce.bc i32_sub.bc i32_tmont.bc ccopy.bc
+testall.bc : i32_add.bc i32_bitlen.bc i32_decmod.bc i32_decode.bc i32_decred.bc i32_div32.bc i32_encode.bc i32_fmont.bc i32_iszero.bc i32_modpow.bc i32_montmul.bc i32_mulacc.bc i32_muladd.bc i32_ninv32.bc i32_reduce.bc i32_sub.bc i32_tmont.bc ccopy.bc klee_wrapper.bc
 	$(LD) $^ -o $@
 
 %.bc: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-.PHONY: testall
-testall: testall.bc
-	./run.sh $< results_with_source.txt
+# .PHONY: testall
+# testall: testall.bc
+# 	./run.sh $< results_with_source.txt
 
+.PHONY: testall.bc
