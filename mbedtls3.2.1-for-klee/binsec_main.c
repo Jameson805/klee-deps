@@ -1,8 +1,11 @@
 #include "bignum.h"
 #include <stdio.h>
-#include <stdlib.h> // For EXIT_SUCCESS, EXIT_FAILURE
+#include <stdlib.h>
 #include <limits.h>
-#include "klee/klee.h"
+
+int64_t A_input;
+int64_t E_input;
+int64_t N_input;
 
 int main() {
     // Declare mbedtls_mpi variables for base (A_base), exponent (E_exponent), modulus (N_modulus), and result (X_result)
@@ -19,14 +22,8 @@ int main() {
     // 2. Set values for A_base, E_exponent, and N_modulus using mbedtls_mpi_lset for simpler integer assignments.
     // We'll calculate X_result = A_base^E_exponent mod N_modulus
 
-    int64_t A;
-    #ifdef TRACE
-        scanf("%ld", &A);
-    #else
-        klee_make_symbolic_sc(&A, sizeof(A), "A", 0);
-    #endif
     // mbedtls_mpi_lset sets an MPI from a long integer.
-    ret = mbedtls_mpi_lset(&A_base, A);
+    ret = mbedtls_mpi_lset(&A_base, A_input);
     if (ret != 0) {
         printf("ERROR: mbedtls_mpi_lset(A_base) failed with %d\n", ret);
         goto cleanup;
@@ -34,25 +31,13 @@ int main() {
 
     // #define PRINT
 
-    int64_t E;
-    #ifdef TRACE
-        scanf("%ld", &E);
-    #else
-        klee_make_symbolic_sc(&E, sizeof(E), "E", 1);
-    #endif
-    ret = mbedtls_mpi_lset(&E_exponent, E);
+    ret = mbedtls_mpi_lset(&E_exponent, E_input);
     if (ret != 0) {
         printf("ERROR: mbedtls_mpi_lset(E_exponent) failed with %d\n", ret);
         goto cleanup;
     }
 
-    int64_t N;
-    #ifdef TRACE
-        scanf("%ld", &N);
-    #else
-        klee_make_symbolic_sc(&N, sizeof(N), "N", 0);
-    #endif
-    ret = mbedtls_mpi_lset(&N_modulus, N);
+    ret = mbedtls_mpi_lset(&N_modulus, N_input);
     if (ret != 0) {
         printf("ERROR: mbedtls_mpi_lset(N_modulus) failed with %d\n", ret);
         goto cleanup;
@@ -97,5 +82,5 @@ cleanup:
     mbedtls_mpi_free(&A_base);
 
     // Return success or failure based on the operation's outcome
-    return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    exit(ret);
 }
