@@ -1,5 +1,3 @@
-#include "klee/klee.h"
-
 /*
  * Copyright (c) 2016 Thomas Pornin <pornin@bolet.org>
  *
