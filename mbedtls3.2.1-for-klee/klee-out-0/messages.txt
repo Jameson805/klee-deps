@@ -1,0 +1,9 @@
+KLEE: Using STP solver backend
+KLEE: SAT solver: MiniSat
+KLEE: Deterministic allocator: Using quarantine queue size 8
+KLEE: Deterministic allocator: globals (start-address=0x6e9f4000000 size=10 GiB)
+KLEE: Deterministic allocator: constants (start-address=0x6e774000000 size=10 GiB)
+KLEE: Deterministic allocator: heap (start-address=0x5e774000000 size=1024 GiB)
+KLEE: Deterministic allocator: stack (start-address=0x5c774000000 size=128 GiB)
+KLEE: ERROR: klee_driver.c:12: failed external call: mbedtls_mpi_init
+KLEE: NOTE: now ignoring this error at this location

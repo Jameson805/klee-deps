@@ -1,3 +1,5 @@
+#include "mbedtls3.2.1/include/mbedtls/bignum.h"
+#include "bignum_sliced_full.h"
 #include <stdio.h>
 #include <stdlib.h> // For EXIT_SUCCESS, EXIT_FAILURE
 #include <limits.h>
@@ -37,11 +39,7 @@ int main() {
         goto cleanup;
     }
 
-    ret = mbedtls_mpi_exp_mod(&X_result, &A_base, &E_exponent, &N_modulus, NULL);
-    if (ret != 0) {
-        printf("ERROR: mbedtls_mpi_exp_mod() failed with %d\n", ret);
-        goto cleanup;
-    }
+    mbedtls_mpi_exp_mod_slice_1(&X_result, &A_base, &E_exponent, &N_modulus);
 
 cleanup:
     mbedtls_mpi_free(&X_result);
@@ -52,3 +50,12 @@ cleanup:
     // Return success or failure based on the operation's outcome
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
+
+/*
+KLEE Command:
+/home/james/klee-deps/klee-controlflow/build/bin/klee \
+    --search=dfs \
+    --max-depth=16 \
+    --max-forks=1000 \
+    klee.bc
+*/

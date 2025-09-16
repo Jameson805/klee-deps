@@ -6,19 +6,9 @@
 #include "stdlib.h"
 #include "string.h"
 #include "time.h"
-typedef int32_t mbedtls_mpi_sint;
-typedef uint32_t mbedtls_mpi_uint;
-typedef uint64_t mbedtls_t_udbl;
-struct mbedtls_mpi {
-   int private_s ;
-   size_t private_n ;
-   mbedtls_mpi_uint *private_p ;
-};
-typedef struct mbedtls_mpi mbedtls_mpi;
-enum __anonenum_mbedtls_mpi_gen_prime_flag_t_1 {
-    MBEDTLS_MPI_GEN_PRIME_FLAG_DH = 0x0001,
-    MBEDTLS_MPI_GEN_PRIME_FLAG_LOW_ERR = 0x0002
-};
+
+#include "mbedtls3.2.1/include/mbedtls/bignum.h"
+
 void mbedtls_mpi_init_slice_1(mbedtls_mpi *X);
 
 void mbedtls_mpi_free_slice_1(mbedtls_mpi *X);
@@ -66,39 +56,6 @@ void mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
                                  mbedtls_mpi const *E, mbedtls_mpi const *N);
 
 extern int Frama_C_interval(int a, int b);
-
-void main(void)
-{
-  mbedtls_mpi A_base;
-  mbedtls_mpi E_exponent;
-  mbedtls_mpi N_modulus;
-  mbedtls_mpi X_result;
-  int ret;
-  int tmp;
-  int tmp_0;
-  int tmp_1;
-  mbedtls_mpi_init_slice_1(& A_base);
-  mbedtls_mpi_init_slice_1(& E_exponent);
-  mbedtls_mpi_init_slice_1(& N_modulus);
-  mbedtls_mpi_init_slice_1(& X_result);
-  tmp = Frama_C_interval(-100,100);
-  int64_t A = (int64_t)tmp;
-  tmp_0 = Frama_C_interval(0,10);
-  int64_t E = (int64_t)tmp_0;
-  tmp_1 = Frama_C_interval(2,100);
-  int64_t N = (int64_t)tmp_1;
-  ret = mbedtls_mpi_lset_slice_1(& A_base,(mbedtls_mpi_sint)A);
-  if (ret != 0) goto cleanup;
-  ret = mbedtls_mpi_lset_slice_1(& E_exponent,(mbedtls_mpi_sint)E);
-  if (ret != 0) goto cleanup;
-  ret = mbedtls_mpi_lset_slice_1(& N_modulus,(mbedtls_mpi_sint)N);
-  if (ret != 0) goto cleanup;
-  mbedtls_mpi_exp_mod_slice_1(& X_result,(mbedtls_mpi const *)(& A_base),
-                              (mbedtls_mpi const *)(& E_exponent),
-                              (mbedtls_mpi const *)(& N_modulus));
-  cleanup: ;
-  return;
-}
 
 void mbedtls_mpi_core_mla_slice_1(mbedtls_mpi_uint *d, size_t d_len,
                                   mbedtls_mpi_uint const *s, size_t s_len,

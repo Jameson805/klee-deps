@@ -1,0 +1,13 @@
+{
+  "controlFlowTrace": [
+    {
+      "branch_id": 46,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0))))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 47630,
+      "line": 376,
+      "taken": false
+    }
+  ]
+}

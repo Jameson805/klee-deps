@@ -1,0 +1,42 @@
+array A[8] : w32 -> w8 = symbolic
+array E[8] : w32 -> w8 = symbolic
+array E__prime[8] : w32 -> w8 = symbolic
+array N[8] : w32 -> w8 = symbolic
+(query [(Eq false
+             (Eq 0
+                 N0:(Extract w32 0 (Select w64 N1:(Slt N2:(ReadLSB w64 0 N)
+                                                       0)
+                                               (Sub w64 0 N2)
+                                               N2))))
+         (Eq false
+             (Sle (Select w32 N1 4294967295 1) 0))
+         (Eq false
+             (Eq 0 (And w32 N0 1)))
+         (Eq 0
+             (Extract w32 0 (Select w64 (Slt N3:(ReadLSB w64 0 E)
+                                             0)
+                                        (Sub w64 0 N3)
+                                        N3)))
+         (Eq 0
+             (Extract w32 0 (Select w64 (Slt N4:(ReadLSB w64 0 E__prime)
+                                             0)
+                                        (Sub w64 0 N4)
+                                        N4)))
+         (Eq false
+             (Eq 4294967295
+                 (Select w32 (Slt (ReadLSB w64 0 A)
+                                  0)
+                             4294967295
+                             1)))
+         (Eq 0 (And w32 N0 2147483648))
+         (Eq 0 (And w32 N0 1073741824))
+         (Eq 0 (And w32 N0 536870912))
+         (Eq 0 (And w32 N0 268435456))
+         (Eq 0 (And w32 N0 134217728))
+         (Eq 0 (And w32 N0 67108864))
+         (Eq 0 (And w32 N0 33554432))
+         (Eq 0 (And w32 N0 16777216))
+         (Eq 0 (And w32 N0 8388608))
+         (Eq 0 (And w32 N0 4194304))
+         (Eq 0 (And w32 N0 2097152))]
+        false)

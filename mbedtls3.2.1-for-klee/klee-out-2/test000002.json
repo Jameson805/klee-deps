@@ -1,0 +1,472 @@
+{
+  "controlFlowTrace": [
+    {
+      "branch_id": 46,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0))))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 47630,
+      "line": 376,
+      "taken": true
+    },
+    {
+      "branch_id": 96,
+      "col": 9,
+      "condition": "(Sle (Select w32 (Slt (ReadLSB w64 0 N)\n                       0)\n                  4294967295\n                  1)\n      0)",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 555,
+      "line": 1166,
+      "taken": false
+    },
+    {
+      "branch_id": 97,
+      "col": 11,
+      "condition": "(Eq 0\n     (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                              0)\n                                         (Sub w64 0 N0)\n                                         N0))\n              1))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 140967,
+      "line": 1171,
+      "taken": false
+    },
+    {
+      "branch_id": 99,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0))))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 47630,
+      "line": 376,
+      "taken": false
+    },
+    {
+      "branch_id": 1650,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  2147483648)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1652,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  1073741824)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1654,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  536870912)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1656,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  268435456)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1658,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  134217728)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1660,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  67108864)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1662,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  33554432)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1664,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  16777216)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1666,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  8388608)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1668,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  4194304)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1670,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  2097152)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1672,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  1048576)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1674,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  524288)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1676,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  262144)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1678,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  131072)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1680,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  65536)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1682,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  32768)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1684,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  16384)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1686,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  8192)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1688,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  4096)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1690,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  2048)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1692,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  1024)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1694,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  512)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1696,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  256)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1698,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  128)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1700,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  64)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1702,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  32)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1704,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  16)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1706,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  8)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1708,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  4)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1710,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  2)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1712,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 E)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  1)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1730,
+      "col": 7,
+      "condition": "(Eq 4294967295\n     (Select w32 (Slt (ReadLSB w64 0 A)\n                      0)\n                 4294967295\n                 1))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 496,
+      "line": 1206,
+      "taken": false
+    },
+    {
+      "branch_id": 1836,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0))))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 47630,
+      "line": 376,
+      "taken": true
+    },
+    {
+      "branch_id": 1842,
+      "col": 7,
+      "condition": "(Slt (Select w32 (Slt (ReadLSB w64 0 N)\n                       0)\n                  4294967295\n                  1)\n      0)",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 621,
+      "line": 1023,
+      "taken": false
+    },
+    {
+      "branch_id": 1844,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0))))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 47630,
+      "line": 376,
+      "taken": true
+    },
+    {
+      "branch_id": 1850,
+      "col": 7,
+      "condition": "(Eq 0\n     (Select w32 (Slt (ReadLSB w64 0 N)\n                      0)\n                 4294967295\n                 1))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 46385,
+      "line": 883,
+      "taken": false
+    },
+    {
+      "branch_id": 1854,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                         0)\n                                    (Sub w64 0 N0)\n                                    N0))))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139063,
+      "line": 332,
+      "taken": true
+    },
+    {
+      "branch_id": 1937,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  2147483648)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1939,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  1073741824)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1941,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  536870912)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1943,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  268435456)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1945,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  134217728)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1947,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  67108864)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1949,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  33554432)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1951,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  16777216)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1953,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  8388608)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    },
+    {
+      "branch_id": 1955,
+      "col": 9,
+      "condition": "(Eq false\n     (Eq 0\n         (And w32 (Extract w32 0 (Select w64 (Slt N0:(ReadLSB w64 0 N)\n                                                  0)\n                                             (Sub w64 0 N0)\n                                             N0))\n                  4194304)))",
+      "filename": "bignum_sliced_full.c",
+      "inst_id": 139213,
+      "line": 197,
+      "taken": false
+    }
+  ]
+}

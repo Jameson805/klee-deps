@@ -1,0 +1,7 @@
+Error: failed external call: mbedtls_mpi_init
+File: klee_driver.c
+Line: 12
+assembly.ll line: 209052
+State: 1
+Stack: 
+	#000209052 in main() at klee_driver.c:12
