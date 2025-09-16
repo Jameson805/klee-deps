@@ -1,0 +1,206 @@
+{
+  "branches": [
+    {
+      "filename": "bignum.c",
+      "line": 104,
+      "column": 9
+    },
+    {
+      "filename": "bignum.c",
+      "line": 126,
+      "column": 9
+    },
+    {
+      "filename": "bignum.c",
+      "line": 131,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 238,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 384,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 365,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1472,
+      "column": 5
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1476,
+      "column": 16
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1045,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1049,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1060,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1061,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1225,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1245,
+      "column": 9
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1248,
+      "column": 9
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1145,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1162,
+      "column": 5
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1383,
+      "column": 5
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1390,
+      "column": 5
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1397,
+      "column": 5
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1077,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1081,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1095,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1096,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1662,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1520,
+      "column": 16
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1520,
+      "column": 9
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1531,
+      "column": 9
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1985,
+      "column": 9
+    },
+    {
+      "filename": "bignum.c",
+      "line": 2124,
+      "column": 21
+    },
+    {
+      "filename": "bignum.c",
+      "line": 2127,
+      "column": 21
+    },
+    {
+      "filename": "bignum.c",
+      "line": 2173,
+      "column": 13
+    },
+    {
+      "filename": "bignum.c",
+      "line": 2182,
+      "column": 9
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1877,
+      "column": 9
+    }
+  ],
+  "indices": [
+    {
+      "filename": "bignum.c",
+      "line": 1399,
+      "column": 12
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1399,
+      "column": 12
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1399,
+      "column": 24
+    },
+    {
+      "filename": "bignum.c",
+      "line": 2119,
+      "column": 15
+    },
+    {
+      "filename": "bignum.c",
+      "line": 2182,
+      "column": 31
+    },
+    {
+      "filename": "bignum.c",
+      "line": 1887,
+      "column": 28
+    }
+  ]
+}
