@@ -1,2 +1,10 @@
 *.o
 *.bc
+*.a
+*.la
+*.so
+klee-last
+klee-out-*/
+.libs/
+.deps/
+klee_main
