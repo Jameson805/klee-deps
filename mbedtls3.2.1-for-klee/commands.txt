@@ -1,0 +1,22 @@
+python3 ~/klee-deps/klee-controlflow/scripts/compare_with_ctchecker.py \
+    ~/klee-deps/mbedtls3.2.1-for-klee/results_with_source-WL-FS-SRC-1.json \
+    ~/klee-deps/mbedtls3.2.1-for-klee/mbedtls3.2.1/klee-out-0 \
+    ~/klee-deps/mbedtls3.2.1-for-klee/reports/report.html \
+    ~/klee-deps/mbedtls3.2.1-for-klee/reports/plot.png \
+    mbedtls_mpi_exp_mod \
+    --code-path ~/klee-deps/mbedtls3.2.1-for-klee/mbedtls3.2.1
+
+python3 ~/klee-deps/klee-controlflow/scripts/compare_with_ctchecker.py \
+    ~/klee-deps/mbedtls3.2.1-for-klee/results_with_source-WL-FS-SRC-1.json \
+    ~/klee-deps/mbedtls3.2.1-for-klee/klee-out-0 \
+    ~/klee-deps/mbedtls3.2.1-for-klee/reports/sliced_report.html \
+    ~/klee-deps/mbedtls3.2.1-for-klee/reports/sliced_plot.png \
+    mbedtls_mpi_exp_mod_sliced \
+    --code-path ~/klee-deps/mbedtls3.2.1-for-klee
+
+python3 convert_ctchecker_to_json.py \
+    ~/klee-deps/mbedtls3.2.1-for-klee/results_with_source-WL-FS-SRC-1.txt \
+    ~/klee-deps/mbedtls3.2.1-for-klee/results_with_source-WL-FS-SRC-1.json
+
+/home/james/klee-deps/klee-controlflow/build/bin/klee --max-time=10 --max-solver-time=1s klee.bc
+/home/james/klee-deps/klee-controlflow/build/bin/klee --max-time=300 --max-solver-time=5s klee.bc

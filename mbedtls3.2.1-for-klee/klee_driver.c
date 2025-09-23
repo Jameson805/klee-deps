@@ -53,9 +53,6 @@ cleanup:
 
 /*
 KLEE Command:
-/home/james/klee-deps/klee-controlflow/build/bin/klee \
-    --search=dfs \
-    --max-depth=16 \
-    --max-forks=1000 \
-    klee.bc
+/home/james/klee-deps/klee-controlflow/build/bin/klee 
+    \ --max-time=10 --max-solver-time=1s klee.bc
 */
