@@ -80,7 +80,7 @@ configure:3362: result: x86_64-pc-linux-gnu
 configure:3386: autobuild project... libgpg-error
 configure:3388: autobuild revision... 1.44
 configure:3392: autobuild hostname... edge-intelligence-lab-gpu-server-2
-configure:3401: autobuild timestamp... 20250919-122156
+configure:3401: autobuild timestamp... 20251005-150856
 configure:3455: checking for gcc
 configure:3482: result: wllvm
 configure:3711: checking for C compiler version
@@ -986,7 +986,7 @@ configure:16015: $? = 0
 configure:16015: result: yes
 configure:16015: checking for strlwr
 configure:16015: wllvm -o conftest -g -O0   conftest.c  >&5
-/usr/bin/ld: /tmp/conftest-317221.o: in function `main':
+/usr/bin/ld: /tmp/conftest-be53ca.o: in function `main':
 /home/theta-lin/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/conftest.c:84: undefined reference to `strlwr'
 clang: error: linker command failed with exit code 1 (use -v to see invocation)
 ERROR:Failed to compile using given arguments: [-o conftest -g -O0 conftest.c]

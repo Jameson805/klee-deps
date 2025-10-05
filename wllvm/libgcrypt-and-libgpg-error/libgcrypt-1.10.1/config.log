@@ -2011,7 +2011,7 @@ configure:18884: $? = 0
 configure:18884: result: yes
 configure:18890: checking for stricmp
 configure:18890: wllvm -o conftest -g -O0 -DNO_ASM -fvisibility=hidden   conftest.c  >&5
-/usr/bin/ld: /tmp/conftest-ca32b3.o: in function `main':
+/usr/bin/ld: /tmp/conftest-578915.o: in function `main':
 /home/theta-lin/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/conftest.c:110: undefined reference to `stricmp'
 clang: error: linker command failed with exit code 1 (use -v to see invocation)
 ERROR:Failed to compile using given arguments: [-o conftest -g -O0 -DNO_ASM -fvisibility=hidden conftest.c]
@@ -2192,7 +2192,7 @@ configure:18959: $? = 0
 configure:18959: result: yes
 configure:18965: checking for gethrtime
 configure:18965: wllvm -o conftest -g -O0 -DNO_ASM -fvisibility=hidden   conftest.c  >&5
-/usr/bin/ld: /tmp/conftest-2205ef.o: in function `main':
+/usr/bin/ld: /tmp/conftest-06fbca.o: in function `main':
 /home/theta-lin/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/conftest.c:121: undefined reference to `gethrtime'
 clang: error: linker command failed with exit code 1 (use -v to see invocation)
 ERROR:Failed to compile using given arguments: [-o conftest -g -O0 -DNO_ASM -fvisibility=hidden conftest.c]
@@ -2353,7 +2353,7 @@ configure:19008: $? = 0
 configure:19008: result: yes
 configure:19014: checking for elf_aux_info
 configure:19014: wllvm -o conftest -g -O0 -DNO_ASM -fvisibility=hidden   conftest.c  >&5
-/usr/bin/ld: /tmp/conftest-5444dc.o: in function `main':
+/usr/bin/ld: /tmp/conftest-cb3991.o: in function `main':
 /home/theta-lin/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/conftest.c:128: undefined reference to `elf_aux_info'
 clang: error: linker command failed with exit code 1 (use -v to see invocation)
 ERROR:Failed to compile using given arguments: [-o conftest -g -O0 -DNO_ASM -fvisibility=hidden conftest.c]
@@ -2497,7 +2497,7 @@ configure:19021: $? = 0
 configure:19021: result: yes
 configure:19027: checking for explicit_memset
 configure:19027: wllvm -o conftest -g -O0 -DNO_ASM -fvisibility=hidden   conftest.c  >&5
-/usr/bin/ld: /tmp/conftest-1c4cdf.o: in function `main':
+/usr/bin/ld: /tmp/conftest-a4d306.o: in function `main':
 /home/theta-lin/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/conftest.c:129: undefined reference to `explicit_memset'
 clang: error: linker command failed with exit code 1 (use -v to see invocation)
 ERROR:Failed to compile using given arguments: [-o conftest -g -O0 -DNO_ASM -fvisibility=hidden conftest.c]

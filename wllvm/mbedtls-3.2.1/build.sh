@@ -1,27 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 <klee_controlflow_path>"
-    exit 1
-fi
-
-KLEE_PATH="$1"
+KLEE_PATH="../../klee-controlflow"
 
 export LLVM_COMPILER=clang
 
 make CC=wllvm CFLAGS='-g -O0' -j
 
-wllvm \
-    -I "$KLEE_PATH/include" \
-    -I include \
-    -L "$KLEE_PATH/build/lib" \
-    -Wl,-rpath="$KLEE_PATH/build/lib" \
-    -lkleeRuntest -g -O0 \
-    klee_main.c \
-    library/libmbedtls.a \
-    library/libmbedx509.a \
-    library/libmbedcrypto.a \
-    -o klee_main
+flags=( -g -O0 -Iinclude )
+klee_flags=(\
+    -I"$KLEE_PATH/include" \
+    -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" \
+    -lkleeRuntest \
+)
+libs=( library/libmbedtls.a library/libmbedx509.a library/libmbedcrypto.a )
 
-extract-bc klee_main
+wllvm "${flags[@]}" "${klee_flags[@]}" klee_main.c "${libs[@]}" -o klee_var_pub
+extract-bc klee_var_pub
+wllvm "${flags[@]}" "${klee_flags[@]}" -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
+extract-bc klee_fix_pub
+
+clang "${flags[@]}" -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
+clang "${flags[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
