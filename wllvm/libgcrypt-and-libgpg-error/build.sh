@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 <klee_controlflow_path>"
-    exit 1
-fi
-
-KLEE_PATH="$1"
+KLEE_PATH="../../klee-controlflow"
 
 export LLVM_COMPILER=clang
 
@@ -21,15 +16,18 @@ cd libgcrypt-1.10.1
 make -j
 cd -
 
-wllvm \
-    -I "$KLEE_PATH/include" \
-    -I libgcrypt-1.10.1/src \
-    -L "$KLEE_PATH/build/lib" \
-    -Wl,-rpath="$KLEE_PATH/build/lib" \
-    -lkleeRuntest -g -O0 \
-    klee_main.c \
-    libgcrypt-1.10.1/src/.libs/libgcrypt.a \
-    libgpg-error-1.44/src/.libs/libgpg-error.a \
-    -o klee_main
+flags=( -g -O0 -Ilibgcrypt-1.10.1/src )
+klee_flags=( \
+    -I"$KLEE_PATH/include" \
+    -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" \
+    -lkleeRuntest \
+)
+libs=( libgcrypt-1.10.1/src/.libs/libgcrypt.a libgpg-error-1.44/src/.libs/libgpg-error.a )
 
-extract-bc klee_main
+wllvm "${flags[@]}" "${klee_flags[@]}" klee_main.c "${libs[@]}" -o klee_var_pub
+extract-bc klee_var_pub
+wllvm "${flags[@]}" "${klee_flags[@]}" -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
+extract-bc klee_fix_pub
+
+clang "${flags[@]}" -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
+clang "${flags[@]}" -DREPLAY klee_main.c "${libs[@]}" -o klee_fix_pub_replay

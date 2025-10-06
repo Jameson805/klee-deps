@@ -1,34 +1,79 @@
 #include <gcrypt.h>
-#include <klee/klee.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
+
+#ifndef REPLAY
+    #include "klee/klee.h"
+#endif
 
 #define SYM_SIZE 8
-#define CONCRETE_PUBS
 
-int main() {
-    // Allocate symbolic buffers for base, exponent, and modulus
-    unsigned char base_buf[SYM_SIZE];
+int load_bytes(const char *filename, void *buf, size_t size)
+{
+    FILE *f = fopen(filename, "rb");
+    if (!f) {
+        printf("ERROR: unable to open file %s\n", filename);
+        return 0;
+    }
+
+    if (fread(buf, 1, size, f) != size) {
+        printf("ERROR: reading file %s\n", filename);
+        fclose(f);
+        return 0;
+    }
+
+    fclose(f);
+    return 1;
+}
+
+int main(int argc, char *argv[]) {
+    #ifdef REPLAY
+        #ifdef CONCRETE_PUBS
+            assert(argc == 2 && "Required arguments: <exp_filename>");
+            char *exp_filename = argv[1];
+        #else
+            assert(argc == 4 && "Required arguments: <exp_filename> <base_filename> <mod_filename>");
+            char *exp_filename = argv[1];
+            char *base_filename = argv[2];
+            char *mod_filename = argv[3];
+        #endif
+    #endif
+
+    // Allocate symbolic buffers for exponent, base, and modulus
     unsigned char exp_buf[SYM_SIZE];
+    unsigned char base_buf[SYM_SIZE];
     unsigned char mod_buf[SYM_SIZE];
+
+    #ifdef REPLAY
+        if (!load_bytes(exp_filename, exp_buf, sizeof(exp_buf))) return 1;
+    #else
+        klee_make_symbolic_sc(exp_buf, sizeof(exp_buf), "exp", 1);
+    #endif
 
     #ifdef CONCRETE_PUBS
         uint32_t base_i = 100003;
         memset(base_buf, 0, sizeof(base_buf));
         memcpy(base_buf, &base_i, sizeof(base_i));
     #else
-        klee_make_symbolic_sc(base_buf, sizeof(base_buf), "base", 0);
+        #ifdef REPLAY
+            if (!load_bytes(base_filename, base_buf, sizeof(base_buf))) return 1;
+        #else
+            klee_make_symbolic_sc(base_buf, sizeof(base_buf), "base", 0);
+        #endif
     #endif
-
-    klee_make_symbolic_sc(exp_buf, sizeof(exp_buf), "exp", 1);
 
     #ifdef CONCRETE_PUBS
         uint32_t mod_i = 1000000007;
         memset(mod_buf, 0, sizeof(mod_buf));
         memcpy(mod_buf, &mod_i, sizeof(mod_i));
     #else
-        klee_make_symbolic_sc(mod_buf, sizeof(mod_buf), "mod", 0);
+        #ifdef REPLAY
+            if (!load_bytes(mod_filename, mod_buf, sizeof(mod_buf))) return 1;
+        #else
+            klee_make_symbolic_sc(mod_buf, sizeof(mod_buf), "mod", 0);
+        #endif
     #endif
 
     // Parse symbolic buffers into gcry_mpi_t big numbers

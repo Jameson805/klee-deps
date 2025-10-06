@@ -1,31 +1,78 @@
 #include "mbedtls/bignum.h"
 #include <stdio.h>
-#include <stdlib.h> // For EXIT_SUCCESS, EXIT_FAILURE
-#include <limits.h>
-#include "klee/klee.h"
+#include <stdlib.h>
+#include <assert.h>
 
-#define CONCRETE_PUBS
+#ifndef REPLAY
+    #include "klee/klee.h"
+#endif
 
-int main() {
-    // Declare mbedtls_mpi variables for base (A_base), exponent (E_exponent), modulus (N_modulus), and result (X_result)
-    mbedtls_mpi A_base, E_exponent, N_modulus, X_result;
+int load_bytes(const char *filename, void *buf, size_t size)
+{
+    FILE *f = fopen(filename, "rb");
+    if (!f) {
+        printf("ERROR: unable to open file %s\n", filename);
+        return 0;
+    }
+
+    if (fread(buf, 1, size, f) != size) {
+        printf("ERROR: reading file %s\n", filename);
+        fclose(f);
+        return 0;
+    }
+
+    fclose(f);
+    return 1;
+}
+
+int main(int argc, char *argv[]) {
+    #ifdef REPLAY
+        #ifdef CONCRETE_PUBS
+            assert(argc == 2 && "Required arguments: <E_filename>");
+            char *E_filename = argv[1];
+        #else
+            assert(argc == 4 && "Required arguments: <E_filename> <A_filename> <N_filename>");
+            char *E_filename = argv[1];
+            char *A_filename = argv[2];
+            char *N_filename = argv[3];
+        #endif
+    #endif
+
+    // Declare mbedtls_mpi variables for exponent (E_exponent), base (A_base), modulus (N_modulus), and result (X_result)
+    mbedtls_mpi E_exponent, A_base, N_modulus, X_result;
     int ret; // For return codes of mbedtls functions
 
     // 1. Initialize MPI variables
     // This function allocates and initializes the internal structure of the MPI.
-    mbedtls_mpi_init(&A_base);
     mbedtls_mpi_init(&E_exponent);
+    mbedtls_mpi_init(&A_base);
     mbedtls_mpi_init(&N_modulus);
     mbedtls_mpi_init(&X_result);
 
     // 2. Set values for A_base, E_exponent, and N_modulus using mbedtls_mpi_lset for simpler integer assignments.
     // We'll calculate X_result = A_base^E_exponent mod N_modulus
 
+    int64_t E;
+    #ifdef REPLAY
+        if (!load_bytes(E_filename, &E, sizeof(E))) goto cleanup;
+    #else
+        klee_make_symbolic_sc(&E, sizeof(E), "E", 1);
+    #endif
+    ret = mbedtls_mpi_lset(&E_exponent, E);
+    if (ret != 0) {
+        printf("ERROR: mbedtls_mpi_lset(E_exponent) failed with %d\n", ret);
+        goto cleanup;
+    }
+
     int64_t A;
     #ifdef CONCRETE_PUBS
         A = 100003;
     #else
-        klee_make_symbolic_sc(&A, sizeof(A), "A", 0);
+        #ifdef REPLAY
+            if (!load_bytes(A_filename, &A, sizeof(A))) goto cleanup;
+        #else
+            klee_make_symbolic_sc(&A, sizeof(A), "A", 0);
+        #endif
     #endif
     // mbedtls_mpi_lset sets an MPI from a long integer.
     ret = mbedtls_mpi_lset(&A_base, A);
@@ -34,21 +81,15 @@ int main() {
         goto cleanup;
     }
 
-    // #define PRINT
-
-    int64_t E;
-    klee_make_symbolic_sc(&E, sizeof(E), "E", 1);
-    ret = mbedtls_mpi_lset(&E_exponent, E);
-    if (ret != 0) {
-        printf("ERROR: mbedtls_mpi_lset(E_exponent) failed with %d\n", ret);
-        goto cleanup;
-    }
-
     int64_t N;
     #ifdef CONCRETE_PUBS
         N = 1000000007;
     #else
-        klee_make_symbolic_sc(&N, sizeof(N), "N", 0);
+        #ifdef REPLAY
+            if (!load_bytes(N_filename, &N, sizeof(N))) goto cleanup;
+        #else
+            klee_make_symbolic_sc(&N, sizeof(N), "N", 0);
+        #endif
     #endif
     ret = mbedtls_mpi_lset(&N_modulus, N);
     if (ret != 0) {
