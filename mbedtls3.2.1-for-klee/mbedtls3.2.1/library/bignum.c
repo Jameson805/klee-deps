@@ -101,6 +101,8 @@ void mbedtls_mpi_free( mbedtls_mpi *X )
     if( X == NULL )
         return;
 
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     if( X->p != NULL )
     {
         mbedtls_mpi_zeroize( X->p, X->n );
@@ -123,11 +125,15 @@ int mbedtls_mpi_grow( mbedtls_mpi *X, size_t nblimbs )
     if( nblimbs > MBEDTLS_MPI_MAX_LIMBS )
         return( MBEDTLS_ERR_MPI_ALLOC_FAILED );
 
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     if( X->n < nblimbs )
     {
         if( ( p = (mbedtls_mpi_uint*)mbedtls_calloc( nblimbs, ciL ) ) == NULL )
             return( MBEDTLS_ERR_MPI_ALLOC_FAILED );
 
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( X->p != NULL )
         {
             memcpy( p, X->p, X->n * ciL );
@@ -234,9 +240,12 @@ int mbedtls_mpi_copy( mbedtls_mpi *X, const mbedtls_mpi *Y )
         return( 0 );
     }
 
-    for( i = Y->n - 1; i > 0; i-- )
+    for( i = Y->n - 1; i > 0; i-- ) {
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( Y->p[i] != 0 )
             break;
+    }
     i++;
 
     X->s = Y->s;
@@ -362,6 +371,8 @@ static size_t mbedtls_clz( const mbedtls_mpi_uint x )
 
     for( j = 0; j < biL; j++ )
     {   
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( x & mask ) break;
 
         mask >>= 1;
@@ -380,9 +391,12 @@ size_t mbedtls_mpi_bitlen( const mbedtls_mpi *X )
     if( X->n == 0 )
         return( 0 );
 
-    for( i = X->n - 1; i > 0; i-- )
+    for( i = X->n - 1; i > 0; i-- ) {
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( X->p[i] != 0 )
             break;
+    }
 
     j = biL - mbedtls_clz( X->p[i] );
 
@@ -1041,13 +1055,19 @@ int mbedtls_mpi_cmp_abs( const mbedtls_mpi *X, const mbedtls_mpi *Y )
     MPI_VALIDATE_RET( X != NULL );
     MPI_VALIDATE_RET( Y != NULL );
 
-    for( i = X->n; i > 0; i-- )
+    for( i = X->n; i > 0; i-- ) {
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( X->p[i - 1] != 0 )
             break;
+    }
 
-    for( j = Y->n; j > 0; j-- )
+    for( j = Y->n; j > 0; j-- ) {
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( Y->p[j - 1] != 0 )
             break;
+    }
 
     if( i == 0 && j == 0 )
         return( 0 );
@@ -1057,7 +1077,11 @@ int mbedtls_mpi_cmp_abs( const mbedtls_mpi *X, const mbedtls_mpi *Y )
 
     for( ; i > 0; i-- )
     {   
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( X->p[i - 1] > Y->p[i - 1] ) return(  1 );
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( X->p[i - 1] < Y->p[i - 1] ) return( -1 );
     }
 
@@ -1073,13 +1097,19 @@ int mbedtls_mpi_cmp_mpi( const mbedtls_mpi *X, const mbedtls_mpi *Y )
     MPI_VALIDATE_RET( X != NULL );
     MPI_VALIDATE_RET( Y != NULL );
 
-    for( i = X->n; i > 0; i-- )
+    for( i = X->n; i > 0; i-- ) {
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( X->p[i - 1] != 0 )
             break;
+    }
 
-    for( j = Y->n; j > 0; j-- )
+    for( j = Y->n; j > 0; j-- ) {
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( Y->p[j - 1] != 0 )
             break;
+    }
 
     if( i == 0 && j == 0 )
         return( 0 );
@@ -1092,7 +1122,11 @@ int mbedtls_mpi_cmp_mpi( const mbedtls_mpi *X, const mbedtls_mpi *Y )
 
     for( ; i > 0; i-- )
     {
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( X->p[i - 1] > Y->p[i - 1] ) return(  X->s );
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( X->p[i - 1] < Y->p[i - 1] ) return( -X->s );
     }
 
@@ -1141,9 +1175,12 @@ int mbedtls_mpi_add_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
      */
     X->s = 1;
 
-    for( j = B->n; j > 0; j-- )
+    for( j = B->n; j > 0; j-- ) {
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( B->p[j - 1] != 0 )
             break;
+    }
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( X, j ) );
 
@@ -1159,6 +1196,8 @@ int mbedtls_mpi_add_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
         *p += tmp; c += ( *p < tmp );
     }
 
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     while( c != 0 )
     {
         if( i >= X->n )
@@ -1221,9 +1260,12 @@ int mbedtls_mpi_sub_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
     MPI_VALIDATE_RET( A != NULL );
     MPI_VALIDATE_RET( B != NULL );
 
-    for( n = B->n; n > 0; n-- )
+    for( n = B->n; n > 0; n-- ) {
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( B->p[n - 1] != 0 )
             break;
+    }
     if( n > A->n )
     {
         /* B >= (2^ciL)^n > A */
@@ -1242,9 +1284,13 @@ int mbedtls_mpi_sub_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
         memset( X->p + A->n, 0, ( X->n - A->n ) * ciL );
 
     carry = mpi_sub_hlp( n, X->p, A->p, B->p );
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     if( carry != 0 )
     {
         /* Propagate the carry to the first nonzero limb of X. */
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         for( ; n < X->n && X->p[n] == 0; n++ )
             --X->p[n];
         /* If we ran out of space for the carry, it means that the result
@@ -1380,6 +1426,8 @@ mbedtls_mpi_uint mbedtls_mpi_core_mla( mbedtls_mpi_uint *d, size_t d_len,
     size_t steps_x8 = s_len / 8;
     size_t steps_x1 = s_len & 7;
 
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     while( steps_x8-- )
     {
         MULADDC_X8_INIT
@@ -1387,6 +1435,8 @@ mbedtls_mpi_uint mbedtls_mpi_core_mla( mbedtls_mpi_uint *d, size_t d_len,
         MULADDC_X8_STOP
     }
 
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     while( steps_x1-- )
     {
         MULADDC_X1_INIT
@@ -1394,6 +1444,8 @@ mbedtls_mpi_uint mbedtls_mpi_core_mla( mbedtls_mpi_uint *d, size_t d_len,
         MULADDC_X1_STOP
     }
 
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     while( excess_len-- )
     {
         *d += c; c = ( *d < c ); d++;
@@ -1469,10 +1521,14 @@ int mbedtls_mpi_mul_int( mbedtls_mpi *X, const mbedtls_mpi *A, mbedtls_mpi_uint 
     MPI_VALIDATE_RET( A != NULL );
 
     size_t n = A->n;
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     while( n > 0 && A->p[n - 1] == 0 )
         --n;
 
     /* The general method below doesn't work if b==0. */
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     if( b == 0 || n == 0 )
         return( mbedtls_mpi_lset( X, 0 ) );
 
@@ -1517,6 +1573,8 @@ static mbedtls_mpi_uint mbedtls_int_div_int( mbedtls_mpi_uint u1,
     /*
      * Check for overflow
      */
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     if( 0 == d || u1 >= d )
     {
         if (r != NULL) *r = ~0;
@@ -1528,6 +1586,8 @@ static mbedtls_mpi_uint mbedtls_int_div_int( mbedtls_mpi_uint u1,
     dividend  = (mbedtls_t_udbl) u1 << biL;
     dividend |= (mbedtls_t_udbl) u0;
     quotient = dividend / d;
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     if( quotient > ( (mbedtls_t_udbl) 1 << biL ) - 1 )
         quotient = ( (mbedtls_t_udbl) 1 << biL ) - 1;
 
@@ -1659,6 +1719,8 @@ int mbedtls_mpi_div_mpi( mbedtls_mpi *Q, mbedtls_mpi *R, const mbedtls_mpi *A,
 
     for( i = n; i > t ; i-- )
     {   
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( X.p[i] >= Y.p[t] )
             Z.p[i - t - 1] = ~0;
         else
@@ -1874,6 +1936,8 @@ static void mpi_montmul( mbedtls_mpi *A, const mbedtls_mpi *B, const mbedtls_mpi
 
     d = T->p;
     n = N->n;
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     m = ( B->n < n ) ? B->n : n;
 
     for( size_t i = 0; i < n; i++ )
@@ -1982,6 +2046,8 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
     MPI_VALIDATE_RET( E != NULL );
     MPI_VALIDATE_RET( N != NULL );
 
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     if( mbedtls_mpi_cmp_int( N, 0 ) <= 0 || ( N->p[0] & 1 ) == 0 )
         return( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
 
@@ -2121,11 +2187,13 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
         /*
          * skip leading 0s
          */
-        //@ slice_preserve_ctrl;
-        //@ slice_preserve_stmt;
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( ei == 0 && state == 0 )
             continue;
-
+        
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( ei == 0 && state == 1 )
         {
             /*
@@ -2171,6 +2239,8 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
         mpi_montmul( X, X, N, mm, &T );
 
         wbits <<= 1;
+        __attribute__((fc_slice_ctrl));
+        __attribute__((fc_slice_stmt));
         if( ( wbits & ( one << wsize ) ) != 0 )
             mpi_montmul( X, &W[1], N, mm, &T );
     }
@@ -2180,6 +2250,8 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
      */
     mpi_montred( X, N, mm, &T );
 
+    __attribute__((fc_slice_ctrl));
+    __attribute__((fc_slice_stmt));
     if( neg && E->n != 0 && ( E->p[0] & 1 ) != 0 )
     {
         X->s = -1;

@@ -50,5 +50,6 @@ cleanup:
 frama-c slicing_driver.c mbedtls3.2.1/library/bignum.c \
   -cpp-extra-args="-Imbedtls3.2.1/include" \
   -slice-annot="mbedtls_mpi_exp_mod" \
-  -then-on 'Slicing export' -print > bignum_2125_sliced.c
+  -kernel-msg-key annot-error=inactive \
+  -then-on 'Slicing export' -print > bignum_sliced.c
 */

@@ -70,39 +70,6 @@ void mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
 
 extern int Frama_C_interval(int a, int b);
 
-void main(void)
-{
-  mbedtls_mpi A_base;
-  mbedtls_mpi E_exponent;
-  mbedtls_mpi N_modulus;
-  mbedtls_mpi X_result;
-  int ret;
-  int tmp;
-  int tmp_0;
-  int tmp_1;
-  mbedtls_mpi_init_slice_1(& A_base);
-  mbedtls_mpi_init_slice_1(& E_exponent);
-  mbedtls_mpi_init_slice_1(& N_modulus);
-  mbedtls_mpi_init_slice_1(& X_result);
-  tmp = Frama_C_interval(-100,100);
-  int64_t A = (int64_t)tmp;
-  tmp_0 = Frama_C_interval(0,10);
-  int64_t E = (int64_t)tmp_0;
-  tmp_1 = Frama_C_interval(2,100);
-  int64_t N = (int64_t)tmp_1;
-  ret = mbedtls_mpi_lset_slice_1(& A_base,(mbedtls_mpi_sint)A);
-  if (ret != 0) goto cleanup;
-  ret = mbedtls_mpi_lset_slice_1(& E_exponent,(mbedtls_mpi_sint)E);
-  if (ret != 0) goto cleanup;
-  ret = mbedtls_mpi_lset_slice_1(& N_modulus,(mbedtls_mpi_sint)N);
-  if (ret != 0) goto cleanup;
-  mbedtls_mpi_exp_mod_slice_1(& X_result,(mbedtls_mpi const *)(& A_base),
-                              (mbedtls_mpi const *)(& E_exponent),
-                              (mbedtls_mpi const *)(& N_modulus));
-  cleanup: ;
-  return;
-}
-
 void mbedtls_mpi_core_mla_slice_1(mbedtls_mpi_uint *d, size_t d_len,
                                   mbedtls_mpi_uint const *s, size_t s_len,
                                   mbedtls_mpi_uint b);

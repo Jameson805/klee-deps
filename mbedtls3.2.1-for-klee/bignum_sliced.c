@@ -65,8 +65,10 @@ int mbedtls_mpi_div_mpi_slice_1(mbedtls_mpi *R, mbedtls_mpi const *A,
 int mbedtls_mpi_mod_mpi_slice_1(mbedtls_mpi *R, mbedtls_mpi const *A,
                                 mbedtls_mpi const *B);
 
-void mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
-                                 mbedtls_mpi const *E, mbedtls_mpi const *N);
+int mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
+                                mbedtls_mpi const *E, mbedtls_mpi const *N);
+
+extern int Frama_C_interval(int a, int b);
 
 void mbedtls_mpi_core_mla_slice_1(mbedtls_mpi_uint *d, size_t d_len,
                                   mbedtls_mpi_uint const *s, size_t s_len,
@@ -152,8 +154,6 @@ int mbedtls_mpi_copy_slice_1(mbedtls_mpi *X, mbedtls_mpi const *Y)
   }
   i = Y->private_n - (size_t)1;
   while (i > (size_t)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(Y->private_p + i) != (mbedtls_mpi_uint)0) break;
     i --;
   }
@@ -192,8 +192,6 @@ static size_t mbedtls_clz_slice_1(mbedtls_mpi_uint const x)
     (mbedtls_mpi_uint)1 << ((sizeof(mbedtls_mpi_uint) << 3) - (unsigned long)1);
   j = (size_t)0;
   while (j < sizeof(mbedtls_mpi_uint) << 3) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (x & mask) break;
     mask >>= 1;
     j ++;
@@ -213,8 +211,6 @@ size_t mbedtls_mpi_bitlen_slice_1(mbedtls_mpi const *X)
   }
   i = X->private_n - (size_t)1;
   while (i > (size_t)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(X->private_p + i) != (mbedtls_mpi_uint)0) break;
     i --;
   }
@@ -320,15 +316,11 @@ int mbedtls_mpi_cmp_abs_slice_1(mbedtls_mpi const *X, mbedtls_mpi const *Y)
   size_t j;
   i = X->private_n;
   while (i > (size_t)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(X->private_p + (i - (size_t)1)) != (mbedtls_mpi_uint)0) break;
     i --;
   }
   j = Y->private_n;
   while (j > (size_t)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(Y->private_p + (j - (size_t)1)) != (mbedtls_mpi_uint)0) break;
     j --;
   }
@@ -346,14 +338,10 @@ int mbedtls_mpi_cmp_abs_slice_1(mbedtls_mpi const *X, mbedtls_mpi const *Y)
     goto return_label;
   }
   while (i > (size_t)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(X->private_p + (i - (size_t)1)) > *(Y->private_p + (i - (size_t)1))) {
       __retres = 1;
       goto return_label;
     }
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(X->private_p + (i - (size_t)1)) < *(Y->private_p + (i - (size_t)1))) {
       __retres = -1;
       goto return_label;
@@ -371,15 +359,11 @@ int mbedtls_mpi_cmp_mpi_slice_1(mbedtls_mpi const *X, mbedtls_mpi const *Y)
   size_t j;
   i = X->private_n;
   while (i > (size_t)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(X->private_p + (i - (size_t)1)) != (mbedtls_mpi_uint)0) break;
     i --;
   }
   j = Y->private_n;
   while (j > (size_t)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(Y->private_p + (j - (size_t)1)) != (mbedtls_mpi_uint)0) break;
     j --;
   }
@@ -396,15 +380,11 @@ int mbedtls_mpi_cmp_mpi_slice_1(mbedtls_mpi const *X, mbedtls_mpi const *Y)
     __retres = - Y->private_s;
     goto return_label;
   }
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
-  /*@ \slicing::slice_preserve_stmt ; */
   if (X->private_s > 0) 
     if (Y->private_s < 0) {
       __retres = 1;
       goto return_label;
     }
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
-  /*@ \slicing::slice_preserve_stmt ; */
   if (Y->private_s > 0) 
     if (X->private_s < 0) {
       __retres = -1;
@@ -454,8 +434,6 @@ int mbedtls_mpi_add_abs_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
   X->private_s = 1;
   j = B->private_n;
   while (j > (size_t)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(B->private_p + (j - (size_t)1)) != (mbedtls_mpi_uint)0) break;
     j --;
   }
@@ -475,8 +453,6 @@ int mbedtls_mpi_add_abs_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
     o ++;
     p ++;
   }
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
-  /*@ \slicing::slice_preserve_stmt ; */
   while (c != (mbedtls_mpi_uint)0) {
     if (i >= X->private_n) {
       ret = mbedtls_mpi_grow_slice_1(X,i + (size_t)1);
@@ -519,8 +495,6 @@ int mbedtls_mpi_sub_abs_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
   mbedtls_mpi_uint carry;
   n = B->private_n;
   while (n > (size_t)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (*(B->private_p + (n - (size_t)1)) != (mbedtls_mpi_uint)0) break;
     n --;
   }
@@ -539,10 +513,7 @@ int mbedtls_mpi_sub_abs_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
   carry = mpi_sub_hlp_slice_1(n,X->private_p,
                               (mbedtls_mpi_uint const *)A->private_p,
                               (mbedtls_mpi_uint const *)B->private_p);
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
   if (carry != (mbedtls_mpi_uint)0) {
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     while (1) {
       if (n < X->private_n) {
         if (! (*(X->private_p + n) == (mbedtls_mpi_uint)0)) break;
@@ -803,8 +774,6 @@ int mbedtls_mpi_mul_int_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
   int __retres;
   int ret;
   size_t n = A->private_n;
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
-  /*@ \slicing::slice_preserve_stmt ; */
   while (1) {
     if (n > (size_t)0) {
       if (! (*(A->private_p + (n - (size_t)1)) == (mbedtls_mpi_uint)0)) 
@@ -813,7 +782,6 @@ int mbedtls_mpi_mul_int_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
     else break;
     n --;
   }
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
   if (b == (mbedtls_mpi_uint)0) goto _LOR;
   else 
     if (n == (size_t)0) {
@@ -841,7 +809,6 @@ static mbedtls_mpi_uint mbedtls_int_div_int_slice_1(mbedtls_mpi_uint u1,
   mbedtls_mpi_uint __retres;
   mbedtls_t_udbl dividend;
   mbedtls_t_udbl quotient;
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
   if ((mbedtls_mpi_uint)0 == d) goto _LOR;
   else 
     if (u1 >= d) {
@@ -853,8 +820,6 @@ static mbedtls_mpi_uint mbedtls_int_div_int_slice_1(mbedtls_mpi_uint u1,
   dividend = (mbedtls_t_udbl)u1 << (sizeof(mbedtls_mpi_uint) << 3);
   dividend |= (mbedtls_t_udbl)u0;
   quotient = dividend / (mbedtls_t_udbl)d;
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
-  /*@ \slicing::slice_preserve_stmt ; */
   if (quotient > ((mbedtls_t_udbl)1 << (sizeof(mbedtls_mpi_uint) << 3)) - (mbedtls_t_udbl)1) 
     quotient = ((mbedtls_t_udbl)1 << (sizeof(mbedtls_mpi_uint) << 3)) - (mbedtls_t_udbl)1;
   __retres = (mbedtls_mpi_uint)quotient;
@@ -942,7 +907,6 @@ int mbedtls_mpi_div_mpi_slice_1(mbedtls_mpi *R, mbedtls_mpi const *A,
   while (i > t) {
     {
       int tmp_4;
-      /*@ \slicing::slice_preserve_ctrl ; */ ;
       if (*(X.private_p + i) >= *(Y.private_p + t)) *(Z.private_p + (
                                                       (i - t) - (size_t)1)) = (mbedtls_mpi_uint)(~ 0);
       else *(Z.private_p + ((i - t) - (size_t)1)) = mbedtls_int_div_int_slice_1
@@ -1134,8 +1098,8 @@ static int mpi_select_slice_1(mbedtls_mpi *R, mbedtls_mpi const *T,
   return ret;
 }
 
-void mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
-                                 mbedtls_mpi const *E, mbedtls_mpi const *N)
+int mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
+                                mbedtls_mpi const *E, mbedtls_mpi const *N)
 {
   int __retres;
   int ret;
@@ -1159,22 +1123,21 @@ void mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
   int tmp_0;
   int tmp_6;
   size_t one = (size_t)1;
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
-  /*@ \slicing::slice_preserve_stmt ; */
-  {
-    tmp = mbedtls_mpi_cmp_int_slice_1(N,0);
-    if (tmp <= 0) {
+  tmp = mbedtls_mpi_cmp_int_slice_1(N,0);
+  if (tmp <= 0) {
+    __retres = -0x0004;
+    goto return_label;
+  }
+  else 
+    if ((*(N->private_p + 0) & (unsigned int)1) == (unsigned int)0) {
       __retres = -0x0004;
       goto return_label;
     }
-    else 
-      if ((*(N->private_p + 0) & (unsigned int)1) == (unsigned int)0) {
-        __retres = -0x0004;
-        goto return_label;
-      }
-  }
   tmp_0 = mbedtls_mpi_cmp_int_slice_1(E,0);
-  if (tmp_0 < 0) goto return_label;
+  if (tmp_0 < 0) {
+    __retres = -0x0004;
+    goto return_label;
+  }
   mpi_montg_init_slice_1(& mm,N);
   mbedtls_mpi_init_slice_1(& RR);
   mbedtls_mpi_init_slice_1(& T);
@@ -1276,12 +1239,8 @@ void mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
     }
     bufsize --;
     ei = (*(E->private_p + nblimbs) >> bufsize) & (unsigned int)1;
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (ei == (mbedtls_mpi_uint)0) 
       if (state == (mbedtls_mpi_uint)0) continue;
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if (ei == (mbedtls_mpi_uint)0) 
       if (state == (mbedtls_mpi_uint)1) {
         mpi_montmul_slice_1(X,(mbedtls_mpi const *)X,N,mm,
@@ -1313,8 +1272,6 @@ void mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
     mpi_montmul_slice_1(X,(mbedtls_mpi const *)X,N,mm,
                         (mbedtls_mpi const *)(& T));
     wbits <<= 1;
-    /*@ \slicing::slice_preserve_ctrl ; */ ;
-    /*@ \slicing::slice_preserve_stmt ; */
     if ((wbits & (one << wsize)) != (unsigned long)0) mpi_montmul_slice_1
                                                       (X,
                                                        (mbedtls_mpi const *)(& W[1]),
@@ -1323,17 +1280,24 @@ void mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
     i ++;
   }
   mpi_montred_slice_1(X,N,mm,(mbedtls_mpi const *)(& T));
-  /*@ \slicing::slice_preserve_ctrl ; */ ;
-  /*@ \slicing::slice_preserve_stmt ; */
   if (neg) 
     if (E->private_n != (size_t)0) 
       if ((*(E->private_p + 0) & (unsigned int)1) != (unsigned int)0) {
         X->private_s = -1;
         ret = mbedtls_mpi_add_mpi_slice_1(X,N,(mbedtls_mpi const *)X);
-        if (ret != 0) goto cleanup;
       }
-  cleanup: ;
-  return_label: return;
+  cleanup: i = one << (wsize - (size_t)1);
+  while (i < one << wsize) {
+    mbedtls_mpi_free_slice_1(& W[i]);
+    i ++;
+  }
+  mbedtls_mpi_free_slice_1(& W[1]);
+  mbedtls_mpi_free_slice_1(& T);
+  mbedtls_mpi_free_slice_1(& Apos);
+  mbedtls_mpi_free_slice_1(& WW);
+  mbedtls_mpi_free_slice_1(& RR);
+  __retres = ret;
+  return_label: return __retres;
 }
 
 

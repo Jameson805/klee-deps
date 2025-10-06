@@ -1,5 +1,5 @@
-#ifndef BIGNUM_SLICED_FULL_H
-#define BIGNUM_SLICED_FULL_H
+#ifndef BIGNUM_SLICED_H
+#define BIGNUM_SLICED_H
 
 #include "mbedtls3.2.1/include/mbedtls/bignum.h"
 

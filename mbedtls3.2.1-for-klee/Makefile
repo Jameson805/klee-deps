@@ -15,7 +15,7 @@ BASE_CFLAGS = -isystem mbedtls3.2.1/include/mbedtls -isystem mbedtls3.2.1/librar
 LDFLAGS =
 
 # --- Klee Target (compiles to LLVM bitcode) ---
-KLEE_SRCS = $(SOURCES) klee_driver.c bignum_sliced_full.c
+KLEE_SRCS = $(SOURCES) klee_driver.c bignum_sliced.c
 KLEE_OBJS = $(KLEE_SRCS:.c=.klee.bc)
 KLEE_CFLAGS = $(BASE_CFLAGS) -emit-llvm
 

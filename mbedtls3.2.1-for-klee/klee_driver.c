@@ -1,5 +1,5 @@
 #include "mbedtls3.2.1/include/mbedtls/bignum.h"
-#include "bignum_sliced_full.h"
+#include "bignum_sliced.h"
 #include <stdio.h>
 #include <stdlib.h> // For EXIT_SUCCESS, EXIT_FAILURE
 #include <limits.h>
@@ -50,9 +50,3 @@ cleanup:
     // Return success or failure based on the operation's outcome
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
-
-/*
-KLEE Command:
-/home/james/klee-deps/klee-controlflow/build/bin/klee 
-    \ --max-time=10 --max-solver-time=1s klee.bc
-*/
