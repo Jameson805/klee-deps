@@ -58,11 +58,6 @@ int main(int argc, char *argv[]) {
     #else
         klee_make_symbolic_sc(&E, sizeof(E), "E", 1);
     #endif
-    ret = mbedtls_mpi_lset(&E_exponent, E);
-    if (ret != 0) {
-        printf("ERROR: mbedtls_mpi_lset(E_exponent) failed with %d\n", ret);
-        goto cleanup;
-    }
 
     int64_t A;
     #ifdef CONCRETE_PUBS
@@ -74,12 +69,6 @@ int main(int argc, char *argv[]) {
             klee_make_symbolic_sc(&A, sizeof(A), "A", 0);
         #endif
     #endif
-    // mbedtls_mpi_lset sets an MPI from a long integer.
-    ret = mbedtls_mpi_lset(&A_base, A);
-    if (ret != 0) {
-        printf("ERROR: mbedtls_mpi_lset(A_base) failed with %d\n", ret);
-        goto cleanup;
-    }
 
     int64_t N;
     #ifdef CONCRETE_PUBS
@@ -91,6 +80,17 @@ int main(int argc, char *argv[]) {
             klee_make_symbolic_sc(&N, sizeof(N), "N", 0);
         #endif
     #endif
+
+    ret = mbedtls_mpi_lset(&E_exponent, E);
+    if (ret != 0) {
+        printf("ERROR: mbedtls_mpi_lset(E_exponent) failed with %d\n", ret);
+        goto cleanup;
+    }
+    ret = mbedtls_mpi_lset(&A_base, A);
+    if (ret != 0) {
+        printf("ERROR: mbedtls_mpi_lset(A_base) failed with %d\n", ret);
+        goto cleanup;
+    }
     ret = mbedtls_mpi_lset(&N_modulus, N);
     if (ret != 0) {
         printf("ERROR: mbedtls_mpi_lset(N_modulus) failed with %d\n", ret);

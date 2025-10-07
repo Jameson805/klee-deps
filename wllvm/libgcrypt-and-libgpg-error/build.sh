@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "$0")"
 
 KLEE_PATH="../../klee-controlflow"
 
@@ -30,4 +31,4 @@ wllvm "${flags[@]}" "${klee_flags[@]}" -DCONCRETE_PUBS klee_main.c "${libs[@]}" 
 extract-bc klee_fix_pub
 
 clang "${flags[@]}" -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
-clang "${flags[@]}" -DREPLAY klee_main.c "${libs[@]}" -o klee_fix_pub_replay
+clang "${flags[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
