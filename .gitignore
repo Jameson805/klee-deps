@@ -9,6 +9,7 @@ klee-last
 klee-out-*/
 .libs/
 .deps/
+build/
 
 klee_main
 klee_fix_pub
