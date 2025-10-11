@@ -25,6 +25,27 @@ int load_bytes(const char *filename, void *buf, size_t size)
     return 1;
 }
 
+/* Constant-time bit-length of signed 64-bit integer, ignoring the sign bit.
+   That is, it computes bitlen(abs(x)) for bits [0..62].
+   Returns 0 if all 63 lower bits are zero.
+   Runs in constant time with respect to input value. */
+unsigned bitlen_i64_nosign(int64_t x) {
+    uint64_t ux = (uint64_t)x & 0x7FFFFFFFFFFFFFFFULL; /* mask off sign bit */
+    unsigned found = 0;
+    unsigned bitpos = 0;
+
+    /* Scan bits 62..0 (most-significant to least-significant) */
+    for (int j = 62; j >= 0; --j) {
+        unsigned bit = (unsigned)((ux >> j) & 1u);
+        unsigned set = bit & (1u - found);      /* set only on first (highest) 1 */
+        bitpos = (set * (unsigned)j) | ((1u - set) * bitpos);
+        found |= bit;
+    }
+
+    /* bitlen = found ? bitpos + 1 : 0, branchless */
+    return found * (bitpos + 1u);
+}
+
 int main(int argc, char *argv[]) {
     #ifdef REPLAY
         #ifdef CONCRETE_PUBS
@@ -57,6 +78,12 @@ int main(int argc, char *argv[]) {
         if (!load_bytes(E_filename, &E, sizeof(E))) goto cleanup;
     #else
         klee_make_symbolic_sc(&E, sizeof(E), "E", 1);
+        klee_assume(E >= 1);
+
+        size_t bitlen;
+        klee_make_symbolic_sc(&bitlen, sizeof(bitlen), "E_bitlen", 0);
+        // E and E' must be of the same bit length
+        klee_assume(bitlen_i64_nosign(E) == bitlen);
     #endif
 
     int64_t A;
@@ -67,6 +94,7 @@ int main(int argc, char *argv[]) {
             if (!load_bytes(A_filename, &A, sizeof(A))) goto cleanup;
         #else
             klee_make_symbolic_sc(&A, sizeof(A), "A", 0);
+            klee_assume(A >= 1);
         #endif
     #endif
 
@@ -78,6 +106,7 @@ int main(int argc, char *argv[]) {
             if (!load_bytes(N_filename, &N, sizeof(N))) goto cleanup;
         #else
             klee_make_symbolic_sc(&N, sizeof(N), "N", 0);
+            klee_assume(N >= 1);
         #endif
     #endif
 

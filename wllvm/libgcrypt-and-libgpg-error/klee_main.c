@@ -10,6 +10,36 @@
 
 #define SYM_SIZE 8
 
+/* Returns nonzero if any byte in buf is nonzero */
+unsigned buf_nonzero(const unsigned char *buf, size_t size) {
+    unsigned v = 0;
+    for (size_t i = 0; i < size; ++i)
+        v |= buf[i];
+    return v;
+}
+
+/* Compute bit-length of big-endian unsigned integer stored in buf (LSB at index 0).
+   Returns 0 if all bits are zero.
+   Constant-time: no data-dependent branches or memory accesses. */
+unsigned buf_bitlen(const unsigned char *buf, size_t size) {
+    unsigned found = 0;   /* becomes 1 once any '1' bit is found */
+    unsigned bitpos = 0;  /* stores the highest set bit position */
+
+    /* Iterate from most-significant bit to least-significant bit */
+    for (size_t i = 0; i < size; i++) {
+        for (int j = 7; j >= 0; --j) {
+            unsigned bit = (buf[i] >> j) & 1u;
+            unsigned curpos = (unsigned)((size - 1 - i) * 8u + j);
+            unsigned set = bit & (1u - found);  /* first time we see a 1 from the MSB */
+            bitpos = (set * curpos) | ((1u - set) * bitpos);
+            found |= bit;
+        }
+    }
+
+    /* bitlen = found ? bitpos + 1 : 0 */
+    return found * (bitpos + 1u);
+}
+
 int load_bytes(const char *filename, void *buf, size_t size)
 {
     FILE *f = fopen(filename, "rb");
@@ -50,6 +80,13 @@ int main(int argc, char *argv[]) {
         if (!load_bytes(exp_filename, exp_buf, sizeof(exp_buf))) return 1;
     #else
         klee_make_symbolic_sc(exp_buf, sizeof(exp_buf), "exp", 1);
+        // exp_buf > 0
+        klee_assume(buf_nonzero(exp_buf, SYM_SIZE) != 0);
+
+        unsigned int bitlen;
+        klee_make_symbolic_sc(&bitlen, sizeof(bitlen), "exp_bitlen", 0);
+        // exp and exp' must be of the same bit length
+        klee_assume(buf_bitlen(exp_buf, SYM_SIZE) == bitlen);
     #endif
 
     #ifdef CONCRETE_PUBS
@@ -61,6 +98,8 @@ int main(int argc, char *argv[]) {
             if (!load_bytes(base_filename, base_buf, sizeof(base_buf))) return 1;
         #else
             klee_make_symbolic_sc(base_buf, sizeof(base_buf), "base", 0);
+            // base_buf > 0
+            klee_assume(buf_nonzero(base_buf, SYM_SIZE) != 0);
         #endif
     #endif
 
@@ -73,17 +112,20 @@ int main(int argc, char *argv[]) {
             if (!load_bytes(mod_filename, mod_buf, sizeof(mod_buf))) return 1;
         #else
             klee_make_symbolic_sc(mod_buf, sizeof(mod_buf), "mod", 0);
+            // mod_buf > 0
+            klee_assume(buf_nonzero(mod_buf, SYM_SIZE) != 0);
         #endif
     #endif
 
     // Parse symbolic buffers into gcry_mpi_t big numbers
-    gcry_mpi_t base, exp, mod, result;
-    if (gcry_mpi_scan(&base, GCRYMPI_FMT_USG, base_buf, SYM_SIZE, NULL) != 0)
-        return 2;
+    gcry_mpi_t exp, base, mod, result;
+
     if (gcry_mpi_scan(&exp, GCRYMPI_FMT_USG, exp_buf, SYM_SIZE, NULL) != 0)
-        return 3;
+        return 1;
+    if (gcry_mpi_scan(&base, GCRYMPI_FMT_USG, base_buf, SYM_SIZE, NULL) != 0)
+        return 1;
     if (gcry_mpi_scan(&mod, GCRYMPI_FMT_USG, mod_buf, SYM_SIZE, NULL) != 0)
-        return 4;
+        return 1;
 
     result = gcry_mpi_new(SYM_SIZE * 8);
 
