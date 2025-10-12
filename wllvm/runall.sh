@@ -6,19 +6,19 @@ script_path=$(realpath ../klee-controlflow/scripts)
 export PATH="$bin_path:$script_path:$PATH"
 
 # defaults
-kill_after="10s"
-max_solver_time="5s"
-loop_max_iterations=32
 max_time=""
+loop_max_iterations=20
+max_solver_time="5s"
+kill_after="10s"
 
 usage() {
     cat <<EOF
 Usage: $0 [--kill-after <duration>] [--max-solver-time <duration>] [--loop-max-iterations <n>] <max_time>
 
   <max_time>               - required, e.g. 1h, 30m, 600s
-  --kill-after <duration>  - optional, default: 10s
+  --loop-max-iterations n  - optional, default: 20
   --max-solver-time <dur>  - optional, default: 5s
-  --loop-max-iterations n  - optional, default: 32
+  --kill-after <duration>  - optional, default: 10s
 EOF
     exit 1
 }
@@ -56,6 +56,14 @@ if ! [[ "$loop_max_iterations" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
+echo "##########"
+echo "Args:"
+echo "max_time=$max_time"
+echo "loop_max_iterations=$loop_max_iterations"
+echo "max_solver_time=$max_solver_time"
+echo "kill_after=$kill_after"
+echo "##########"
+
 klee_timeout() {
     timeout --kill-after="$kill_after" "$max_time" \
     klee --max-solver-time="$max_solver_time" --libc=uclibc --posix-runtime "$1" \
@@ -63,13 +71,24 @@ klee_timeout() {
 }
 
 limit_loop() {
-    opt \
-    -load ../loop-limiter/build/libLoopLimiter.so \
-    -load-pass-plugin=../loop-limiter/build/libLoopLimiter.so \
-    -passes=loop-limiter \
-    -max-iterations=$loop_max_iterations \
-    "$1" -o "$2"
+    if [ -z "$3" ]; then
+        opt \
+            -load ../loop-limiter/build/libLoopLimiter.so \
+            -load-pass-plugin=../loop-limiter/build/libLoopLimiter.so \
+            -passes=loop-limiter \
+            -max-iterations="$loop_max_iterations" \
+            "$1" -o "$2"
+    else
+        opt \
+            -load ../loop-limiter/build/libLoopLimiter.so \
+            -load-pass-plugin=../loop-limiter/build/libLoopLimiter.so \
+            -passes=loop-limiter \
+            -max-iterations="$loop_max_iterations" \
+            -functions="$3" \
+            "$1" -o "$2"
+    fi
 }
+
 
 rm -rf results
 mkdir results
@@ -80,8 +99,8 @@ echo "Begin experiments for Mbed TLS 3.2.1"
 echo "##########"
 
 mbedtls-3.2.1/build.sh
-limit_loop mbedtls-3.2.1/klee_fix_pub.bc mbedtls-3.2.1/klee_fix_pub_lim_loop.bc
-limit_loop mbedtls-3.2.1/klee_var_pub.bc mbedtls-3.2.1/klee_var_pub_lim_loop.bc
+limit_loop mbedtls-3.2.1/klee_fix_pub.bc mbedtls-3.2.1/klee_fix_pub_lim_loop.bc mbedtls_mpi_exp_mod
+limit_loop mbedtls-3.2.1/klee_var_pub.bc mbedtls-3.2.1/klee_var_pub_lim_loop.bc mbedtls_mpi_exp_mod
 rm -f mbedtls-3.2.1/klee-last
 rm -rf mbedtls-3.2.1/klee-out-*
 
@@ -138,8 +157,8 @@ echo "Begin experiments for Libgcrypt 1.10.1"
 echo "##########"
 
 libgcrypt-and-libgpg-error/build.sh
-limit_loop libgcrypt-and-libgpg-error/klee_fix_pub.bc  libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc
-limit_loop libgcrypt-and-libgpg-error/klee_var_pub.bc  libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc
+limit_loop libgcrypt-and-libgpg-error/klee_fix_pub.bc  libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc _gcry_mpi_powm
+limit_loop libgcrypt-and-libgpg-error/klee_var_pub.bc  libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc _gcry_mpi_powm
 rm -f libgcrypt-and-libgpg-error/klee-last
 rm -rf libgcrypt-and-libgpg-error/klee-out-*
 

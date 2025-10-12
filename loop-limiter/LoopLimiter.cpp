@@ -15,8 +15,26 @@ namespace {
 static cl::opt<unsigned> MaxIterations("max-iterations",
   cl::desc("The max number of iterations for KLEE to explore"), cl::Required);
 
+static cl::list<std::string> Functions(
+    "functions",
+    cl::desc("Comma-separated list of function names to instrument (empty = all)"),
+    cl::ZeroOrMore, cl::CommaSeparated);
+
 struct LoopLimiter : public PassInfoMixin<LoopLimiter> {
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM) {
+    // If a whitelist is provided, only instrument functions in it.
+    if (!Functions.empty()) {
+      bool Allowed = false;
+      for (const auto &Name : Functions) {
+        if (F.getName() == Name) {
+          Allowed = true;
+          break;
+        }
+      }
+      if (!Allowed)
+        return PreservedAnalyses::all();
+    }
+
     LoopInfo &LI = FAM.getResult<LoopAnalysis>(F);
     Module *M = F.getParent();
     LLVMContext &Context = M->getContext();
@@ -49,16 +67,18 @@ struct LoopLimiter : public PassInfoMixin<LoopLimiter> {
       BasicBlock *Preheader = L->getLoopPreheader();
       BasicBlock *Header = L->getHeader();
 
-      // Only instrument loops with a single canonical preheader and a single latch.
-      BasicBlock *SingleLatch = L->getLoopLatch();
       if (!Preheader || !Header) {
         errs() << "warning: skipping loop in function '" << F.getName()
                << "' because it has no preheader/header\n";
         continue;
       }
-      if (!SingleLatch) {
+
+      // Collect all loop latches (support multiple back-edges).
+      SmallVector<BasicBlock*, 4> Latches;
+      L->getLoopLatches(Latches);
+      if (Latches.empty()) {
         errs() << "warning: skipping loop in function '" << F.getName()
-               << "' because it does not have a single latch (multiple back-edges)\n";
+               << "' because it has no latch\n";
         continue;
       }
 
@@ -91,11 +111,13 @@ struct LoopLimiter : public PassInfoMixin<LoopLimiter> {
       Value *Compare = Builder.CreateICmpSGE(CurrentCount, Limit, "bound.check"); // check for >=
       Builder.CreateCondBr(Compare, ExitBB, ContinueBB);
 
-      // 5. We already ensured a single latch; increment the counterimmediately before its terminator.
-      Builder.SetInsertPoint(SingleLatch->getTerminator());
-      Value *OldVal = Builder.CreateLoad(Type::getInt32Ty(Context), Counter, "counter.old");
-      Value *NewVal = Builder.CreateAdd(OldVal, Builder.getInt32(1), "counter.new");
-      Builder.CreateStore(NewVal, Counter);
+      // 5. Increment the counter in every latch before the back-edge is taken.
+      for (BasicBlock *Latch : Latches) {
+        Builder.SetInsertPoint(Latch->getTerminator());
+        Value *OldVal = Builder.CreateLoad(Type::getInt32Ty(Context), Counter, "counter.old");
+        Value *NewVal = Builder.CreateAdd(OldVal, Builder.getInt32(1), "counter.new");
+        Builder.CreateStore(NewVal, Counter);
+      }
     }
 
     return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();

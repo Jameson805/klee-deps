@@ -60,6 +60,7 @@ opt \
   -load-pass-plugin=./build/libLoopLimiter.so \
   -passes=loop-limiter \
   -max-iterations=5 \
+  -functions=a \
   input.bc -o input_instrumented.bc
 ```
 
@@ -70,7 +71,8 @@ opt \
 
 Tips
 --------------
-- Change MaxIterations with the -max-iterations command-line option passed to opt (as shown above).
+- Change MaxIterations with the `-max-iterations` command-line option passed to opt (as shown above).
+- Target specific function(s) with `-functions` followed by comma separated names (target all functions by default).
 - If a loop is skipped you'll see a warning printed to errs() identifying the function and the reason.
 - If you need to support more complex loops (multiple latches, loops without preheaders, or irreducible loops) you must:
   - canonicalize loops (e.g., run passes that create preheaders),
