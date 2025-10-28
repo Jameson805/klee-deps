@@ -437,7 +437,14 @@ _gcry_mpi_powm (gcry_mpi_t res,
   msign = mod->sign;
 
   ep = expo->d;
-  MPN_NORMALIZE(ep, esize);
+  // MPN_NORMALIZE(ep, esize);
+  // Simplification of above macro for slicing purposes:
+  while (esize > 0) {
+    //@ slice_preserve_ctrl;
+    //@ slice_preserve_stmt;
+    if (ep[esize - 1]) break;
+    esize--;
+  }
 
   if (esize * BITS_PER_MPI_LIMB > 512)
     W = 5;
@@ -468,6 +475,7 @@ _gcry_mpi_powm (gcry_mpi_t res,
         {
           RESIZE_IF_NEEDED (res, 1);
           rp = res->d;
+          //@ assert \valid(rp + 0);
           rp[0] = 1;
         }
       res->sign = 0;
@@ -556,6 +564,8 @@ _gcry_mpi_powm (gcry_mpi_t res,
     xp = xp_marker = mpi_alloc_limb_space( size, msec );
 
     memset( &karactx, 0, sizeof karactx );
+    //@ slice_preserve_ctrl;
+    //@ slice_preserve_stmt;
     negative_result = (ep[0] & 1) && bsign;
 
     /* Precompute PRECOMP[], BASE^(2 * i + 1), BASE^1, ^3, ^5, ... */
@@ -608,12 +618,15 @@ _gcry_mpi_powm (gcry_mpi_t res,
 
     e = ep[i];
     count_leading_zeros (c, e);
+    //@ assert 0 <= c && c <= BITS_PER_MPI_LIMB - 1;
     e = (e << c) << 1;
     c = BITS_PER_MPI_LIMB - 1 - c;
 
     j = 0;
 
-    for (;;)
+    for (;;) {
+      //@ slice_preserve_ctrl;
+      //@ slice_preserve_stmt;
       if (e == 0)
         {
           j += c;
@@ -633,17 +646,21 @@ _gcry_mpi_powm (gcry_mpi_t res,
           w.d = base_u;
 
           count_leading_zeros (c0, e);
+          //@ assert 0 <= c0 && c0 <= BITS_PER_MPI_LIMB - 1;
           e = (e << c0);
           c -= c0;
           j += c0;
 
           e0 = (e >> (BITS_PER_MPI_LIMB - W));
+          //@ slice_preserve_ctrl;
+          //@ slice_preserve_stmt;
           if (c >= W)
             c0 = 0;
           else
             {
               if ( --i < 0 )
                 {
+                  //@ assert 0 <= c0 && c0 <= BITS_PER_MPI_LIMB - 1;
                   e0 = (e >> (BITS_PER_MPI_LIMB - c));
                   j += c - W;
                   goto last_step;
@@ -662,8 +679,12 @@ _gcry_mpi_powm (gcry_mpi_t res,
 
         last_step:
           count_trailing_zeros (c0, e0);
+          //@ assert 0 <= c0 && c0 <= BITS_PER_MPI_LIMB - 1;
+          e = (e << c0);
           e0 = (e0 >> c0) >> 1;
-
+          
+          //@ slice_preserve_ctrl;
+          //@ slice_preserve_stmt;
           for (j += W - c0; j >= 0; j--)
             {
 
@@ -698,7 +719,10 @@ _gcry_mpi_powm (gcry_mpi_t res,
           if ( i < 0 )
             break;
         }
+    }
 
+    //@ slice_preserve_ctrl;
+    //@ slice_preserve_stmt;
     while (j--)
       {
         mul_mod (xp, &xsize, rp, rsize, rp, rsize, mp, msize, &karactx);

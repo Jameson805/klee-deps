@@ -1174,17 +1174,7 @@ _gcry_strdup (const char *string)
 void *
 _gcry_xmalloc( size_t n )
 {
-  void *p;
-
-  while ( !(p = _gcry_malloc( n )) )
-    {
-      if ( fips_mode ()
-           || !outofcore_handler
-           || !outofcore_handler (outofcore_handler_value, n, 0) )
-        {
-          _gcry_fatal_error (gpg_err_code_from_errno (errno), NULL);
-        }
-    }
+    void *p = malloc(n);
     return p;
 }
 

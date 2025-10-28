@@ -1,4 +1,4 @@
-This is gcrypt.info, produced by makeinfo version 6.5 from gcrypt.texi.
+This is gcrypt.info, produced by makeinfo version 6.8 from gcrypt.texi.
 
 This manual is for Libgcrypt version 1.10.1 and was last updated 28
 March 2022.  Libgcrypt is GNU's library of cryptographic building
@@ -22,7 +22,7 @@ END-INFO-DIR-ENTRY
 
 Indirect:
 gcrypt.info-1: 860
-gcrypt.info-2: 305422
+gcrypt.info-2: 305426
 
 Tag Table:
 (Indirect)
@@ -111,27 +111,32 @@ Node: hmac256213178
 Node: Configuration214183
 Node: Architecture217399
 Ref: fig:subsystems218925
-Ref: Architecture-Footnote-1220012
-Ref: Architecture-Footnote-2220074
-Node: Public-Key Subsystem Architecture220158
-Node: Symmetric Encryption Subsystem Architecture222442
-Node: Hashing and MACing Subsystem Architecture224039
-Node: Multi-Precision-Integer Subsystem Architecture226113
-Node: Prime-Number-Generator Subsystem Architecture227551
-Ref: Prime-Number-Generator Subsystem Architecture-Footnote-1229478
-Node: Random-Number Subsystem Architecture229768
-Node: CSPRNG Description232959
-Ref: CSPRNG Description-Footnote-1234514
-Node: DRBG Description234637
-Node: Self-Tests236318
-Node: FIPS Mode248135
-Ref: fig:fips-fsm252319
-Ref: tbl:fips-states252422
-Ref: tbl:fips-state-transitions253670
-Node: Library Copying257280
-Node: Copying285386
-Node: Figures and Tables305422
-Node: Concept Index305847
-Node: Function and Data Index318472
+Ref: Architecture-Footnote-1220013
+Ref: Architecture-Footnote-2220075
+Node: Public-Key Subsystem Architecture220159
+Node: Symmetric Encryption Subsystem Architecture222443
+Node: Hashing and MACing Subsystem Architecture224040
+Node: Multi-Precision-Integer Subsystem Architecture226114
+Node: Prime-Number-Generator Subsystem Architecture227552
+Ref: Prime-Number-Generator Subsystem Architecture-Footnote-1229479
+Node: Random-Number Subsystem Architecture229769
+Node: CSPRNG Description232960
+Ref: CSPRNG Description-Footnote-1234515
+Node: DRBG Description234638
+Node: Self-Tests236319
+Node: FIPS Mode248136
+Ref: fig:fips-fsm252320
+Ref: tbl:fips-states252424
+Ref: tbl:fips-state-transitions253673
+Node: Library Copying257284
+Node: Copying285390
+Node: Figures and Tables305426
+Node: Concept Index305851
+Node: Function and Data Index318476
 
 End Tag Table
+
+
+Local Variables:
+coding: utf-8
+End:

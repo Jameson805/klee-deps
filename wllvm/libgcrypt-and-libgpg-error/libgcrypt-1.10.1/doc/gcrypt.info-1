@@ -1,4 +1,4 @@
-This is gcrypt.info, produced by makeinfo version 6.5 from gcrypt.texi.
+This is gcrypt.info, produced by makeinfo version 6.8 from gcrypt.texi.
 
 This manual is for Libgcrypt version 1.10.1 and was last updated 28
 March 2022.  Libgcrypt is GNU's library of cryptographic building
@@ -5427,6 +5427,7 @@ places with the master copy at 'ftp://ftp.gnupg.org/gcrypt/libgcrypt/'.
 Announcements of new releases are posted to the
 'gnupg-announce@gnupg.org' mailing list(2).
 
+
      [image src="libgcrypt-modules.png" alt="Libgcrypt subsystems" ]
 
 Figure 17.1: Libgcrypt subsystems
@@ -6275,9 +6276,11 @@ The FIPS mode of Libgcrypt implements a finite state machine (FSM) using
 only valid transitions (*note Table B.2: tbl:fips-state-transitions.)
 may happen.
 
+
             [image src="fips-fsm.png" alt="FIPS FSM Diagram" ]
 
 Figure B.1: FIPS mode state diagram
+
 
 States used by the FIPS FSM:
 
@@ -6317,6 +6320,7 @@ Shutdown
      The application may at this point still run cleanup handlers.
 
 Table B.1: FIPS mode states
+
 
 The valid state transitions (*note Figure B.1: fig:fips-fsm.) are:
 '1'

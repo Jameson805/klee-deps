@@ -4,11 +4,13 @@
 #include <string.h>
 #include <assert.h>
 
+#include "modpow_sliced.h"
+
 #ifndef REPLAY
     #include "klee/klee.h"
 #endif
 
-#define SYM_SIZE 8
+#define SYM_SIZE 2
 
 int load_bytes(const char *filename, void *buf, size_t size)
 {
@@ -50,6 +52,10 @@ int main(int argc, char *argv[]) {
         if (!load_bytes(exp_filename, exp_buf, sizeof(exp_buf))) return 1;
     #else
         klee_make_symbolic_sc(exp_buf, sizeof(exp_buf), "exp", 1);
+
+        for (int i = 0; i < SYM_SIZE; i++) {
+            klee_assume(exp_buf[i] <= 0x03);
+        }
     #endif
 
     #ifdef CONCRETE_PUBS
@@ -61,6 +67,10 @@ int main(int argc, char *argv[]) {
             if (!load_bytes(base_filename, base_buf, sizeof(base_buf))) return 1;
         #else
             klee_make_symbolic_sc(base_buf, sizeof(base_buf), "base", 0);
+
+            for (int i = 0; i < SYM_SIZE; i++) {
+                klee_assume(base_buf[i] <= 0x0F); 
+            }
         #endif
     #endif
 
@@ -73,6 +83,11 @@ int main(int argc, char *argv[]) {
             if (!load_bytes(mod_filename, mod_buf, sizeof(mod_buf))) return 1;
         #else
             klee_make_symbolic_sc(mod_buf, sizeof(mod_buf), "mod", 0);
+
+            for (int i = 0; i < SYM_SIZE; i++) {
+                klee_assume(mod_buf[i] <= 0x0F);  
+            }
+            klee_assume(mod_buf[0] != 0);
         #endif
     #endif
 
@@ -88,7 +103,7 @@ int main(int argc, char *argv[]) {
     result = gcry_mpi_new(SYM_SIZE * 8);
 
     // Perform modular exponentiation
-    gcry_mpi_powm(result, base, exp, mod);
+    _gcry_mpi_powm_slice_1(result, base, exp, mod);
 
     // Free memory
     gcry_mpi_release(base);

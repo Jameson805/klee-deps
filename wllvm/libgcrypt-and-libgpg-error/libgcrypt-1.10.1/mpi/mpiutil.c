@@ -52,6 +52,8 @@ static gcry_mpi_t constants[MPI_NUMBER_OF_CONSTANTS];
 static volatile mpi_limb_t vzero = 0;
 static volatile mpi_limb_t vone = 1;
 
+// extern void Frama_C_make_unknown(void *ptr, unsigned long size);
+
 
 const char *
 _gcry_mpi_get_hw_config (void)
@@ -102,8 +104,15 @@ _gcry_mpi_alloc( unsigned nlimbs )
     gcry_mpi_t a;
 
     a = xmalloc( sizeof *a );
-    a->d = nlimbs? mpi_alloc_limb_space( nlimbs, 0 ) : NULL;
-    a->alloced = nlimbs;
+    if (!nlimbs) {
+      a->d = malloc(sizeof(mpi_limb_t));
+      a->d[0] = 0;
+      // Frama_C_make_unknown(a->d, sizeof(mpi_limb_t));
+    } else {
+      a->d = mpi_alloc_limb_space(nlimbs+3, 0);
+      // Frama_C_make_unknown(a->d, nlimbs * sizeof(mpi_limb_t));
+    }
+    a->alloced = nlimbs+3;
     a->nlimbs = 0;
     a->sign = 0;
     a->flags = 0;
@@ -136,14 +145,8 @@ _gcry_mpi_alloc_secure( unsigned nlimbs )
 mpi_ptr_t
 _gcry_mpi_alloc_limb_space( unsigned int nlimbs, int secure )
 {
-    mpi_ptr_t p;
-    size_t len;
-
-    len = (nlimbs ? nlimbs : 1) * sizeof (mpi_limb_t);
-    p = secure ? xmalloc_secure (len) : xmalloc (len);
-    if (! nlimbs)
-      *p = 0;
-
+    mpi_ptr_t p = malloc(nlimbs * sizeof(mpi_limb_t));
+    // Frama_C_make_unknown(p, nlimbs * sizeof(mpi_limb_t));
     return p;
 }
 

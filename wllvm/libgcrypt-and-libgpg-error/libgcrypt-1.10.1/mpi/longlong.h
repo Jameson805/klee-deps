@@ -605,7 +605,7 @@ extern USItype __udiv_qrnnd ();
 	   __CLOBBER_CC)
 # define count_leading_zeros(count, x) \
   do {                                                                  \
-    UDItype __cbtmp;                                                    \
+    UDItype __cbtmp = 0;                                                \
     __asm__ ("bsrq %1,%0"                                               \
              : "=r" (__cbtmp) : "rm" ((UDItype)(x))                     \
              __CLOBBER_CC);                                             \
@@ -613,7 +613,7 @@ extern USItype __udiv_qrnnd ();
   } while (0)
 # define count_trailing_zeros(count, x) \
   do {                                                                  \
-    UDItype __cbtmp;                                                    \
+    UDItype __cbtmp = 0;                                                \
     __asm__ ("bsfq %1,%0"                                               \
              : "=r" (__cbtmp) : "rm" ((UDItype)(x))                     \
              __CLOBBER_CC);                                             \
