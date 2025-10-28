@@ -11,11 +11,5 @@
       "column": 2
     }
   ],
-  "indices": [
-    {
-      "filename": "i32_modpow.c",
-      "line": 59,
-      "column": 10
-    }
-  ]
+  "indices": []
 }

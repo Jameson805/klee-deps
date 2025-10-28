@@ -1,0 +1,15 @@
+{
+  "branches": [
+    {
+      "filename": "bn_exp.c",
+      "line": 242,
+      "column": 13
+    },
+    {
+      "filename": "bn_exp.c",
+      "line": 262,
+      "column": 17
+    }
+  ],
+  "indices": []
+}

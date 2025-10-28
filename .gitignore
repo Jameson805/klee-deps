@@ -5,6 +5,7 @@
 *.so
 *.ll
 *.log
+*.d
 klee-last
 klee-out-*/
 .libs/
@@ -12,9 +13,35 @@ klee-out-*/
 build/
 
 klee_main
-klee_fix_pub
-klee_var_pub
-klee_fix_pub_replay
-klee_var_pub_replay
+klee_fix_pub*
+klee_var_pub*
+klee_fix_pub_replay*
+klee_var_pub_replay*
 
 wllvm/results
+
+wllvm/openssl-1.1.1q/Makefile
+wllvm/openssl-1.1.1q/test/buildtest_*
+wllvm/openssl-1.1.1q/test/*test
+wllvm/openssl-1.1.1q/fuzz/*test
+wllvm/openssl-1.1.1q/apps/CA.pl
+wllvm/openssl-1.1.1q/apps/openssl
+wllvm/openssl-1.1.1q/apps/progs.h
+wllvm/openssl-1.1.1q/apps/tsget.pl
+wllvm/openssl-1.1.1q/configdata.pm
+wllvm/openssl-1.1.1q/crypto/buildinf.h
+wllvm/openssl-1.1.1q/include/crypto/bn_conf.h
+wllvm/openssl-1.1.1q/include/crypto/dso_conf.h
+wllvm/openssl-1.1.1q/include/openssl/opensslconf.h
+wllvm/openssl-1.1.1q/libcrypto.pc
+wllvm/openssl-1.1.1q/libssl.pc
+wllvm/openssl-1.1.1q/openssl.pc
+wllvm/openssl-1.1.1q/test/rsa_complex
+wllvm/openssl-1.1.1q/test/ssltest_old
+wllvm/openssl-1.1.1q/test/v3ext
+wllvm/openssl-1.1.1q/test/versions
+wllvm/openssl-1.1.1q/test/x509aux
+wllvm/openssl-1.1.1q/tools/c_rehash
+wllvm/openssl-1.1.1q/util/shlib_wrap.sh
+
+.vscode/

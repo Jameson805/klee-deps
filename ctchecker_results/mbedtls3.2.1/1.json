@@ -2,21 +2,6 @@
   "branches": [
     {
       "filename": "bignum.c",
-      "line": 104,
-      "column": 9
-    },
-    {
-      "filename": "bignum.c",
-      "line": 126,
-      "column": 9
-    },
-    {
-      "filename": "bignum.c",
-      "line": 131,
-      "column": 13
-    },
-    {
-      "filename": "bignum.c",
       "line": 238,
       "column": 13
     },
@@ -186,21 +171,6 @@
       "filename": "bignum.c",
       "line": 1399,
       "column": 24
-    },
-    {
-      "filename": "bignum.c",
-      "line": 2119,
-      "column": 15
-    },
-    {
-      "filename": "bignum.c",
-      "line": 2182,
-      "column": 31
-    },
-    {
-      "filename": "bignum.c",
-      "line": 1887,
-      "column": 28
     }
   ]
 }

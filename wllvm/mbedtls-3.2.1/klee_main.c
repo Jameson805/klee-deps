@@ -107,6 +107,7 @@ int main(int argc, char *argv[]) {
         #else
             klee_make_symbolic_sc(&N, sizeof(N), "N", 0);
             klee_assume(N >= 1);
+            klee_assume(N % 2 == 1);
         #endif
     #endif
 

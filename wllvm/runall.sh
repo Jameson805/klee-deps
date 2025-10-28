@@ -9,7 +9,7 @@ export PATH="$bin_path:$script_path:$PATH"
 max_time=""
 loop_max_iterations=20
 max_solver_time="5s"
-kill_after="10s"
+kill_after="5m"
 
 usage() {
     cat <<EOF
@@ -69,9 +69,7 @@ echo "kill_after=$kill_after"
 echo "##########"
 
 klee_timeout() {
-    timeout --kill-after="$kill_after" "$max_time" \
-    klee --max-solver-time="$max_solver_time" --libc=uclibc --posix-runtime "$1" \
-    || true
+    timeout --foreground --signal=INT --kill-after=30s $max_time klee --max-solver-time="$max_solver_time" --libc=uclibc --posix-runtime --dump-states-on-halt=false --use-batching-search=true "$1" || true
 }
 
 limit_loop() {
@@ -81,6 +79,45 @@ limit_loop() {
         -passes=loop-limiter \
         -max-iterations="$loop_max_iterations" \
         $@
+}
+
+run_case() {
+    local title="$1"          # e.g. "Mbed TLS 3.2.1 (Fix Pub)"
+    local bc="$2"             # e.g. mbedtls-3.2.1/klee_fix_pub.bc
+    local result_name="$3"    # e.g. mbedtls_fix_pub
+    local replay_script="$4"  # e.g. mbedtls-3.2.1/klee_fix_pub_replay
+    local replay_opts="$5"    # e.g. "--secret E" or "--secret exp --public base,mod"
+    local ct_json="$6"        # e.g. ../ctchecker_results/mbedtls3.2.1/3.json
+    local code_path="$7"      # e.g. mbedtls-3.2.1/library
+    local memory_flag="$8"    # must be "true" or "false"
+    shift 8                   # Remaining args (if any) are extra compare args, e.g., --lines ...
+
+    if [[ "$memory_flag" != "true" && "$memory_flag" != "false" ]]; then
+        echo "Error: memory_flag must be 'true' or 'false' (got '$memory_flag')" >&2
+        exit 1
+    fi
+
+    local bc_dir
+    bc_dir=$(dirname "$bc")
+
+    echo "========="
+    echo "$title"
+    echo "========="
+    klee_timeout "$bc"
+    mv "$bc_dir/klee-out-0" "results/$result_name"
+    rm -f "$bc_dir/klee-last"
+    rm -rf "$bc_dir/klee-out-*"
+
+    compare_with_ctchecker.py branch "$ct_json" "results/$result_name" "results/${result_name}_branch.json" --code-path "$code_path" "$@"
+    reproduce_positives.py "results/${result_name}_branch.json" "results/$result_name" "$replay_script" $replay_opts --output "results/${result_name}_branch.json"
+    make_report.py "results/${result_name}_branch.json" "results/${result_name}_branch_report.html"
+    make_plot.py "results/${result_name}_branch.json" "$title (Branch)" "results/${result_name}_branch_plot.png"
+
+    if [[ "$memory_flag" == "true" ]]; then
+        compare_with_ctchecker.py memory "$ct_json" "results/$result_name" "results/${result_name}_memory.json" --code-path "$code_path" "$@"
+        make_report.py "results/${result_name}_memory.json" "results/${result_name}_memory_report.html"
+        make_plot.py "results/${result_name}_memory.json" "$title" "results/${result_name}_memory_plot.png"
+    fi
 }
 
 echo "##########"
@@ -109,77 +146,12 @@ limit_loop \
 rm -f mbedtls-3.2.1/klee-last
 rm -rf mbedtls-3.2.1/klee-out-*
 
-echo "========="
-echo "Mbed TLS 3.2.1 (Fix Pub)"
-echo "========="
-klee_timeout mbedtls-3.2.1/klee_fix_pub.bc
-mv mbedtls-3.2.1/klee-out-0 results/mbedtls_fix_pub
-rm -f mbedtls-3.2.1/klee-last
-rm -rf mbedtls-3.2.1/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/mbedtls3.2.1/2.json results/mbedtls_fix_pub results/mbedtls_fix_pub_combined.json --code-path mbedtls-3.2.1/library --lines 1968:2202
-reproduce_positives.py results/mbedtls_fix_pub_combined.json results/mbedtls_fix_pub mbedtls-3.2.1/klee_fix_pub_replay --secret E --output results/mbedtls_fix_pub_combined.json
-make_report.py results/mbedtls_fix_pub_combined.json results/mbedtls_fix_pub_report.html
-make_plot.py results/mbedtls_fix_pub_combined.json "Mbed TLS 3.2.1 (Fix Pub)" results/mbedtls_fix_pub_plot.png
-
-echo "========="
-echo "Mbed TLS 3.2.1 (Fix Pub Lim Loop)"
-echo "========="
-klee_timeout mbedtls-3.2.1/klee_fix_pub_lim_loop.bc
-mv mbedtls-3.2.1/klee-out-0 results/mbedtls_fix_pub_lim_loop
-rm -f mbedtls-3.2.1/klee-last
-rm -rf mbedtls-3.2.1/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/mbedtls3.2.1/2.json results/mbedtls_fix_pub_lim_loop results/mbedtls_fix_pub_lim_loop_combined.json --code-path mbedtls-3.2.1/library --lines 1968:2202
-reproduce_positives.py results/mbedtls_fix_pub_lim_loop_combined.json results/mbedtls_fix_pub_lim_loop mbedtls-3.2.1/klee_fix_pub_replay --secret E --output results/mbedtls_fix_pub_lim_loop_combined.json
-make_report.py results/mbedtls_fix_pub_lim_loop_combined.json results/mbedtls_fix_pub_lim_loop_report.html
-make_plot.py results/mbedtls_fix_pub_lim_loop_combined.json "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" results/mbedtls_fix_pub_lim_loop_plot.png
-
-echo "========="
-echo "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)"
-echo "========="
-klee_timeout mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc
-mv mbedtls-3.2.1/klee-out-0 results/mbedtls_fix_pub_lim_loop_break
-rm -f mbedtls-3.2.1/klee-last
-rm -rf mbedtls-3.2.1/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/mbedtls3.2.1/2.json results/mbedtls_fix_pub_lim_loop_break results/mbedtls_fix_pub_lim_loop_break_combined.json --code-path mbedtls-3.2.1/library --lines 1968:2202
-reproduce_positives.py results/mbedtls_fix_pub_lim_loop_break_combined.json results/mbedtls_fix_pub_lim_loop_break mbedtls-3.2.1/klee_fix_pub_replay --secret E --output results/mbedtls_fix_pub_lim_loop_break_combined.json
-make_report.py results/mbedtls_fix_pub_lim_loop_break_combined.json results/mbedtls_fix_pub_lim_loop_break_report.html
-make_plot.py results/mbedtls_fix_pub_lim_loop_break_combined.json "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" results/mbedtls_fix_pub_lim_loop_break_plot.png
-
-echo "========="
-echo "Mbed TLS 3.2.1 (Var Pub)"
-echo "========="
-klee_timeout mbedtls-3.2.1/klee_var_pub.bc
-mv mbedtls-3.2.1/klee-out-0 results/mbedtls_var_pub
-rm -f mbedtls-3.2.1/klee-last
-rm -rf mbedtls-3.2.1/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/mbedtls3.2.1/2.json results/mbedtls_var_pub results/mbedtls_var_pub_combined.json --code-path mbedtls-3.2.1/library --lines 1968:2202
-reproduce_positives.py results/mbedtls_var_pub_combined.json results/mbedtls_var_pub mbedtls-3.2.1/klee_var_pub_replay --secret E --public A,N --output results/mbedtls_var_pub_combined.json
-make_report.py results/mbedtls_var_pub_combined.json results/mbedtls_var_pub_report.html
-make_plot.py results/mbedtls_var_pub_combined.json "Mbed TLS 3.2.1 (Var Pub)" results/mbedtls_var_pub_plot.png
-
-echo "========="
-echo "Mbed TLS 3.2.1 (Var Pub Lim Loop)"
-echo "========="
-klee_timeout mbedtls-3.2.1/klee_var_pub_lim_loop.bc
-mv mbedtls-3.2.1/klee-out-0 results/mbedtls_var_pub_lim_loop
-rm -f mbedtls-3.2.1/klee-last
-rm -rf mbedtls-3.2.1/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/mbedtls3.2.1/2.json results/mbedtls_var_pub_lim_loop results/mbedtls_var_pub_lim_loop_combined.json --code-path mbedtls-3.2.1/library --lines 1968:2202
-reproduce_positives.py results/mbedtls_var_pub_lim_loop_combined.json results/mbedtls_var_pub_lim_loop mbedtls-3.2.1/klee_var_pub_replay --secret E --public A,N --output results/mbedtls_var_pub_lim_loop_combined.json
-make_report.py results/mbedtls_var_pub_lim_loop_combined.json results/mbedtls_var_pub_lim_loop_report.html
-make_plot.py results/mbedtls_var_pub_lim_loop_combined.json "Mbed TLS 3.2.1 (Var Pub Lim Loop)" results/mbedtls_var_pub_lim_loop_plot.png
-
-echo "========="
-echo "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)"
-echo "========="
-klee_timeout mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc
-mv mbedtls-3.2.1/klee-out-0 results/mbedtls_var_pub_lim_loop_break
-rm -f mbedtls-3.2.1/klee-last
-rm -rf mbedtls-3.2.1/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/mbedtls3.2.1/2.json results/mbedtls_var_pub_lim_loop_break results/mbedtls_var_pub_lim_loop_break_combined.json --code-path mbedtls-3.2.1/library --lines 1968:2202
-reproduce_positives.py results/mbedtls_var_pub_lim_loop_break_combined.json results/mbedtls_var_pub_lim_loop_break mbedtls-3.2.1/klee_var_pub_replay --secret E --public A,N --output results/mbedtls_var_pub_lim_loop_break_combined.json
-make_report.py results/mbedtls_var_pub_lim_loop_break_combined.json results/mbedtls_var_pub_lim_loop_break_report.html
-make_plot.py results/mbedtls_var_pub_lim_loop_break_combined.json "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" results/mbedtls_var_pub_lim_loop_break_plot.png
+run_case "Mbed TLS 3.2.1 (Fix Pub)" "mbedtls-3.2.1/klee_fix_pub.bc" "mbedtls_fix_pub" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_lim_loop.bc" "mbedtls_fix_pub_lim_loop" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc" "mbedtls_fix_pub_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+run_case "Mbed TLS 3.2.1 (Var Pub)" "mbedtls-3.2.1/klee_var_pub.bc" "mbedtls_var_pub" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop)" "mbedtls-3.2.1/klee_var_pub_lim_loop.bc" "mbedtls_var_pub_lim_loop" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc" "mbedtls_var_pub_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
 
 echo "##########"
 echo "Begin experiments for Libgcrypt 1.10.1"
@@ -207,74 +179,69 @@ limit_loop \
 rm -f libgcrypt-and-libgpg-error/klee-last
 rm -rf libgcrypt-and-libgpg-error/klee-out-*
 
-echo "========="
-echo "Libgcrypt 1.10.1 (Fix Pub)"
-echo "========="
-klee_timeout libgcrypt-and-libgpg-error/klee_fix_pub.bc
-mv libgcrypt-and-libgpg-error/klee-out-0 results/libgcrypt_fix_pub
-rm -f libgcrypt-and-libgpg-error/klee-last
-rm -rf libgcrypt-and-libgpg-error/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/libgcrypt1.10.1/2.json results/libgcrypt_fix_pub results/libgcrypt_fix_pub_combined.json --code-path libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi
-reproduce_positives.py results/libgcrypt_fix_pub_combined.json results/libgcrypt_fix_pub libgcrypt-and-libgpg-error/klee_fix_pub_replay --secret exp --output results/libgcrypt_fix_pub_combined.json
-make_report.py results/libgcrypt_fix_pub_combined.json results/libgcrypt_fix_pub_report.html
-make_plot.py results/libgcrypt_fix_pub_combined.json "Libgcrypt 1.10.1 (Fix Pub)" results/libgcrypt_fix_pub_plot.png
+run_case "Libgcrypt 1.10.1 (Fix Pub)" "libgcrypt-and-libgpg-error/klee_fix_pub.bc" "libgcrypt_fix_pub" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc" "libgcrypt_fix_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc" "libgcrypt_fix_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+run_case "Libgcrypt 1.10.1 (Var Pub)" "libgcrypt-and-libgpg-error/klee_var_pub.bc" "libgcrypt_var_pub" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc" "libgcrypt_var_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc" "libgcrypt_var_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
 
-echo "========="
-echo "Libgcrypt 1.10.1 (Fix Pub Lim Loop)"
-echo "========="
-klee_timeout libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc
-mv libgcrypt-and-libgpg-error/klee-out-0 results/libgcrypt_fix_pub_lim_loop
-rm -f libgcrypt-and-libgpg-error/klee-last
-rm -rf libgcrypt-and-libgpg-error/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/libgcrypt1.10.1/2.json results/libgcrypt_fix_pub_lim_loop results/libgcrypt_fix_pub_lim_loop_combined.json --code-path libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi
-reproduce_positives.py results/libgcrypt_fix_pub_lim_loop_combined.json results/libgcrypt_fix_pub_lim_loop libgcrypt-and-libgpg-error/klee_fix_pub_replay --secret exp --output results/libgcrypt_fix_pub_lim_loop_combined.json
-make_report.py results/libgcrypt_fix_pub_lim_loop_combined.json results/libgcrypt_fix_pub_lim_loop_report.html
-make_plot.py results/libgcrypt_fix_pub_lim_loop_combined.json "Libgcrypt 1.10.1 (Fix Pub Lim Loop)" results/libgcrypt_fix_pub_lim_loop_plot.png
+echo "##########"
+echo "Begin experiments for OpenSSL 1.1.1q"
+echo "##########"
 
-echo "========="
-echo "Libgcrypt 1.10.1 (Fix Pub Lim Loop Break)"
-echo "========="
-klee_timeout libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc
-mv libgcrypt-and-libgpg-error/klee-out-0 results/libgcrypt_fix_pub_lim_loop_break
-rm -f libgcrypt-and-libgpg-error/klee-last
-rm -rf libgcrypt-and-libgpg-error/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/libgcrypt1.10.1/2.json results/libgcrypt_fix_pub_lim_loop_break results/libgcrypt_fix_pub_lim_loop_break_combined.json --code-path libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi
-reproduce_positives.py results/libgcrypt_fix_pub_lim_loop_break_combined.json results/libgcrypt_fix_pub_lim_loop_break libgcrypt-and-libgpg-error/klee_fix_pub_replay --secret exp --output results/libgcrypt_fix_pub_lim_loop_break_combined.json
-make_report.py results/libgcrypt_fix_pub_lim_loop_break_combined.json results/libgcrypt_fix_pub_lim_loop_break_report.html
-make_plot.py results/libgcrypt_fix_pub_lim_loop_break_combined.json "Libgcrypt 1.10.1 (Fix Pub Lim Loop Break)" results/libgcrypt_fix_pub_lim_loop_break_plot.png
+openssl-1.1.1q/build.sh
 
-echo "========="
-echo "Libgcrypt 1.10.1 (Var Pub)"
-echo "========="
-klee_timeout libgcrypt-and-libgpg-error/klee_var_pub.bc
-mv libgcrypt-and-libgpg-error/klee-out-0 results/libgcrypt_var_pub
-rm -f libgcrypt-and-libgpg-error/klee-last
-rm -rf libgcrypt-and-libgpg-error/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/libgcrypt1.10.1/2.json results/libgcrypt_var_pub results/libgcrypt_var_pub_combined.json --code-path libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi
-reproduce_positives.py results/libgcrypt_var_pub_combined.json results/libgcrypt_var_pub libgcrypt-and-libgpg-error/klee_var_pub_replay --secret exp --public base,mod --output results/libgcrypt_var_pub_combined.json
-make_report.py results/libgcrypt_var_pub_combined.json results/libgcrypt_var_pub_report.html
-make_plot.py results/libgcrypt_var_pub_combined.json "Libgcrypt 1.10.1 (Var Pub)" results/libgcrypt_var_pub_plot.png
+for algo in recp mont mont_consttime mont_word; do
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF \
+        -o "openssl-1.1.1q/klee_fix_pub_lim_loop_${algo}.bc" \
+        "openssl-1.1.1q/klee_fix_pub_${algo}.bc"
 
-echo "========="
-echo "Libgcrypt 1.10.1 (Var Pub Lim Loop)"
-echo "========="
-klee_timeout libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc
-mv libgcrypt-and-libgpg-error/klee-out-0 results/libgcrypt_var_pub_lim_loop
-rm -f libgcrypt-and-libgpg-error/klee-last
-rm -rf libgcrypt-and-libgpg-error/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/libgcrypt1.10.1/2.json results/libgcrypt_var_pub_lim_loop results/libgcrypt_var_pub_lim_loop_combined.json --code-path libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi
-reproduce_positives.py results/libgcrypt_var_pub_lim_loop_combined.json results/libgcrypt_var_pub_lim_loop libgcrypt-and-libgpg-error/klee_var_pub_replay --secret exp --public base,mod --output results/libgcrypt_var_pub_lim_loop_combined.json
-make_report.py results/libgcrypt_var_pub_lim_loop_combined.json results/libgcrypt_var_pub_lim_loop_report.html
-make_plot.py results/libgcrypt_var_pub_lim_loop_combined.json "Libgcrypt 1.10.1 (Var Pub Lim Loop)" results/libgcrypt_var_pub_lim_loop_plot.png
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF \
+        -o "openssl-1.1.1q/klee_var_pub_lim_loop_${algo}.bc" \
+        "openssl-1.1.1q/klee_var_pub_${algo}.bc"
 
-echo "========="
-echo "Libgcrypt 1.10.1 (Var Pub Lim Loop Break)"
-echo "========="
-klee_timeout libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc
-mv libgcrypt-and-libgpg-error/klee-out-0 results/libgcrypt_var_pub_lim_loop_break
-rm -f libgcrypt-and-libgpg-error/klee-last
-rm -rf libgcrypt-and-libgpg-error/klee-out-*
-compare_with_ctchecker.py ../ctchecker_results/libgcrypt1.10.1/2.json results/libgcrypt_var_pub_lim_loop_break results/libgcrypt_var_pub_lim_loop_break_combined.json --code-path libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi
-reproduce_positives.py results/libgcrypt_var_pub_lim_loop_break_combined.json results/libgcrypt_var_pub_lim_loop_break libgcrypt-and-libgpg-error/klee_var_pub_replay --secret exp --public base,mod --output results/libgcrypt_var_pub_lim_loop_break_combined.json
-make_report.py results/libgcrypt_var_pub_lim_loop_break_combined.json results/libgcrypt_var_pub_lim_loop_break_report.html
-make_plot.py results/libgcrypt_var_pub_lim_loop_break_combined.json "Libgcrypt 1.10.1 (Var Pub Lim Loop Break)" results/libgcrypt_var_pub_lim_loop_break_plot.png
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen \
+        -break \
+        -o "openssl-1.1.1q/klee_fix_pub_lim_loop_break_${algo}.bc" \
+        "openssl-1.1.1q/klee_fix_pub_${algo}.bc"
+
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen \
+        -break \
+        -o "openssl-1.1.1q/klee_var_pub_lim_loop_break_${algo}.bc" \
+        "openssl-1.1.1q/klee_var_pub_${algo}.bc"
+done
+
+run_openssl_algo() {
+    local algo="$1"
+    local memory_flag="$2"    # "true" or "false"
+    local lines_range="$3"    # e.g. "161:295"
+
+    if [[ "$memory_flag" != "true" && "$memory_flag" != "false" ]]; then
+        echo "Error: memory_flag must be 'true' or 'false' (got '$memory_flag')" >&2
+        exit 1
+    fi
+
+    echo "##########"
+    echo "Running OpenSSL 1.1.1q ${algo} tests"
+    echo "##########"
+
+    rm -f "openssl-1.1.1q/klee-last"
+    rm -rf "openssl-1.1.1q/klee-out-*"
+
+    run_case "OpenSSL 1.1.1q ${algo} (Fix Pub)" "openssl-1.1.1q/klee_fix_pub_${algo}.bc" "openssl_${algo}_fix_pub" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range"
+    run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Lim Loop)" "openssl-1.1.1q/klee_fix_pub_lim_loop_${algo}.bc" "openssl_${algo}_fix_pub_lim_loop" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range"
+    run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Lim Loop Break)" "openssl-1.1.1q/klee_fix_pub_lim_loop_break_${algo}.bc" "openssl_${algo}_fix_pub_lim_loop_break" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range"
+    run_case "OpenSSL 1.1.1q ${algo} (Var Pub)" "openssl-1.1.1q/klee_var_pub_${algo}.bc" "openssl_${algo}_var_pub" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range"
+    run_case "OpenSSL 1.1.1q ${algo} (Var Pub Lim Loop)" "openssl-1.1.1q/klee_var_pub_lim_loop_${algo}.bc" "openssl_${algo}_var_pub_lim_loop" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range"
+    run_case "OpenSSL 1.1.1q ${algo} (Var Pub Lim Loop Break)" "openssl-1.1.1q/klee_var_pub_lim_loop_break_${algo}.bc" "openssl_${algo}_var_pub_lim_loop_break" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range"
+}
+
+run_openssl_algo recp false 161:295
+run_openssl_algo mont false 297:471
+run_openssl_algo mont_consttime true 593:1136
+run_openssl_algo mont_word false 1138:1283

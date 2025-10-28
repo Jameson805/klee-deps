@@ -18,7 +18,7 @@ unsigned buf_nonzero(const unsigned char *buf, size_t size) {
     return v;
 }
 
-/* Compute bit-length of big-endian unsigned integer stored in buf (LSB at index 0).
+/* Compute bit-length of big-endian unsigned integer stored in buf (MSB at index 0).
    Returns 0 if all bits are zero.
    Constant-time: no data-dependent branches or memory accesses. */
 unsigned buf_bitlen(const unsigned char *buf, size_t size) {
@@ -38,6 +38,13 @@ unsigned buf_bitlen(const unsigned char *buf, size_t size) {
 
     /* bitlen = found ? bitpos + 1 : 0 */
     return found * (bitpos + 1u);
+}
+
+void be_store_u64_tail(unsigned char *dst, size_t dst_len, uint64_t x) {
+    memset(dst, 0, dst_len);
+    for (int i = 0; i < 8; ++i) {
+        dst[dst_len - 8 + i] = (unsigned char)((x >> (8 * (7 - i))) & 0xFF);
+    }
 }
 
 int load_bytes(const char *filename, void *buf, size_t size)
@@ -90,9 +97,8 @@ int main(int argc, char *argv[]) {
     #endif
 
     #ifdef CONCRETE_PUBS
-        uint32_t base_i = 100003;
-        memset(base_buf, 0, sizeof(base_buf));
-        memcpy(base_buf, &base_i, sizeof(base_i));
+        uint64_t base_i = 100003;
+        be_store_u64_tail(base_buf, sizeof(base_buf), base_i);
     #else
         #ifdef REPLAY
             if (!load_bytes(base_filename, base_buf, sizeof(base_buf))) return 1;
@@ -104,9 +110,8 @@ int main(int argc, char *argv[]) {
     #endif
 
     #ifdef CONCRETE_PUBS
-        uint32_t mod_i = 1000000007;
-        memset(mod_buf, 0, sizeof(mod_buf));
-        memcpy(mod_buf, &mod_i, sizeof(mod_i));
+        uint64_t mod_i = 1000000007;
+        be_store_u64_tail(mod_buf, sizeof(mod_buf), mod_i);
     #else
         #ifdef REPLAY
             if (!load_bytes(mod_filename, mod_buf, sizeof(mod_buf))) return 1;
@@ -114,6 +119,8 @@ int main(int argc, char *argv[]) {
             klee_make_symbolic_sc(mod_buf, sizeof(mod_buf), "mod", 0);
             // mod_buf > 0
             klee_assume(buf_nonzero(mod_buf, SYM_SIZE) != 0);
+            // mod_buf is odd
+            klee_assume(mod_buf[SYM_SIZE - 1] & 1);
         #endif
     #endif
 
