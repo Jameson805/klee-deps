@@ -261,7 +261,7 @@ BUILD_VERSION = 1.44.0.21743
 CC = wllvm
 CCDEPMODE = depmode=gcc3
 CC_FOR_BUILD = $(CC)
-CFLAGS = -g -O0 -Wall -Wpointer-arith -fvisibility=hidden
+CFLAGS = -g -O0 -DNO_ASM -Wall -Wpointer-arith -fvisibility=hidden
 CPP = wllvm -E
 CPPFLAGS = 
 CYGPATH_W = echo

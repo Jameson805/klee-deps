@@ -437,10 +437,10 @@ BUILD_VERSION = 1.10.1.0
 CC = wllvm
 CCAS = wllvm
 CCASDEPMODE = depmode=gcc3
-CCASFLAGS = -g -O0
+CCASFLAGS = -g -O0 -DNO_ASM
 CCDEPMODE = depmode=gcc3
 CC_FOR_BUILD = $(CC)
-CFLAGS = -g -O0 -fvisibility=hidden -fno-delete-null-pointer-checks -Wall
+CFLAGS = -g -O0 -DNO_ASM -fvisibility=hidden -fno-delete-null-pointer-checks -Wall
 CPP = wllvm -E
 CPPFLAGS = 
 CYGPATH_W = echo

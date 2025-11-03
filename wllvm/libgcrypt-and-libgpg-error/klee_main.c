@@ -54,9 +54,11 @@ int main(int argc, char *argv[]) {
         klee_make_symbolic_sc(exp_buf, sizeof(exp_buf), "exp", 1);
 
         for (int i = 0; i < SYM_SIZE; i++) {
-            klee_assume(exp_buf[i] <= 0x03);
+            klee_assume(exp_buf[i] != 0);
+            klee_assume(exp_buf[i] <= 0x05);
         }
     #endif
+    klee_warning("Reaches after exp");
 
     #ifdef CONCRETE_PUBS
         uint32_t base_i = 100003;
@@ -69,10 +71,12 @@ int main(int argc, char *argv[]) {
             klee_make_symbolic_sc(base_buf, sizeof(base_buf), "base", 0);
 
             for (int i = 0; i < SYM_SIZE; i++) {
-                klee_assume(base_buf[i] <= 0x0F); 
+                klee_assume(base_buf[i] != 0); 
+                klee_assume(base_buf[i] <= 0x2F); 
             }
         #endif
     #endif
+    klee_warning("Reached after base");
 
     #ifdef CONCRETE_PUBS
         uint32_t mod_i = 1000000007;
@@ -85,11 +89,14 @@ int main(int argc, char *argv[]) {
             klee_make_symbolic_sc(mod_buf, sizeof(mod_buf), "mod", 0);
 
             for (int i = 0; i < SYM_SIZE; i++) {
-                klee_assume(mod_buf[i] <= 0x0F);  
+                klee_assume(mod_buf[i] != 0); 
+                klee_assume(mod_buf[i] <= 0x0F); 
             }
-            klee_assume(mod_buf[0] != 0);
+            klee_assume(!(mod_buf[0] == 1 && mod_buf[1] == 0));
         #endif
     #endif
+
+    klee_warning("Reaches all make symbolics");
 
     // Parse symbolic buffers into gcry_mpi_t big numbers
     gcry_mpi_t base, exp, mod, result;
@@ -99,6 +106,9 @@ int main(int argc, char *argv[]) {
         return 3;
     if (gcry_mpi_scan(&mod, GCRYMPI_FMT_USG, mod_buf, SYM_SIZE, NULL) != 0)
         return 4;
+
+    klee_warning("Reaches all gcry_mpi_scan");
+
 
     result = gcry_mpi_new(SYM_SIZE * 8);
 

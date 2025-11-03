@@ -7,7 +7,7 @@ KLEE_PATH="../../klee-controlflow"
 export PATH="/usr/lib/llvm-13/bin:$PATH"
 export CC=wllvm
 export LLVM_COMPILER=clang
-export CFLAGS='-g -O0'
+export CFLAGS='-g -O0 -DNO_ASM'
 
 echo "wllvm version: $(wllvm --version || echo 'wllvm not found')"
 echo "llvm-link: $(which llvm-link-13)"
