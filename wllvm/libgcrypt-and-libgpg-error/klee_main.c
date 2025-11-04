@@ -8,7 +8,12 @@
     #include "klee/klee.h"
 #endif
 
-#define SYM_SIZE 8
+#ifdef USE_SLICED
+    #include "modpow_sliced.h"
+#endif
+
+
+#define SYM_SIZE 4
 
 /* Returns nonzero if any byte in buf is nonzero */
 unsigned buf_nonzero(const unsigned char *buf, size_t size) {
@@ -136,14 +141,18 @@ int main(int argc, char *argv[]) {
 
     result = gcry_mpi_new(SYM_SIZE * 8);
 
-    // Perform modular exponentiation
-    gcry_mpi_powm(result, base, exp, mod);
+    // Perform modular exponentiation, either with sliced code or normal libgcrypt
+    #ifdef USE_SLICED
+        _gcry_mpi_powm_slice_1(result, base, exp, mod);
+    #else
+        gcry_mpi_powm(result, base, exp, mod);
+    #endif
 
     // Free memory
+    gcry_mpi_release(result);
     gcry_mpi_release(base);
     gcry_mpi_release(exp);
     gcry_mpi_release(mod);
-    gcry_mpi_release(result);
 
     return 0;
 }
