@@ -30,7 +30,6 @@ wllvm/libgcrypt-and-libgpg-error/**/tests/*.o
 wllvm/libgcrypt-and-libgpg-error/**/tests/*.bc
 
 wllvm/libgcrypt-and-libgpg-error/**/Makefile
-wllvm/libgcrypt-and-libgpg-error/**/Makefile.in
 wllvm/libgcrypt-and-libgpg-error/**/libtool
 wllvm/libgcrypt-and-libgpg-error/**/config.status
 wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/src/mpicalc
