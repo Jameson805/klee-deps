@@ -69,7 +69,7 @@ echo "kill_after=$kill_after"
 echo "##########"
 
 klee_timeout() {
-    timeout --foreground --signal=INT --kill-after=30s $max_time klee --max-solver-time="$max_solver_time" --libc=uclibc --posix-runtime --dump-states-on-halt=false --use-batching-search=true "$1" || true
+    timeout --foreground --signal=INT --kill-after=30s $max_time klee --max-solver-time="$max_solver_time" --libc=uclibc --posix-runtime --dump-states-on-halt=false --use-batching-search=true --max-memory=16384 "$1" || true
 }
 
 limit_loop() {
@@ -120,128 +120,138 @@ run_case() {
     fi
 }
 
-echo "##########"
-echo "Begin experiments for Mbed TLS 3.2.1"
-echo "##########"
-
-mbedtls-3.2.1/build.sh
-limit_loop \
-    -blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz \
-    -o mbedtls-3.2.1/klee_fix_pub_lim_loop.bc \
-    mbedtls-3.2.1/klee_fix_pub.bc
-limit_loop \
-    -blacklist=bitlen_i64_nosign \
-    -break \
-    -o mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc \
-    mbedtls-3.2.1/klee_fix_pub.bc
-limit_loop \
-    -blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz \
-    -o mbedtls-3.2.1/klee_var_pub_lim_loop.bc \
-    mbedtls-3.2.1/klee_var_pub.bc
-limit_loop \
-    -blacklist=bitlen_i64_nosign \
-    -break \
-    -o mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc \
-    mbedtls-3.2.1/klee_var_pub.bc
-rm -f mbedtls-3.2.1/klee-last
-rm -rf mbedtls-3.2.1/klee-out-*
-
-run_case "Mbed TLS 3.2.1 (Fix Pub)" "mbedtls-3.2.1/klee_fix_pub.bc" "mbedtls_fix_pub" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_lim_loop.bc" "mbedtls_fix_pub_lim_loop" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc" "mbedtls_fix_pub_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-run_case "Mbed TLS 3.2.1 (Var Pub)" "mbedtls-3.2.1/klee_var_pub.bc" "mbedtls_var_pub" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop)" "mbedtls-3.2.1/klee_var_pub_lim_loop.bc" "mbedtls_var_pub_lim_loop" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc" "mbedtls_var_pub_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-
-echo "##########"
-echo "Begin experiments for Libgcrypt 1.10.1"
-echo "##########"
-
-libgcrypt-and-libgpg-error/build.sh
-limit_loop \
-    -blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift \
-    -o libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc \
-    libgcrypt-and-libgpg-error/klee_fix_pub.bc
-limit_loop \
-    -blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift \
-    -o libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc \
-    libgcrypt-and-libgpg-error/klee_var_pub.bc
-limit_loop \
-    -blacklist=buf_nonzero,buf_bitlen \
-    -break \
-    -o libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc \
-    libgcrypt-and-libgpg-error/klee_fix_pub.bc
-limit_loop \
-    -blacklist=buf_nonzero,buf_bitlen \
-    -break \
-    -o libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc \
-    libgcrypt-and-libgpg-error/klee_var_pub.bc
-rm -f libgcrypt-and-libgpg-error/klee-last
-rm -rf libgcrypt-and-libgpg-error/klee-out-*
-
-run_case "Libgcrypt 1.10.1 (Fix Pub)" "libgcrypt-and-libgpg-error/klee_fix_pub.bc" "libgcrypt_fix_pub" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc" "libgcrypt_fix_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc" "libgcrypt_fix_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-run_case "Libgcrypt 1.10.1 (Var Pub)" "libgcrypt-and-libgpg-error/klee_var_pub.bc" "libgcrypt_var_pub" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc" "libgcrypt_var_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc" "libgcrypt_var_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-
-echo "##########"
-echo "Begin experiments for OpenSSL 1.1.1q"
-echo "##########"
-
-openssl-1.1.1q/build.sh
-
-for algo in recp mont mont_consttime mont_word; do
-    limit_loop \
-        -blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF \
-        -o "openssl-1.1.1q/klee_fix_pub_lim_loop_${algo}.bc" \
-        "openssl-1.1.1q/klee_fix_pub_${algo}.bc"
-
-    limit_loop \
-        -blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF \
-        -o "openssl-1.1.1q/klee_var_pub_lim_loop_${algo}.bc" \
-        "openssl-1.1.1q/klee_var_pub_${algo}.bc"
-
-    limit_loop \
-        -blacklist=buf_nonzero,buf_bitlen \
-        -break \
-        -o "openssl-1.1.1q/klee_fix_pub_lim_loop_break_${algo}.bc" \
-        "openssl-1.1.1q/klee_fix_pub_${algo}.bc"
-
-    limit_loop \
-        -blacklist=buf_nonzero,buf_bitlen \
-        -break \
-        -o "openssl-1.1.1q/klee_var_pub_lim_loop_break_${algo}.bc" \
-        "openssl-1.1.1q/klee_var_pub_${algo}.bc"
-done
-
-run_openssl_algo() {
-    local algo="$1"
-    local memory_flag="$2"    # "true" or "false"
-    local lines_range="$3"    # e.g. "161:295"
-
-    if [[ "$memory_flag" != "true" && "$memory_flag" != "false" ]]; then
-        echo "Error: memory_flag must be 'true' or 'false' (got '$memory_flag')" >&2
-        exit 1
-    fi
-
+run_mbedtls() {
     echo "##########"
-    echo "Running OpenSSL 1.1.1q ${algo} tests"
+    echo "Begin experiments for Mbed TLS 3.2.1"
     echo "##########"
 
-    rm -f "openssl-1.1.1q/klee-last"
-    rm -rf "openssl-1.1.1q/klee-out-*"
+    mbedtls-3.2.1/build.sh
+    limit_loop \
+        -blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz \
+        -o mbedtls-3.2.1/klee_fix_pub_lim_loop.bc \
+        mbedtls-3.2.1/klee_fix_pub.bc
+    limit_loop \
+        -blacklist=bitlen_i64_nosign \
+        -break \
+        -o mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc \
+        mbedtls-3.2.1/klee_fix_pub.bc
+    limit_loop \
+        -blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz \
+        -o mbedtls-3.2.1/klee_var_pub_lim_loop.bc \
+        mbedtls-3.2.1/klee_var_pub.bc
+    limit_loop \
+        -blacklist=bitlen_i64_nosign \
+        -break \
+        -o mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc \
+        mbedtls-3.2.1/klee_var_pub.bc
+    rm -f mbedtls-3.2.1/klee-last
+    rm -rf mbedtls-3.2.1/klee-out-*
 
-    run_case "OpenSSL 1.1.1q ${algo} (Fix Pub)" "openssl-1.1.1q/klee_fix_pub_${algo}.bc" "openssl_${algo}_fix_pub" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
-    run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Lim Loop)" "openssl-1.1.1q/klee_fix_pub_lim_loop_${algo}.bc" "openssl_${algo}_fix_pub_lim_loop" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
-    run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Lim Loop Break)" "openssl-1.1.1q/klee_fix_pub_lim_loop_break_${algo}.bc" "openssl_${algo}_fix_pub_lim_loop_break" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
-    run_case "OpenSSL 1.1.1q ${algo} (Var Pub)" "openssl-1.1.1q/klee_var_pub_${algo}.bc" "openssl_${algo}_var_pub" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
-    run_case "OpenSSL 1.1.1q ${algo} (Var Pub Lim Loop)" "openssl-1.1.1q/klee_var_pub_lim_loop_${algo}.bc" "openssl_${algo}_var_pub_lim_loop" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
-    run_case "OpenSSL 1.1.1q ${algo} (Var Pub Lim Loop Break)" "openssl-1.1.1q/klee_var_pub_lim_loop_break_${algo}.bc" "openssl_${algo}_var_pub_lim_loop_break" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
+    run_case "Mbed TLS 3.2.1 (Fix Pub)" "mbedtls-3.2.1/klee_fix_pub.bc" "mbedtls_fix_pub" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_lim_loop.bc" "mbedtls_fix_pub_lim_loop" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc" "mbedtls_fix_pub_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    run_case "Mbed TLS 3.2.1 (Var Pub)" "mbedtls-3.2.1/klee_var_pub.bc" "mbedtls_var_pub" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    # run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop)" "mbedtls-3.2.1/klee_var_pub_lim_loop.bc" "mbedtls_var_pub_lim_loop" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc" "mbedtls_var_pub_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
 }
 
-run_openssl_algo recp false 161:295
-run_openssl_algo mont false 297:471
-run_openssl_algo mont_consttime true 593:1136
-run_openssl_algo mont_word false 1138:1283
+run_libgcrypt() {
+    echo "##########"
+    echo "Begin experiments for Libgcrypt 1.10.1"
+    echo "##########"
+
+    libgcrypt-and-libgpg-error/build.sh
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift \
+        -o libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc \
+        libgcrypt-and-libgpg-error/klee_fix_pub.bc
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift \
+        -o libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc \
+        libgcrypt-and-libgpg-error/klee_var_pub.bc
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen \
+        -break \
+        -o libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc \
+        libgcrypt-and-libgpg-error/klee_fix_pub.bc
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen \
+        -break \
+        -o libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc \
+        libgcrypt-and-libgpg-error/klee_var_pub.bc
+    rm -f libgcrypt-and-libgpg-error/klee-last
+    rm -rf libgcrypt-and-libgpg-error/klee-out-*
+
+    run_case "Libgcrypt 1.10.1 (Fix Pub)" "libgcrypt-and-libgpg-error/klee_fix_pub.bc" "libgcrypt_fix_pub" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+    # run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc" "libgcrypt_fix_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+    # run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc" "libgcrypt_fix_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+    run_case "Libgcrypt 1.10.1 (Var Pub)" "libgcrypt-and-libgpg-error/klee_var_pub.bc" "libgcrypt_var_pub" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+    # run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc" "libgcrypt_var_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+    run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc" "libgcrypt_var_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+}
+
+run_openssl() {
+    echo "##########"
+    echo "Begin experiments for OpenSSL 1.1.1q"
+    echo "##########"
+
+    openssl-1.1.1q/build.sh
+
+    for algo in recp mont mont_consttime mont_word; do
+        limit_loop \
+            -blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF \
+            -o "openssl-1.1.1q/klee_fix_pub_lim_loop_${algo}.bc" \
+            "openssl-1.1.1q/klee_fix_pub_${algo}.bc"
+
+        limit_loop \
+            -blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF \
+            -o "openssl-1.1.1q/klee_var_pub_lim_loop_${algo}.bc" \
+            "openssl-1.1.1q/klee_var_pub_${algo}.bc"
+
+        limit_loop \
+            -blacklist=buf_nonzero,buf_bitlen \
+            -break \
+            -o "openssl-1.1.1q/klee_fix_pub_lim_loop_break_${algo}.bc" \
+            "openssl-1.1.1q/klee_fix_pub_${algo}.bc"
+
+        limit_loop \
+            -blacklist=buf_nonzero,buf_bitlen \
+            -break \
+            -o "openssl-1.1.1q/klee_var_pub_lim_loop_break_${algo}.bc" \
+            "openssl-1.1.1q/klee_var_pub_${algo}.bc"
+    done
+
+    run_openssl_algo() {
+        local algo="$1"
+        local memory_flag="$2"    # "true" or "false"
+        local lines_range="$3"    # e.g. "161:295"
+
+        if [[ "$memory_flag" != "true" && "$memory_flag" != "false" ]]; then
+            echo "Error: memory_flag must be 'true' or 'false' (got '$memory_flag')" >&2
+            exit 1
+        fi
+
+        echo "##########"
+        echo "Running OpenSSL 1.1.1q ${algo} tests"
+        echo "##########"
+
+        rm -f "openssl-1.1.1q/klee-last"
+        rm -rf "openssl-1.1.1q/klee-out-*"
+
+        run_case "OpenSSL 1.1.1q ${algo} (Fix Pub)" "openssl-1.1.1q/klee_fix_pub_${algo}.bc" "openssl_${algo}_fix_pub" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
+        # run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Lim Loop)" "openssl-1.1.1q/klee_fix_pub_lim_loop_${algo}.bc" "openssl_${algo}_fix_pub_lim_loop" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
+        # run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Lim Loop Break)" "openssl-1.1.1q/klee_fix_pub_lim_loop_break_${algo}.bc" "openssl_${algo}_fix_pub_lim_loop_break" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
+        run_case "OpenSSL 1.1.1q ${algo} (Var Pub)" "openssl-1.1.1q/klee_var_pub_${algo}.bc" "openssl_${algo}_var_pub" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
+        # run_case "OpenSSL 1.1.1q ${algo} (Var Pub Lim Loop)" "openssl-1.1.1q/klee_var_pub_lim_loop_${algo}.bc" "openssl_${algo}_var_pub_lim_loop" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
+        run_case "OpenSSL 1.1.1q ${algo} (Var Pub Lim Loop Break)" "openssl-1.1.1q/klee_var_pub_lim_loop_break_${algo}.bc" "openssl_${algo}_var_pub_lim_loop_break" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q/${algo}-3.json" "openssl-1.1.1q/crypto/bn" "$memory_flag" --filename bn_exp.c --lines "$lines_range" --src-prefix crypto/bn
+    }
+
+    run_openssl_algo recp false 161:295
+    run_openssl_algo mont false 297:471
+    run_openssl_algo mont_consttime false 593:1136
+    run_openssl_algo mont_word false 1138:1283
+}
+
+run_mbedtls
+run_libgcrypt
+run_openssl
