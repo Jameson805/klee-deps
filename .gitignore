@@ -20,6 +20,24 @@ klee_var_pub_replay*
 
 wllvm/results
 
+wllvm/libgcrypt-and-libgpg-error/**/tests/*
+!wllvm/libgcrypt-and-libgpg-error/**/tests/*.*
+!wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/tests/etc/
+!wllvm/libgcrypt-and-libgpg-error/**/tests/README
+!wllvm/libgcrypt-and-libgpg-error/**/tests/ChangeLog*
+wllvm/libgcrypt-and-libgpg-error/**/tests/.deps/
+wllvm/libgcrypt-and-libgpg-error/**/tests/*.o
+wllvm/libgcrypt-and-libgpg-error/**/tests/*.bc
+
+wllvm/libgcrypt-and-libgpg-error/**/Makefile
+wllvm/libgcrypt-and-libgpg-error/**/Makefile.in
+wllvm/libgcrypt-and-libgpg-error/**/libtool
+wllvm/libgcrypt-and-libgpg-error/**/config.status
+wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/src/mpicalc
+wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/src/gpg-error
+wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/src/mkerrcodes
+wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/src/mkheader
+
 wllvm/openssl-1.1.1q/Makefile
 wllvm/openssl-1.1.1q/test/buildtest_*
 wllvm/openssl-1.1.1q/test/*test
