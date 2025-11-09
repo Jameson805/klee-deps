@@ -8,8 +8,53 @@ export PATH="/usr/lib/llvm-13/bin:$PATH"
 export CC=wllvm
 export LLVM_COMPILER=clang
 
-# Optional flag, pass 1 to skip dependency builds
-SKIP_DEPS=${1:-0}   
+usage() {
+    echo "Usage: $0 [--skip-deps] SIZE"
+    echo "  --skip-deps    Skip building libgpg-error and libgcrypt"
+    echo "  SIZE           Mandatory integer, passed to -DSYM_SIZE"
+}
+
+SKIP_DEPS=0
+SIZE=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --skip-deps)
+            SKIP_DEPS=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            usage
+            exit 1
+            ;;
+        *)
+            if [[ -z "$SIZE" ]]; then
+                SIZE="$1"
+                shift
+            else
+                echo "Unexpected argument: $1"
+                usage
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+if [[ -z "$SIZE" ]]; then
+    echo "Missing required SIZE argument."
+    usage
+    exit 1
+fi
+if ! [[ "$SIZE" =~ ^[0-9]+$ ]]; then
+    echo "SIZE must be a non-negative integer, got: $SIZE"
+    exit 1
+fi
+
 if [ "$SKIP_DEPS" -eq 0 ]; then
     echo "Building dependencies..."
 
@@ -28,27 +73,26 @@ else
 fi
 
 # Flags and libraries
-flags=( -g -O0 -Ilibgcrypt-1.10.1/src )
+flags=( -g -O0 -I../include -Ilibgcrypt-1.10.1/src )
 klee_flags=( -I"$KLEE_PATH/include" -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" -lkleeRuntest )
 libs=( libgcrypt-1.10.1/src/.libs/libgcrypt.a libgpg-error-1.44/src/.libs/libgpg-error.a )
 
-
 # KLEE bitcode builds
-wllvm "${flags[@]}" "${klee_flags[@]}" klee_main.c "${libs[@]}" -o klee_var_pub
+wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SIZE} -DKLEE_CF klee_main.c "${libs[@]}" -o klee_var_pub
 extract-bc klee_var_pub
 
-wllvm "${flags[@]}" "${klee_flags[@]}" -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
+wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SIZE} -DKLEE_CF -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
 extract-bc klee_fix_pub
 
-wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED klee_main.c modpow_sliced.c "${libs[@]}" -o klee_var_pub_sliced
+wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DKLEE_CF klee_main.c modpow_sliced.c "${libs[@]}" -o klee_var_pub_sliced
 extract-bc klee_var_pub_sliced
 
-wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DCONCRETE_PUBS klee_main.c modpow_sliced.c "${libs[@]}" -o klee_fix_pub_sliced
+wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DKLEE_CF -DCONCRETE_PUBS klee_main.c modpow_sliced.c "${libs[@]}" -o klee_fix_pub_sliced
 extract-bc klee_fix_pub_sliced
 
 # Replay builds
-clang "${flags[@]}" -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
-clang "${flags[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
+clang "${flags[@]}" -DSYM_SIZE=${SIZE} -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
+clang "${flags[@]}" -DSYM_SIZE=${SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
 
-clang "${flags[@]}" -DUSE_SLICED -DREPLAY klee_main.c modpow_sliced.c "${libs[@]}" -o klee_var_pub_sliced_replay
-clang "${flags[@]}" -DUSE_SLICED -DREPLAY -DCONCRETE_PUBS klee_main.c modpow_sliced.c "${libs[@]}" -o klee_fix_pub_sliced_replay
+clang "${flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DREPLAY klee_main.c modpow_sliced.c "${libs[@]}" -o klee_var_pub_sliced_replay
+clang "${flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c modpow_sliced.c "${libs[@]}" -o klee_fix_pub_sliced_replay

@@ -7,18 +7,22 @@ export PATH="$bin_path:$script_path:$PATH"
 
 # defaults
 max_time=""
-loop_max_iterations=20
-max_solver_time="5s"
+loop_max_iterations=10
+max_solver_time="10s"
 kill_after="5m"
+sym_size=4
+max_memory=8000
 
 usage() {
     cat <<EOF
-Usage: $0 [--kill-after <duration>] [--max-solver-time <duration>] [--loop-max-iterations <n>] <max_time>
+Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <duration>] [--kill-after <duration>] [--max-memory <n>] <max_time>
 
   <max_time>               - required, e.g. 1h, 30m, 600s
-  --loop-max-iterations n  - optional, default: 20
-  --max-solver-time <dur>  - optional, default: 5s
+  --sym-size <n>           - optional, default: 4 (size in bytes for bignum symbols)
+  --loop-max-iterations n  - optional, default: 10
+  --max-solver-time <dur>  - optional, default: 10s
   --kill-after <duration>  - optional, default: 10s
+  --max-memory <n>         - optional, default: 8000 (MB KLEE state cap)
 EOF
     exit 1
 }
@@ -32,6 +36,10 @@ while [[ $# -gt 0 ]]; do
             max_solver_time="$2"; shift 2;;
         --loop-max-iterations)
             loop_max_iterations="$2"; shift 2;;
+        --sym-size)
+            sym_size="$2"; shift 2;;
+        --max-memory)
+            max_memory="$2"; shift 2;;
         --)
             shift; break;;
         -*)
@@ -55,6 +63,14 @@ if ! [[ "$loop_max_iterations" =~ ^[0-9]+$ ]]; then
     echo "Error: loop_max_iterations must be a non-negative integer (got '$loop_max_iterations')"
     exit 1
 fi
+if ! [[ "$sym_size" =~ ^[0-9]+$ ]]; then
+    echo "Error: sym_size must be a non-negative integer (got '$sym_size')"
+    exit 1
+fi
+if ! [[ "$max_memory" =~ ^[0-9]+$ ]]; then
+    echo "Error: max_memory must be a non-negative integer (got '$max_memory')"
+    exit 1
+fi
 
 rm -rf results
 mkdir results
@@ -63,13 +79,21 @@ exec > >(tee -a results/output.log) 2>&1
 echo "##########"
 echo "Args:"
 echo "max_time=$max_time"
+echo "sym_size=$sym_size"
 echo "loop_max_iterations=$loop_max_iterations"
 echo "max_solver_time=$max_solver_time"
 echo "kill_after=$kill_after"
+echo "max_memory=$max_memory"
 echo "##########"
 
 klee_timeout() {
-    timeout --foreground --signal=INT --kill-after=30s $max_time klee --max-solver-time="$max_solver_time" --libc=uclibc --posix-runtime --dump-states-on-halt=false --use-batching-search=true --max-memory=16384 "$1" || true
+    timeout --foreground --signal=INT --kill-after=30s $max_time \
+    klee --libc=uclibc \
+        --posix-runtime \
+        --dump-states-on-halt=false \
+        --use-batching-search=true \
+        --max-solver-time="$max_solver_time" \
+        --max-memory=$max_memory "$1" || true
 }
 
 limit_loop() {
@@ -125,7 +149,7 @@ run_mbedtls() {
     echo "Begin experiments for Mbed TLS 3.2.1"
     echo "##########"
 
-    mbedtls-3.2.1/build.sh
+    mbedtls-3.2.1/build.sh ${sym_size}
     limit_loop \
         -blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz \
         -o mbedtls-3.2.1/klee_fix_pub_lim_loop.bc \
@@ -147,12 +171,12 @@ run_mbedtls() {
     rm -f mbedtls-3.2.1/klee-last
     rm -rf mbedtls-3.2.1/klee-out-*
 
-    run_case "Mbed TLS 3.2.1 (Fix Pub)" "mbedtls-3.2.1/klee_fix_pub.bc" "mbedtls_fix_pub" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_lim_loop.bc" "mbedtls_fix_pub_lim_loop" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc" "mbedtls_fix_pub_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret E" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    run_case "Mbed TLS 3.2.1 (Var Pub)" "mbedtls-3.2.1/klee_var_pub.bc" "mbedtls_var_pub" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    # run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop)" "mbedtls-3.2.1/klee_var_pub_lim_loop.bc" "mbedtls_var_pub_lim_loop" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc" "mbedtls_var_pub_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_replay" "--secret E --public A,N" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    run_case "Mbed TLS 3.2.1 (Fix Pub)" "mbedtls-3.2.1/klee_fix_pub.bc" "mbedtls_fix_pub" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_lim_loop.bc" "mbedtls_fix_pub_lim_loop" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc" "mbedtls_fix_pub_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    run_case "Mbed TLS 3.2.1 (Var Pub)" "mbedtls-3.2.1/klee_var_pub.bc" "mbedtls_var_pub" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    # run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop)" "mbedtls-3.2.1/klee_var_pub_lim_loop.bc" "mbedtls_var_pub_lim_loop" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc" "mbedtls_var_pub_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
 }
 
 run_libgcrypt() {
@@ -160,7 +184,7 @@ run_libgcrypt() {
     echo "Begin experiments for Libgcrypt 1.10.1"
     echo "##########"
 
-    libgcrypt-and-libgpg-error/build.sh
+    libgcrypt-and-libgpg-error/build.sh ${sym_size}
     limit_loop \
         -blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift \
         -o libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc \
@@ -195,7 +219,7 @@ run_openssl() {
     echo "Begin experiments for OpenSSL 1.1.1q"
     echo "##########"
 
-    openssl-1.1.1q/build.sh
+    openssl-1.1.1q/build.sh ${sym_size}
 
     for algo in recp mont mont_consttime mont_word; do
         limit_loop \
