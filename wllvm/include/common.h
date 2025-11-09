@@ -2,13 +2,14 @@
 #define COMMON_H
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
 
-#if KLEE_CF + REPLAY != 1
-  #error "You must define *exactly one* of KLEE_CF or REPLAY."
+#if KLEE_CF + REPLAY + BINSEC != 1
+  #error "You must define *exactly one* of KLEE_CF, REPLAY, or BINSEC."
 #endif
 
 #ifdef KLEE_CF
@@ -158,7 +159,7 @@ int main(int argc, char *argv[]) {
         #endif
     #endif
 
-    return driver_main(exp_buf, base_buf, mod_buf, SYM_SIZE);
+    exit(driver_main(exp_buf, base_buf, mod_buf, SYM_SIZE));
 }
 
 #endif // COMMON_H

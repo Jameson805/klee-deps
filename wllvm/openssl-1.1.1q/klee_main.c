@@ -5,10 +5,6 @@
   #error "You must define *exactly one* of RECP, MONT, MONT_CONSTTIME, or MONT_WORD."
 #endif
 
-#ifndef REPLAY
-    #include "klee/klee.h"
-#endif
-
 /* Convert the least-significant bytes of a big-endian buffer to BN_ULONG.
    Takes the tail min(len, sizeof(BN_ULONG)) bytes and ignores any higher bytes. */
 static BN_ULONG be_tail_to_bn_ulong(const unsigned char *buf, size_t len) {

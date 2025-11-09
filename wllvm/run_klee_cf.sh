@@ -72,9 +72,10 @@ if ! [[ "$max_memory" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-rm -rf results
-mkdir results
-exec > >(tee -a results/output.log) 2>&1
+results_dir="klee_cf_results"
+rm -rf "$results_dir"
+mkdir -p "$results_dir"
+exec > >(tee -a "$results_dir/output.log") 2>&1
 
 echo "##########"
 echo "Args:"
@@ -128,19 +129,19 @@ run_case() {
     echo "$title"
     echo "========="
     klee_timeout "$bc"
-    mv "$bc_dir/klee-out-0" "results/$result_name"
+    mv "$bc_dir/klee-out-0" "$results_dir/$result_name"
     rm -f "$bc_dir/klee-last"
     rm -rf "$bc_dir/klee-out-*"
 
-    compare_with_ctchecker.py branch "$ct_json" "results/$result_name" "results/${result_name}_branch.json" --code-path "$code_path" "$@"
-    reproduce_positives.py "results/${result_name}_branch.json" "results/$result_name" "$replay_script" $replay_opts --output "results/${result_name}_branch.json"
-    make_report.py "results/${result_name}_branch.json" "results/${result_name}_branch_report.html"
-    make_plot.py "results/${result_name}_branch.json" "$title (Branch)" "results/${result_name}_branch_plot.png"
+    compare_with_ctchecker.py branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" "$@"
+    reproduce_positives.py "$results_dir/${result_name}_branch.json" "$results_dir/$result_name" "$replay_script" $replay_opts --output "$results_dir/${result_name}_branch.json"
+    make_report.py "$results_dir/${result_name}_branch.json" "$results_dir/${result_name}_branch_report.html"
+    make_plot.py "$results_dir/${result_name}_branch.json" "$title (Branch)" "$results_dir/${result_name}_branch_plot.png"
 
     if [[ "$memory_flag" == "true" ]]; then
-        compare_with_ctchecker.py memory "$ct_json" "results/$result_name" "results/${result_name}_memory.json" --code-path "$code_path" "$@"
-        make_report.py "results/${result_name}_memory.json" "results/${result_name}_memory_report.html"
-        make_plot.py "results/${result_name}_memory.json" "$title" "results/${result_name}_memory_plot.png"
+        compare_with_ctchecker.py memory "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_memory.json" --code-path "$code_path" "$@"
+        make_report.py "$results_dir/${result_name}_memory.json" "$results_dir/${result_name}_memory_report.html"
+        make_plot.py "$results_dir/${result_name}_memory.json" "$title" "$results_dir/${result_name}_memory_plot.png"
     fi
 }
 

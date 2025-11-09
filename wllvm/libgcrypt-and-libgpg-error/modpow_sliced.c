@@ -5,7 +5,7 @@
 #include "string.h"
 
 #include "modpow_sliced.h"
-#ifndef REPLAY
+#ifdef KLEE_CF
     #include "klee/klee.h"
 #endif
 
@@ -294,7 +294,7 @@ void _gcry_mpi_powm_slice_1(gcry_mpi_t res, gcry_mpi_t base, gcry_mpi_t expo,
                                      (unsigned int)mod_shift_cnt);
       rp = res->d;
       if (carry_limb) {
-        #ifndef REPLAY
+        #ifdef KLEE_CF
           klee_assume(rsize < MAX_RSIZE);
         #endif
         mpi_size_t tmp_buf[MAX_RSIZE];

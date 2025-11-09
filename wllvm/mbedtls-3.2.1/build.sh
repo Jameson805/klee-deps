@@ -68,10 +68,16 @@ klee_flags=(\
 )
 libs=( library/libmbedtls.a library/libmbedx509.a library/libmbedcrypto.a )
 
+# KLEE-controlflow bitcode builds
 wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SIZE} -DKLEE_CF klee_main.c "${libs[@]}" -o klee_var_pub
 extract-bc klee_var_pub
 wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SIZE} -DKLEE_CF -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
 extract-bc klee_fix_pub
 
+# Replay builds
 clang "${flags[@]}" -DSYM_SIZE=${SIZE} -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
 clang "${flags[@]}" -DSYM_SIZE=${SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
+
+# BINSEC builds
+clang "${flags[@]}" -static -DSYM_SIZE=${SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
+clang "${flags[@]}" -static -DSYM_SIZE=${SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub

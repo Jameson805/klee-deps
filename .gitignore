@@ -18,8 +18,11 @@ klee_fix_pub*
 klee_var_pub*
 klee_fix_pub_replay*
 klee_var_pub_replay*
+binsec_fix_pub*
+binsec_var_pub*
 
-wllvm/results
+wllvm/klee_cf_results/
+wllvm/binsec_results/
 
 wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/Makefile
 wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher/Makefile

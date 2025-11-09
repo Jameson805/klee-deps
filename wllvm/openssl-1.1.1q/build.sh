@@ -73,11 +73,17 @@ algos=( recp mont mont_consttime mont_word )
 for algo in "${algos[@]}"; do
     macro=$(echo "$algo" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g')
 
+    # KLEE-controlflow bitcode builds
     wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SIZE} -DKLEE_CF -D${macro} klee_main.c "${libs[@]}" -o "klee_var_pub_${algo}"
     extract-bc "klee_var_pub_${algo}"
     wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SIZE} -DKLEE_CF -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_${algo}"
     extract-bc "klee_fix_pub_${algo}"
 
+    # Replay builds
     clang "${flags[@]}" -D${macro} -DSYM_SIZE=${SIZE} -DREPLAY klee_main.c "${libs[@]}" -o "klee_var_pub_replay_${algo}"
     clang "${flags[@]}" -D${macro} -DSYM_SIZE=${SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_replay_${algo}"
+
+    # BINSEC builds
+    clang "${flags[@]}" -static -D${macro} -DSYM_SIZE=${SIZE} -DBINSEC klee_main.c "${libs[@]}" -o "binsec_var_pub_${algo}"
+    clang "${flags[@]}" -static -D${macro} -DSYM_SIZE=${SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_${algo}"
 done
