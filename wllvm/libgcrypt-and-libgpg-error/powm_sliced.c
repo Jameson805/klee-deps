@@ -4,10 +4,13 @@
 #include "stdlib.h"
 #include "string.h"
 
-#include "modpow_sliced.h"
+#include "powm_sliced.h"
 
 typedef struct gcry_mpi *gcry_mpi_t;
+typedef struct gcry_mpi_point *gcry_mpi_point_t;
 
+struct mpi_ec_ctx_s;
+typedef struct mpi_ec_ctx_s *mpi_ec_t;
 typedef unsigned long mpi_limb_t;
 struct gcry_mpi {
    int alloced ;
@@ -16,9 +19,68 @@ struct gcry_mpi {
    unsigned int flags ;
    mpi_limb_t *d ;
 };
+
+typedef struct barrett_ctx_s *mpi_barrett_t;
+struct gcry_mpi_point {
+   gcry_mpi_t x ;
+   gcry_mpi_t y ;
+   gcry_mpi_t z ;
+};
+enum gcry_mpi_ec_models {
+    MPI_EC_WEIERSTRASS = 0,
+    MPI_EC_MONTGOMERY = 1,
+    MPI_EC_EDWARDS = 2
+};
+enum ecc_dialects {
+    ECC_DIALECT_STANDARD = 0,
+    ECC_DIALECT_ED25519 = 1,
+    ECC_DIALECT_SAFECURVE = 2
+};
+struct __anonstruct_valid_16 {
+   unsigned int a_is_pminus3 : 1 ;
+   unsigned int two_inv_p : 1 ;
+};
+struct __anonstruct_t_15 {
+   struct __anonstruct_valid_16 valid ;
+   int a_is_pminus3 ;
+   gcry_mpi_t two_inv_p ;
+   mpi_barrett_t p_barrett ;
+   gcry_mpi_t scratch[11] ;
+};
+struct mpi_ec_ctx_s {
+   enum gcry_mpi_ec_models model ;
+   enum ecc_dialects dialect ;
+   int flags ;
+   unsigned int nbits ;
+   gcry_mpi_t p ;
+   gcry_mpi_t a ;
+   gcry_mpi_t b ;
+   gcry_mpi_point_t G ;
+   gcry_mpi_t n ;
+   unsigned int h ;
+   gcry_mpi_point_t Q ;
+   gcry_mpi_t d ;
+   char const *name ;
+   struct __anonstruct_t_15 t ;
+   void (*addm)(gcry_mpi_t w, gcry_mpi_t u, gcry_mpi_t v, mpi_ec_t ctx) ;
+   void (*subm)(gcry_mpi_t w, gcry_mpi_t u, gcry_mpi_t v, mpi_ec_t ec) ;
+   void (*mulm)(gcry_mpi_t w, gcry_mpi_t u, gcry_mpi_t v, mpi_ec_t ctx) ;
+   void (*pow2)(gcry_mpi_t w, gcry_mpi_t const b, mpi_ec_t ctx) ;
+   void (*mul2)(gcry_mpi_t w, gcry_mpi_t u, mpi_ec_t ctx) ;
+   void (*mod)(gcry_mpi_t w, mpi_ec_t ctx) ;
+};
 typedef mpi_limb_t *mpi_ptr_t;
 typedef int mpi_size_t;
 typedef unsigned int __attribute__((__mode__(DI))) UDItype;
+struct barrett_ctx_s {
+   gcry_mpi_t m ;
+   int m_copied ;
+   int k ;
+   gcry_mpi_t y ;
+   gcry_mpi_t r1 ;
+   gcry_mpi_t r2 ;
+   gcry_mpi_t r3 ;
+};
 gcry_mpi_t ( __attribute__((__visibility__("default"))) gcry_mpi_new_slice_1)
 (unsigned int nbits);
 
@@ -41,37 +103,76 @@ void *_gcry_xmalloc_slice_1(size_t n);
 
 void _gcry_free_slice_1(void *p);
 
-void _gcry_fast_wipememory_slice_1(void *ptr, size_t len);
+void _gcry_fast_wipememory(void *ptr, size_t len);
 
 gcry_mpi_t _gcry_mpi_alloc_slice_1(unsigned int nlimbs);
 
 void _gcry_mpi_set_cond_slice_1(gcry_mpi_t w, gcry_mpi_t const u,
                                 unsigned long set);
 
+gcry_mpi_t ( __attribute__((__visibility__("default"))) gcry_mpi_new_slice_1)
+(unsigned int nbits)
+{
+  gcry_mpi_t tmp;
+  tmp = _gcry_mpi_new_slice_1(nbits);
+  return tmp;
+}
+
+void ( __attribute__((__visibility__("default"))) gcry_mpi_set_ui_slice_1)
+(gcry_mpi_t w, unsigned long u)
+{
+  _gcry_mpi_set_ui_slice_1(w,u);
+  return;
+}
+
+void ( __attribute__((__visibility__("default"))) gcry_mpi_powm_slice_1)
+(gcry_mpi_t w, gcry_mpi_t const b, gcry_mpi_t const e, gcry_mpi_t const m)
+{
+  _gcry_mpi_powm_slice_1(w,b,e,m);
+  return;
+}
+
+void _gcry_private_free(void *a);
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch"
+#pragma GCC diagnostic pop
+void _gcry_free_slice_1(void *p)
+{
+  _gcry_private_free(p);
+  return;
+}
+
+void *_gcry_xmalloc_slice_1(size_t n)
+{
+  void *p = malloc(n);
+  return p;
+}
+
 mpi_ptr_t _gcry_mpi_alloc_limb_space_slice_1(unsigned int nlimbs);
 
 void _gcry_mpi_free_limb_space_slice_1(mpi_ptr_t a, unsigned int nlimbs);
 
-mpi_limb_t _gcry_mpih_mul(mpi_ptr_t prodp, mpi_ptr_t up, mpi_size_t usize,
-                          mpi_ptr_t vp, mpi_size_t vsize);
+void _gcry_mpih_mul_slice_1(mpi_ptr_t prodp, mpi_ptr_t up, mpi_size_t usize,
+                            mpi_ptr_t vp, mpi_size_t vsize);
 
-mpi_limb_t _gcry_mpih_divrem(mpi_ptr_t qp, mpi_size_t qextra_limbs,
-                             mpi_ptr_t np, mpi_size_t nsize, mpi_ptr_t dp,
-                             mpi_size_t dsize);
+mpi_limb_t _gcry_mpih_mul_1_slice_1(mpi_ptr_t res_ptr, mpi_size_t s1_size);
 
-mpi_limb_t _gcry_mpih_lshift(mpi_ptr_t wp, mpi_ptr_t up, mpi_size_t usize,
-                             unsigned int cnt);
+void _gcry_mpih_divrem_slice_1(mpi_ptr_t np, mpi_size_t nsize, mpi_ptr_t dp,
+                               mpi_size_t dsize);
 
-mpi_limb_t _gcry_mpih_rshift(mpi_ptr_t wp, mpi_ptr_t up, mpi_size_t usize,
-                             unsigned int cnt);
+mpi_limb_t _gcry_mpih_lshift_slice_1(mpi_ptr_t wp, mpi_ptr_t up,
+                                     mpi_size_t usize, unsigned int cnt);
+
+void _gcry_mpih_rshift_slice_1(mpi_ptr_t wp, mpi_ptr_t up, unsigned int cnt);
 
 static void mul_mod_slice_1(mpi_ptr_t xp, mpi_size_t *xsize_p, mpi_ptr_t rp,
                             mpi_size_t rsize, mpi_ptr_t sp, mpi_size_t ssize,
                             mpi_ptr_t mp, mpi_size_t msize)
 {
-  _gcry_mpih_mul(xp,rp,rsize,sp,ssize);
+  _gcry_mpih_mul_slice_1(xp,rp,rsize,sp,ssize);
   if (rsize + ssize > msize) {
-    _gcry_mpih_divrem(xp + msize,0,xp,rsize + ssize,mp,msize);
+    _gcry_mpih_divrem_slice_1(xp,rsize + ssize,mp,msize);
     *xsize_p = msize;
   }
   else *xsize_p = rsize + ssize;
@@ -132,8 +233,8 @@ void _gcry_mpi_powm_slice_1(gcry_mpi_t res, gcry_mpi_t base, gcry_mpi_t expo,
     UDItype __cbtmp = (UDItype)0;
     mod_shift_cnt = (int)(__cbtmp ^ (unsigned int __attribute__((__mode__(DI))))63);
   }
-  if (mod_shift_cnt) _gcry_mpih_lshift(mp,mod->d,msize,
-                                       (unsigned int)mod_shift_cnt);
+  if (mod_shift_cnt) _gcry_mpih_lshift_slice_1(mp,mod->d,msize,
+                                               (unsigned int)mod_shift_cnt);
   else {
     mpi_size_t _i;
     _i = 0;
@@ -204,10 +305,10 @@ void _gcry_mpi_powm_slice_1(gcry_mpi_t res, gcry_mpi_t base, gcry_mpi_t expo,
     e = (e << c) << 1;
     c = (8 * 8 - 1) - c;
     j = 0;
-    while (1) {
-      /*@ \slicing::slice_preserve_ctrl ; */ ;
+    while (1) 
       if (e == (mpi_limb_t)0) {
         j += c;
+        /*@ \slicing::slice_preserve_ctrl ; */ ;
         break;
       }
       else {
@@ -271,7 +372,6 @@ void _gcry_mpi_powm_slice_1(gcry_mpi_t res, gcry_mpi_t base, gcry_mpi_t expo,
         }
         j = c0;
       }
-    }
     /*@ \slicing::slice_preserve_ctrl ; */ ;
     while (1) {
       mpi_size_t tmp_5;
@@ -285,8 +385,8 @@ void _gcry_mpi_powm_slice_1(gcry_mpi_t res, gcry_mpi_t base, gcry_mpi_t expo,
       rsize = xsize;
     }
     if (mod_shift_cnt) {
-      carry_limb = _gcry_mpih_lshift(res->d,rp,rsize,
-                                     (unsigned int)mod_shift_cnt);
+      carry_limb = _gcry_mpih_lshift_slice_1(res->d,rp,rsize,
+                                             (unsigned int)mod_shift_cnt);
       rp = res->d;
       if (carry_limb) {
         *(rp + rsize) = carry_limb;
@@ -305,10 +405,10 @@ void _gcry_mpi_powm_slice_1(gcry_mpi_t res, gcry_mpi_t base, gcry_mpi_t expo,
         }
         rp = res->d;
       }
-    _gcry_mpih_divrem(rp + msize,0,rp,rsize,mp,msize);
+    _gcry_mpih_divrem_slice_1(rp,rsize,mp,msize);
     rsize = msize;
-    if (mod_shift_cnt) _gcry_mpih_rshift(rp,rp,rsize,
-                                         (unsigned int)mod_shift_cnt);
+    if (mod_shift_cnt) _gcry_mpih_rshift_slice_1(rp,rp,
+                                                 (unsigned int)mod_shift_cnt);
     while (rsize > 0) {
       if (*(rp + (rsize - 1))) break;
       rsize --;
@@ -331,57 +431,132 @@ void _gcry_mpi_powm_slice_1(gcry_mpi_t res, gcry_mpi_t base, gcry_mpi_t expo,
   return;
 }
 
-gcry_mpi_t ( __attribute__((__visibility__("default"))) gcry_mpi_new_slice_1)
-(unsigned int nbits)
+void _gcry_mpih_divrem_slice_1(mpi_ptr_t np, mpi_size_t nsize, mpi_ptr_t dp,
+                               mpi_size_t dsize)
 {
-  gcry_mpi_t tmp;
-  tmp = _gcry_mpi_new_slice_1(nbits);
-  return tmp;
-}
-
-void ( __attribute__((__visibility__("default"))) gcry_mpi_set_ui_slice_1)
-(gcry_mpi_t w, unsigned long u)
-{
-  _gcry_mpi_set_ui_slice_1(w,u);
+  switch (dsize) {
+    case 0: ;
+    case 1:
+    {
+      mpi_limb_t n1;
+      mpi_limb_t d;
+      d = *(dp + 0);
+      n1 = *(np + (nsize - 1));
+      if (n1 >= d) n1 -= d;
+      *(np + 0) = n1;
+    }
+    break;
+    case 2: ;
+    default: ;
+  }
   return;
 }
 
-void ( __attribute__((__visibility__("default"))) gcry_mpi_powm_slice_1)
-(gcry_mpi_t w, gcry_mpi_t const b, gcry_mpi_t const e, gcry_mpi_t const m)
+mpi_limb_t _gcry_mpih_lshift_slice_1(mpi_ptr_t wp, mpi_ptr_t up,
+                                     mpi_size_t usize, unsigned int cnt)
 {
-  _gcry_mpi_powm_slice_1(w,b,e,m);
+  mpi_limb_t high_limb;
+  mpi_limb_t low_limb;
+  unsigned int sh_1;
+  unsigned int sh_2;
+  mpi_size_t i;
+  mpi_limb_t retval;
+  sh_1 = cnt;
+  wp ++;
+  sh_2 = (unsigned int)(8 * 8) - sh_1;
+  i = usize - 1;
+  low_limb = *(up + i);
+  retval = low_limb >> sh_2;
+  high_limb = low_limb;
+  i --;
+  goto break_cont_1;
+  break_cont_1: *(wp + i) = high_limb << sh_1;
+  return retval;
+}
+
+void _gcry_mpih_mul_slice_1(mpi_ptr_t prodp, mpi_ptr_t up, mpi_size_t usize,
+                            mpi_ptr_t vp, mpi_size_t vsize)
+{
+  mpi_limb_t cy;
+  {
+    mpi_limb_t v_limb;
+    if (! vsize) goto return_label;
+    v_limb = *(vp + 0);
+    if (v_limb <= (mpi_limb_t)1) {
+      if (v_limb == (mpi_limb_t)1) {
+        mpi_size_t _i;
+        _i = 0;
+        while (_i < usize) {
+          *(prodp + _i) = *(up + _i);
+          _i ++;
+        }
+      }
+      else {
+        int _i_0;
+        _i_0 = 0;
+        while (_i_0 < usize) {
+          *(prodp + _i_0) = (mpi_limb_t)0;
+          _i_0 ++;
+        }
+      }
+      cy = (mpi_limb_t)0;
+    }
+    else cy = _gcry_mpih_mul_1_slice_1(prodp,usize);
+    *(prodp + usize) = cy;
+  }
+  return_label: return;
+}
+
+mpi_limb_t _gcry_mpih_mul_1_slice_1(mpi_ptr_t res_ptr, mpi_size_t s1_size)
+{
+  mpi_limb_t cy_limb;
+  mpi_size_t j;
+  mpi_limb_t prod_high;
+  mpi_limb_t prod_low;
+  j = - s1_size;
+  res_ptr -= j;
+  cy_limb = (mpi_limb_t)0;
+  while (1) {
+    {
+      int tmp;
+      prod_low += cy_limb;
+      tmp = 0;
+      cy_limb = (mpi_limb_t)tmp + prod_high;
+      *(res_ptr + j) = prod_low;
+    }
+    j ++;
+    break;
+  }
+  return cy_limb;
+}
+
+void _gcry_mpih_rshift_slice_1(mpi_ptr_t wp, mpi_ptr_t up, unsigned int cnt)
+{
+  mpi_limb_t high_limb;
+  mpi_limb_t low_limb;
+  unsigned int sh_1;
+  mpi_size_t i;
+  sh_1 = cnt;
+  wp --;
+  high_limb = *(up + 0);
+  low_limb = high_limb;
+  i = 1;
+  *(wp + i) = low_limb >> sh_1;
   return;
 }
 
-void _gcry_private_free(void *a);
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch"
-#pragma GCC diagnostic pop
-void _gcry_free_slice_1(void *p)
-{
-  _gcry_private_free(p);
-  return;
-}
-
-void *_gcry_xmalloc_slice_1(size_t n)
-{
-  void *p = malloc(n);
-  return p;
-}
-
-static mpi_limb_t volatile vzero = (mpi_limb_t)0;
-static mpi_limb_t volatile vone = (mpi_limb_t)1;
-// extern void Frama_C_make_unknown(void *ptr, unsigned long size);
+static mpi_limb_t volatile vzero_0 = (mpi_limb_t)0;
+static mpi_limb_t volatile vone_0 = (mpi_limb_t)1;
+extern void Frama_C_make_unknown(void *ptr, unsigned long size);
 
 gcry_mpi_t _gcry_mpi_alloc_slice_1(unsigned int nlimbs)
 {
   gcry_mpi_t a;
   a = (gcry_mpi_t)_gcry_xmalloc_slice_1(sizeof(*a));
-  a->d = _gcry_mpi_alloc_limb_space_slice_1(nlimbs + 3); // adding guard limbs for memory safety
-  // Frama_C_make_unknown((void *)a->d,
-  //                     (unsigned long)nlimbs * sizeof(mpi_limb_t));
-  a->alloced = (int)(nlimbs+3);
+  a->d = _gcry_mpi_alloc_limb_space_slice_1(nlimbs + (unsigned int)3);
+  Frama_C_make_unknown((void *)a->d,
+                       (unsigned long)nlimbs * sizeof(mpi_limb_t));
+  a->alloced = (int)(nlimbs + (unsigned int)3);
   a->nlimbs = 0;
   a->sign = 0;
   a->flags = (unsigned int)0;
@@ -391,7 +566,7 @@ gcry_mpi_t _gcry_mpi_alloc_slice_1(unsigned int nlimbs)
 mpi_ptr_t _gcry_mpi_alloc_limb_space_slice_1(unsigned int nlimbs)
 {
   mpi_ptr_t p = malloc((unsigned long)nlimbs * sizeof(mpi_limb_t));
-  // Frama_C_make_unknown((void *)p,(unsigned long)nlimbs * sizeof(mpi_limb_t));
+  Frama_C_make_unknown((void *)p,(unsigned long)nlimbs * sizeof(mpi_limb_t));
   return p;
 }
 
@@ -400,8 +575,7 @@ void _gcry_mpi_free_limb_space_slice_1(mpi_ptr_t a, unsigned int nlimbs)
   if (a) {
     size_t len = (unsigned long)nlimbs * sizeof(mpi_limb_t);
     if (len) 
-      if (1) goto _LOR;
-      else _LOR: _gcry_fast_wipememory_slice_1((void *)a,len);
+      if (1) goto _LOR; else _LOR: _gcry_fast_wipememory((void *)a,len);
     _gcry_free_slice_1((void *)a);
   }
   return;
@@ -414,8 +588,8 @@ void _gcry_mpi_set_cond_slice_1(gcry_mpi_t w, gcry_mpi_t const u,
   mpi_limb_t xu;
   mpi_limb_t xw;
   mpi_size_t nlimbs = u->alloced;
-  mpi_limb_t mask1 = vzero - set;
-  mpi_limb_t mask2 = set - vone;
+  mpi_limb_t mask1 = vzero_0 - set;
+  mpi_limb_t mask2 = set - vone_0;
   mpi_limb_t *uu = u->d;
   mpi_limb_t *uw = w->d;
   i = 0;
@@ -443,10 +617,4 @@ gcry_mpi_t _gcry_mpi_new_slice_1(unsigned int nbits)
   tmp = _gcry_mpi_alloc_slice_1(((nbits + (unsigned int)(8 * 8)) - (unsigned int)1) / (unsigned int)(
                                 8 * 8));
   return tmp;
-}
-
-void _gcry_fast_wipememory_slice_1(void *ptr, size_t len)
-{
-  explicit_bzero(ptr,len);
-  return;
 }

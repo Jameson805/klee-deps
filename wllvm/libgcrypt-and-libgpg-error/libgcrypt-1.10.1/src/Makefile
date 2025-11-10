@@ -318,14 +318,14 @@ BUILD_FILEVERSION = 1,10,1,0
 BUILD_REVISION = 0000000
 BUILD_TIMESTAMP = <none>
 BUILD_VERSION = 1.10.1.0
-CC = wllvm
-CCAS = wllvm
+CC = gcc
+CCAS = gcc
 CCASDEPMODE = depmode=gcc3
-CCASFLAGS = -g -O0 -DNO_ASM
+CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CC_FOR_BUILD = $(CC)
-CFLAGS = -g -O0 -DNO_ASM -fvisibility=hidden -fno-delete-null-pointer-checks -Wall
-CPP = wllvm -E
+CFLAGS = -g -O2 -fvisibility=hidden -fno-delete-null-pointer-checks -Wall
+CPP = gcc -E
 CPPFLAGS = 
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
@@ -420,7 +420,7 @@ abs_srcdir = /home/james/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.
 abs_top_builddir = /home/james/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1
 abs_top_srcdir = /home/james/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1
 ac_ct_AR = ar
-ac_ct_CC = wllvm
+ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
 am__include = include
 am__leading_dot = .

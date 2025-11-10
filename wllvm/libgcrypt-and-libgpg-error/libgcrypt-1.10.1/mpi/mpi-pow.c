@@ -625,11 +625,11 @@ _gcry_mpi_powm (gcry_mpi_t res,
     j = 0;
 
     for (;;) {
-      //@ slice_preserve_ctrl;
-      //@ slice_preserve_stmt;
       if (e == 0)
         {
           j += c;
+          //@ slice_preserve_ctrl;
+          //@ slice_preserve_stmt;
           if ( --i < 0 )
             break;
 

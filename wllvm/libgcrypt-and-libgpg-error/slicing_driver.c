@@ -6,21 +6,6 @@
 /* Frama-C nondeterministic interval helper */
 extern int Frama_C_interval(int a, int b);
 
-/* Stubs to simplify pre-powm behavior, doesn't work yet
-gcry_mpi_t gcry_mpi_new(unsigned int nbits) { 
-    gcry_mpi_t x = malloc(sizeof(*x));
-    return x;
-}
-
-void gcry_mpi_set_ui(gcry_mpi_t x, unsigned long v) { 
-    if (x) x->nlimbs = 1;
-    if (x && x->d) x->d[0] = v; 
-}
-
-void gcry_mpi_release(gcry_mpi_t x) { 
-    free(x);
-}
-*/
 
 int main(void)
 {
