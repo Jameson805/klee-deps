@@ -21,6 +21,8 @@ klee_var_pub_replay*
 binsec_fix_pub*
 binsec_var_pub*
 abacus_fix_pub*
+self_comp_fix_pub*
+self_comp_var_pub*
 
 wllvm/*_results/
 

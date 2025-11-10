@@ -5,11 +5,12 @@ cd "$(dirname "$0")"
 KLEE_PATH="../../klee-controlflow"
 
 usage() {
-    echo "Usage: $0 [--skip-deps] (--klee-cf | --binsec | --abacus) --sym-size N"
+    echo "Usage: $0 [--skip-deps] (--klee-cf | --binsec | --abacus | --self-comp) --sym-size N"
     echo "  --skip-deps    Skip building libgpg-error and libgcrypt"
     echo "  --klee-cf      Build KLEE bitcode and Replay binaries"
     echo "  --binsec       Build BINSEC binaries"
     echo "  --abacus       Build Abacus binaries"
+    echo "  --self-comp    Build self-composition KLEE bitcode"
     echo "  --sym-size N   Mandatory non-negative integer to pass as -DSYM_SIZE"
 }
 
@@ -23,15 +24,16 @@ while [[ $# -gt 0 ]]; do
             SKIP_DEPS=1
             shift
             ;;
-        --klee-cf|--binsec|--abacus)
+        --klee-cf|--binsec|--abacus|--self-comp)
             if [[ -n "$MODE" ]]; then
-                echo "Multiple build modes specified. Choose exactly one of --klee-cf, --binsec, --abacus."
+                echo "Multiple build modes specified. Choose exactly one of --klee-cf, --binsec, --abacus, --self-comp."
                 exit 1
             fi
             case "$1" in
-                --klee-cf) MODE="klee_cf" ;;
-                --binsec)  MODE="binsec"  ;;
-                --abacus)  MODE="abacus"  ;;
+                --klee-cf)   MODE="klee_cf"   ;;
+                --binsec)    MODE="binsec"    ;;
+                --abacus)    MODE="abacus"    ;;
+                --self-comp) MODE="self_comp" ;;
             esac
             shift
             ;;
@@ -56,7 +58,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$MODE" ]]; then
-    echo "Missing required build mode. Choose exactly one of --klee-cf, --binsec, --abacus."
+    echo "Missing required build mode. Choose exactly one of --klee-cf, --binsec, --abacus, --self-comp."
     usage
     exit 1
 fi
@@ -74,7 +76,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     echo "Building dependencies..."
 
     CC=gcc
-    if [[ "$MODE" == "klee_cf" ]]; then
+    if [[ "$MODE" == "klee_cf" || "$MODE" == "self_comp" ]]; then
         export LLVM_COMPILER=clang
         CC=wllvm
     fi
@@ -104,6 +106,16 @@ klee_flags=(\
 )
 libs=( libcrypto.a )
 
+record_branch() {
+    pass_path="../../branch-recorder/build/libBranchRecorder.so"
+    target_fun="$2"
+    opt -load "${pass_path}" \
+        -load-pass-plugin="${pass_path}" \
+        -passes=branch-recorder \
+        -whitelist="${target_fun}" \
+        "$1" -o "$1"
+}
+
 algos=( recp mont mont_consttime mont_word )
 for algo in "${algos[@]}"; do
     macro=$(echo "$algo" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g')
@@ -129,5 +141,22 @@ for algo in "${algos[@]}"; do
     if [[ "$MODE" == "abacus" ]]; then
         # Abacus builds
         gcc "${flags[@]}" -m32 -pthread -D${macro} -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -ldl -o "abacus_fix_pub_${algo}"
+    fi
+
+    if [[ "$MODE" == "self_comp" ]]; then
+        case "$algo" in
+            recp)           fun="BN_mod_exp_recp" ;;
+            mont)           fun="BN_mod_exp_mont" ;;
+            mont_consttime) fun="BN_mod_exp_mont_consttime" ;;
+            mont_word)      fun="BN_mod_exp_mont_word" ;;
+        esac
+
+        wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SYM_SIZE} -DSELF_COMP -D${macro} klee_main.c "${libs[@]}" -o "self_comp_var_pub_${algo}"
+        extract-bc "self_comp_var_pub_${algo}"
+        record_branch "self_comp_var_pub_${algo}.bc" "${fun}"
+
+        wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SYM_SIZE} -DSELF_COMP -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "self_comp_fix_pub_${algo}"
+        extract-bc "self_comp_fix_pub_${algo}"
+        record_branch "self_comp_fix_pub_${algo}.bc" "${fun}"
     fi
 done

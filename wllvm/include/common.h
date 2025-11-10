@@ -8,22 +8,6 @@
 #include <string.h>
 #include <assert.h>
 
-#if KLEE_CF + REPLAY + BINSEC + ABACUS != 1
-  #error "You must define *exactly one* of KLEE_CF, REPLAY, BINSEC, or ABACUS."
-#endif
-
-#ifdef KLEE_CF
-    #include "klee/klee.h"
-#endif
-
-#ifdef ABACUS
-    #define CONCRETE_PUBS
-    int __attribute__((optimize(0)))
-    abacus_make_symbolic(char *name, void *addr, uint32_t length) {
-        return 1;
-    }
-#endif
-
 /* Returns nonzero if any byte in buf is nonzero */
 static unsigned buf_nonzero(const unsigned char *buf, size_t size) {
     unsigned v = 0;
@@ -100,77 +84,170 @@ static int load_bytes(const char *filename, void *buf, size_t size)
 }
 
 #if SYM_SIZE != 2 && SYM_SIZE != 4 && SYM_SIZE != 8
-  #error "You must define SYM_SIZE to one of 2, 4, or 8."
+    #error "You must define SYM_SIZE to one of 2, 4, or 8."
 #endif
-static unsigned char exp_buf[SYM_SIZE];
-static unsigned char base_buf[SYM_SIZE];
-static unsigned char mod_buf[SYM_SIZE];
 
-/* User-provided entry that consumes the prepared buffers. */
-int driver_main(const unsigned char *exp_buf, const unsigned char *base_buf, const unsigned char *mod_buf, size_t len);
+#ifdef SELF_COMP
 
-int main(int argc, char *argv[]) {
-    #ifdef REPLAY
+    #include "klee/klee.h"
+
+    static unsigned char exp_1_buf[SYM_SIZE];
+    static unsigned char exp_2_buf[SYM_SIZE];
+    static unsigned char base_buf[SYM_SIZE];
+    static unsigned char mod_buf[SYM_SIZE];
+
+    #define MAX_BRANCH_RECORDS 65536
+
+    int branchRecords[MAX_BRANCH_RECORDS];
+    int branchRecordsLen;
+
+    int branchRecords1[MAX_BRANCH_RECORDS];
+    int branchRecords1Len;
+
+    /* User-provided entry that consumes the prepared buffers. */
+    int driver_main(const unsigned char *exp_buf, const unsigned char *base_buf, const unsigned char *mod_buf, size_t len);
+
+    int main(int argc, char *argv[]) {
+        klee_make_symbolic(exp_1_buf, SYM_SIZE, "exp_1");
+        klee_make_symbolic(exp_2_buf, SYM_SIZE, "exp_2");
+        // exp_1_buf > 0 and exp_2_buf > 0
+        klee_assume(buf_nonzero(exp_1_buf, SYM_SIZE) != 0);
+        klee_assume(buf_nonzero(exp_2_buf, SYM_SIZE) != 0);
+        // exp1 and exp2 must be of the same bit length
+        klee_assume(buf_bitlen(exp_1_buf, SYM_SIZE) == buf_bitlen(exp_2_buf, SYM_SIZE));
+
         #ifdef CONCRETE_PUBS
-            assert(argc == 2 && "Required arguments: <exp_filename>");
-            char *exp_filename = argv[1];
+            #if SYM_SIZE == 2
+                uint16_t base_i = 251; // Closest prime less than uint8_t max
+                uint16_t mod_i = 65521; // Closest prime less than uint16_t max
+                be_store_u16_tail(base_buf, SYM_SIZE, base_i);
+                be_store_u16_tail(mod_buf, SYM_SIZE, mod_i);
+            #elif SYM_SIZE == 4
+                uint32_t base_i = 251; // Closest prime less than uint8_t max
+                uint32_t mod_i = 4294967291; // Closest prime less than uint32_t max
+                be_store_u32_tail(base_buf, SYM_SIZE, base_i);
+                be_store_u32_tail(mod_buf, SYM_SIZE, mod_i);
+            #elif SYM_SIZE == 8
+                uint64_t base_i = 251; // Closest prime less than uint8_t max
+                uint64_t mod_i = 18446744073709551557; // Closest prime less than uint64_t max
+                be_store_u64_tail(base_buf, SYM_SIZE, base_i);
+                be_store_u64_tail(mod_buf, SYM_SIZE, mod_i);
+            #endif
         #else
-            assert(argc == 4 && "Required arguments: <exp_filename> <base_filename> <mod_filename>");
-            char *exp_filename = argv[1];
-            char *base_filename = argv[2];
-            char *mod_filename = argv[3];
-        #endif
-    #endif
-
-    #ifdef KLEE_CF
-        klee_make_symbolic_sc(exp_buf, sizeof(exp_buf), "exp", 1);
-        // exp_buf > 0
-        klee_assume(buf_nonzero(exp_buf, SYM_SIZE) != 0);
-
-        unsigned int bitlen;
-        klee_make_symbolic_sc(&bitlen, sizeof(bitlen), "exp_bitlen", 0);
-        // exp and exp' must be of the same bit length
-        klee_assume(buf_bitlen(exp_buf, SYM_SIZE) == bitlen);
-    #elif defined(REPLAY)
-        if (!load_bytes(exp_filename, exp_buf, sizeof(exp_buf))) return 1;
-    #elif defined(ABACUS)
-        char *type = "1";
-        abacus_make_symbolic(type, &exp_buf, sizeof(exp_buf));
-    #endif
-
-    #ifdef CONCRETE_PUBS
-        #if SYM_SIZE == 2
-            uint16_t base_i = 251; // Closest prime less than uint8_t max
-            uint16_t mod_i = 65521; // Closest prime less than uint16_t max
-            be_store_u16_tail(base_buf, sizeof(base_buf), base_i);
-            be_store_u16_tail(mod_buf, sizeof(mod_buf), mod_i);
-        #elif SYM_SIZE == 4
-            uint32_t base_i = 251; // Closest prime less than uint8_t max
-            uint32_t mod_i = 4294967291; // Closest prime less than uint32_t max
-            be_store_u32_tail(base_buf, sizeof(base_buf), base_i);
-            be_store_u32_tail(mod_buf, sizeof(mod_buf), mod_i);
-        #elif SYM_SIZE == 8
-            uint64_t base_i = 251; // Closest prime less than uint8_t max
-            uint64_t mod_i = 18446744073709551557; // Closest prime less than uint64_t max
-            be_store_u64_tail(base_buf, sizeof(base_buf), base_i);
-            be_store_u64_tail(mod_buf, sizeof(mod_buf), mod_i);
-        #endif
-    #else
-        #ifdef KLEE_CF
-            klee_make_symbolic_sc(base_buf, sizeof(base_buf), "base", 0);
-            klee_make_symbolic_sc(mod_buf, sizeof(mod_buf), "mod", 0);
+            klee_make_symbolic(base_buf, SYM_SIZE, "base");
+            klee_make_symbolic(mod_buf, SYM_SIZE, "mod");
             // base_buf > 0 and mod_buf > 0
             klee_assume(buf_nonzero(base_buf, SYM_SIZE) != 0);
             klee_assume(buf_nonzero(mod_buf, SYM_SIZE) != 0);
             // mod_buf is odd
             klee_assume(mod_buf[SYM_SIZE - 1] & 1);
-        #elif defined(REPLAY)
-            if (!load_bytes(base_filename, base_buf, sizeof(base_buf))) return 1;
-            if (!load_bytes(mod_filename, mod_buf, sizeof(mod_buf))) return 1;
         #endif
+
+        if (driver_main(exp_1_buf, base_buf, mod_buf, SYM_SIZE)) return 1;
+
+        memcpy(branchRecords1, branchRecords, sizeof(branchRecords));
+        branchRecords1Len = branchRecordsLen;
+        branchRecordsLen = 0;
+
+        if (driver_main(exp_2_buf, base_buf, mod_buf, SYM_SIZE)) return 1;
+
+        klee_assert(branchRecordsLen == branchRecords1Len && "diverging branch record lengths");
+        for (int i = 0; i < branchRecordsLen; ++i) {
+            klee_assert(branchRecords[i] == branchRecords1[i] && "diverging branch records");
+        }
+
+        return 0;
+    }
+
+#else // !SELF_COMP
+
+    #if KLEE_CF + REPLAY + BINSEC + ABACUS != 1
+    #error "You must define *exactly one* of KLEE_CF, REPLAY, BINSEC, or ABACUS."
     #endif
 
-    exit(driver_main(exp_buf, base_buf, mod_buf, SYM_SIZE));
-}
+    #ifdef KLEE_CF
+        #include "klee/klee.h"
+    #endif
+
+    #ifdef ABACUS
+        #define CONCRETE_PUBS
+        int __attribute__((optimize(0)))
+        abacus_make_symbolic(char *name, void *addr, uint32_t length) {
+            return 1;
+        }
+    #endif
+
+    static unsigned char exp_buf[SYM_SIZE];
+    static unsigned char base_buf[SYM_SIZE];
+    static unsigned char mod_buf[SYM_SIZE];
+
+    /* User-provided entry that consumes the prepared buffers. */
+    int driver_main(const unsigned char *exp_buf, const unsigned char *base_buf, const unsigned char *mod_buf, size_t len);
+
+    int main(int argc, char *argv[]) {
+        #ifdef REPLAY
+            #ifdef CONCRETE_PUBS
+                assert(argc == 2 && "Required arguments: <exp_filename>");
+                char *exp_filename = argv[1];
+            #else
+                assert(argc == 4 && "Required arguments: <exp_filename> <base_filename> <mod_filename>");
+                char *exp_filename = argv[1];
+                char *base_filename = argv[2];
+                char *mod_filename = argv[3];
+            #endif
+        #endif
+
+        #ifdef KLEE_CF
+            klee_make_symbolic_sc(exp_buf, SYM_SIZE, "exp", 1);
+            // exp_buf > 0
+            klee_assume(buf_nonzero(exp_buf, SYM_SIZE) != 0);
+
+            unsigned int bitlen;
+            klee_make_symbolic_sc(&bitlen, SYM_SIZE, "exp_bitlen", 0);
+            // exp and exp' must be of the same bit length
+            klee_assume(buf_bitlen(exp_buf, SYM_SIZE) == bitlen);
+        #elif defined(REPLAY)
+            if (!load_bytes(exp_filename, exp_buf, SYM_SIZE)) return 1;
+        #elif defined(ABACUS)
+            char *type = "1";
+            abacus_make_symbolic(type, &exp_buf, SYM_SIZE);
+        #endif
+
+        #ifdef CONCRETE_PUBS
+            #if SYM_SIZE == 2
+                uint16_t base_i = 251; // Closest prime less than uint8_t max
+                uint16_t mod_i = 65521; // Closest prime less than uint16_t max
+                be_store_u16_tail(base_buf, SYM_SIZE, base_i);
+                be_store_u16_tail(mod_buf, SYM_SIZE, mod_i);
+            #elif SYM_SIZE == 4
+                uint32_t base_i = 251; // Closest prime less than uint8_t max
+                uint32_t mod_i = 4294967291; // Closest prime less than uint32_t max
+                be_store_u32_tail(base_buf, SYM_SIZE, base_i);
+                be_store_u32_tail(mod_buf, SYM_SIZE, mod_i);
+            #elif SYM_SIZE == 8
+                uint64_t base_i = 251; // Closest prime less than uint8_t max
+                uint64_t mod_i = 18446744073709551557; // Closest prime less than uint64_t max
+                be_store_u64_tail(base_buf, SYM_SIZE, base_i);
+                be_store_u64_tail(mod_buf, SYM_SIZE, mod_i);
+            #endif
+        #else
+            #ifdef KLEE_CF
+                klee_make_symbolic_sc(base_buf, SYM_SIZE, "base", 0);
+                klee_make_symbolic_sc(mod_buf, SYM_SIZE, "mod", 0);
+                // base_buf > 0 and mod_buf > 0
+                klee_assume(buf_nonzero(base_buf, SYM_SIZE) != 0);
+                klee_assume(buf_nonzero(mod_buf, SYM_SIZE) != 0);
+                // mod_buf is odd
+                klee_assume(mod_buf[SYM_SIZE - 1] & 1);
+            #elif defined(REPLAY)
+                if (!load_bytes(base_filename, base_buf, SYM_SIZE)) return 1;
+                if (!load_bytes(mod_filename, mod_buf, SYM_SIZE)) return 1;
+            #endif
+        #endif
+
+        exit(driver_main(exp_buf, base_buf, mod_buf, SYM_SIZE));
+    }
+
+#endif // SELF_COMP
 
 #endif // COMMON_H
