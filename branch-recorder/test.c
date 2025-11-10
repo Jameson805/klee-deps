@@ -1,7 +1,8 @@
 #include <stdio.h>
 
-int branchRecords[65536];
-int branchRecordsLen = 0;
+void __record_branch(int decision, const char *file, int line, int col) {
+    printf("[BRANCH] %s:%d:%d -> %d\n", file, line, col, decision);
+}
 
 void f(int n) {
    if (n > 0) {
@@ -18,9 +19,5 @@ void g(int n) {
 int main() {
     f(3);
     g(1);
-
-    printf("branchRecords: ");
-    for (int i = 0; i < branchRecordsLen; ++i) printf("%d ", branchRecords[i]);
-    printf("\n");
     return 0;
 }

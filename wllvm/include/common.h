@@ -8,6 +8,7 @@
 #include <string.h>
 #include <assert.h>
 
+
 /* Returns nonzero if any byte in buf is nonzero */
 static unsigned buf_nonzero(const unsigned char *buf, size_t size) {
     unsigned v = 0;
@@ -98,11 +99,27 @@ static int load_bytes(const char *filename, void *buf, size_t size)
 
     #define MAX_BRANCH_RECORDS 65536
 
-    int branchRecords[MAX_BRANCH_RECORDS];
-    int branchRecordsLen;
+    typedef struct {
+        int decision;
+        const char *file;
+        int line;
+        int col;
+    } BranchRecord;
 
-    int branchRecords1[MAX_BRANCH_RECORDS];
-    int branchRecords1Len;
+    static BranchRecord branchRecords[MAX_BRANCH_RECORDS];
+    static int branchRecordsLen;
+
+    static BranchRecord branchRecords1[MAX_BRANCH_RECORDS];
+    static int branchRecords1Len;
+
+    void __record_branch(int decision, const char *file, int line, int col) {
+        klee_assert(branchRecordsLen < MAX_BRANCH_RECORDS);
+        branchRecords[branchRecordsLen].decision = decision;
+        branchRecords[branchRecordsLen].file = file;
+        branchRecords[branchRecordsLen].line = line;
+        branchRecords[branchRecordsLen].col = col;
+        branchRecordsLen++;
+    }
 
     /* User-provided entry that consumes the prepared buffers. */
     int driver_main(const unsigned char *exp_buf, const unsigned char *base_buf, const unsigned char *mod_buf, size_t len);
@@ -151,9 +168,40 @@ static int load_bytes(const char *filename, void *buf, size_t size)
 
         if (driver_main(exp_2_buf, base_buf, mod_buf, SYM_SIZE)) return 1;
 
-        klee_assert(branchRecordsLen == branchRecords1Len && "diverging branch record lengths");
-        for (int i = 0; i < branchRecordsLen; ++i) {
-            klee_assert(branchRecords[i] == branchRecords1[i] && "diverging branch records");
+        // Compare traces
+        int minLen = (branchRecordsLen < branchRecords1Len) ? branchRecordsLen : branchRecords1Len;
+        for (int i = 0; i < minLen; ++i) {
+            BranchRecord *a = &branchRecords[i];
+            BranchRecord *b = &branchRecords1[i];
+
+            int sameLoc = (a->line == b->line) && (a->col == b->col) && (strcmp(a->file, b->file) == 0);
+            int sameDecision = (a->decision == b->decision);
+
+            if (sameLoc && !sameDecision) {
+                // Case 1: differs just by condition
+                fprintf(stderr, "[NON-CT BRANCH] %s:%d:%d\n", a->file, a->line, a->col);
+                klee_assert(0 && "non-CT branch");
+            }
+
+            if (!sameLoc) {
+                // Case 2: location differs (report both)
+                fprintf(stderr, "[NON-CT BRANCH] mismatch %s:%d:%d (dec=%d) vs %s:%d:%d (dec=%d)\n",
+                        a->file, a->line, a->col, a->decision,
+                        b->file, b->line, b->col, b->decision);
+                klee_assert(0 && "non-CT branch");
+            }
+        }
+
+        if (branchRecordsLen != branchRecords1Len) {
+            // Case 3: length differs; report the extra branch at index minLen
+            BranchRecord *extra;
+            if (branchRecordsLen > branchRecords1Len) {
+                extra = &branchRecords[minLen];
+            } else {
+                extra = &branchRecords1[minLen];
+            }
+            fprintf(stderr, "[NON-CT BRANCH] extra %s:%d:%d\n", extra->file, extra->line, extra->col);
+            klee_assert(0 && "non-CT branch");
         }
 
         return 0;

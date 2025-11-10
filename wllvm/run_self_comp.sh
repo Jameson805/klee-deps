@@ -99,6 +99,7 @@ klee_timeout() {
     timeout --foreground --signal=INT --kill-after="$kill_after" "$max_time" \
     "$klee_root/klee" --libc=uclibc \
         --posix-runtime \
+        --emit-all-errors=true \
         --dump-states-on-halt=false \
         --use-batching-search=true \
         --max-solver-time="$max_solver_time" \
