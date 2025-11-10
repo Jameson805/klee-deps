@@ -97,15 +97,20 @@ klee_timeout() {
     fi
 
     timeout --foreground --signal=INT --kill-after="$kill_after" "$max_time" \
-    "$klee_root/klee" --libc=uclibc \
-        --posix-runtime \
-        --emit-all-errors=true \
-        --dump-states-on-halt=false \
-        --use-batching-search=true \
-        --max-solver-time="$max_solver_time" \
-        --max-depth="$max_depth" \
-        "${search_flag[@]}" \
-        --max-memory=$max_memory "$1" || true
+        stdbuf -oL -eL "$klee_root/klee" --libc=uclibc \
+            --posix-runtime \
+            --emit-all-errors=true \
+            --dump-states-on-halt=false \
+            --use-batching-search=true \
+            --max-solver-time="$max_solver_time" \
+            --max-depth="$max_depth" \
+            "${search_flag[@]}" \
+            --max-memory=$max_memory "$1" 2>&1 \
+    | python3 -u -c 'import sys,time
+for line in sys.stdin:
+    sys.stdout.write(f"[{time.time():.3f}] {line}")
+    sys.stdout.flush()' \
+    || true
 }
 
 run_case() {
