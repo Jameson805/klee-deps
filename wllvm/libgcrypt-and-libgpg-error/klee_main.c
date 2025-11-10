@@ -2,7 +2,7 @@
 #include <gcrypt.h>
 
 #ifdef USE_SLICED
-    #include "modpow_sliced.h"
+    #include "powm_sliced.h"
 #endif
 
 int driver_main(const unsigned char *exp_buf, const unsigned char *base_buf, const unsigned char *mod_buf, size_t len)

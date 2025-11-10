@@ -84,22 +84,22 @@ extract-bc klee_var_pub
 wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SIZE} -DKLEE_CF -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
 extract-bc klee_fix_pub
 
-wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DKLEE_CF klee_main.c modpow_sliced.c "${libs[@]}" -o klee_var_pub_sliced
+wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DKLEE_CF klee_main.c powm_sliced.c "${libs[@]}" -o klee_var_pub_sliced
 extract-bc klee_var_pub_sliced
 
-wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DKLEE_CF -DCONCRETE_PUBS klee_main.c modpow_sliced.c "${libs[@]}" -o klee_fix_pub_sliced
+wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DKLEE_CF -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o klee_fix_pub_sliced
 extract-bc klee_fix_pub_sliced
 
 # Replay builds
 clang "${flags[@]}" -DSYM_SIZE=${SIZE} -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
 clang "${flags[@]}" -DSYM_SIZE=${SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
 
-clang "${flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DREPLAY klee_main.c modpow_sliced.c "${libs[@]}" -o klee_var_pub_sliced_replay
-clang "${flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c modpow_sliced.c "${libs[@]}" -o klee_fix_pub_sliced_replay
+clang "${flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DREPLAY klee_main.c powm_sliced.c "${libs[@]}" -o klee_var_pub_sliced_replay
+clang "${flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o klee_fix_pub_sliced_replay
 
 # BINSEC builds
 clang "${flags[@]}" -static -DSYM_SIZE=${SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
 clang "${flags[@]}" -static -DSYM_SIZE=${SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
 
-clang "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SIZE} -DBINSEC klee_main.c modpow_sliced.c "${libs[@]}" -o binsec_var_pub_sliced
-clang "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c modpow_sliced.c "${libs[@]}" -o binsec_fix_pub_sliced
+clang "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SIZE} -DBINSEC klee_main.c powm_sliced.c "${libs[@]}" -o binsec_var_pub_sliced
+clang "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o binsec_fix_pub_sliced

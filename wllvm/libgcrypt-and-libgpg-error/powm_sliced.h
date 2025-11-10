@@ -1,5 +1,5 @@
-#ifndef MODPOW_SLICED_H
-#define MODPOW_SLICED_H
+#ifndef POWM_SLICED_H
+#define POWM_SLICED_H
 
 #include <gcrypt.h>
 
