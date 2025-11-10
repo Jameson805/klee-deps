@@ -20,9 +20,9 @@ klee_fix_pub_replay*
 klee_var_pub_replay*
 binsec_fix_pub*
 binsec_var_pub*
+abacus_fix_pub*
 
-wllvm/klee_cf_results/
-wllvm/binsec_results/
+wllvm/*_results/
 
 wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/Makefile
 wllvm/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher/Makefile
@@ -107,6 +107,7 @@ wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/doc/Makefile
 wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/doc/gpgrt-config.1
 wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/doc/yat2m
 wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/doc/yat2m-stamp
+wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/doc/errorref.txt.x
 wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/lang/Makefile
 wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/lang/cl/Makefile
 wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44/lang/cl/gpg-error-codes.lisp

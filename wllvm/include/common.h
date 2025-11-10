@@ -8,12 +8,20 @@
 #include <string.h>
 #include <assert.h>
 
-#if KLEE_CF + REPLAY + BINSEC != 1
-  #error "You must define *exactly one* of KLEE_CF, REPLAY, or BINSEC."
+#if KLEE_CF + REPLAY + BINSEC + ABACUS != 1
+  #error "You must define *exactly one* of KLEE_CF, REPLAY, BINSEC, or ABACUS."
 #endif
 
 #ifdef KLEE_CF
     #include "klee/klee.h"
+#endif
+
+#ifdef ABACUS
+    #define CONCRETE_PUBS
+    int __attribute__((optimize(0)))
+    abacus_make_symbolic(char *name, void *addr, uint32_t length) {
+        return 1;
+    }
 #endif
 
 /* Returns nonzero if any byte in buf is nonzero */
@@ -125,6 +133,9 @@ int main(int argc, char *argv[]) {
         klee_assume(buf_bitlen(exp_buf, SYM_SIZE) == bitlen);
     #elif defined(REPLAY)
         if (!load_bytes(exp_filename, exp_buf, sizeof(exp_buf))) return 1;
+    #elif defined(ABACUS)
+        char *type = "1";
+        abacus_make_symbolic(type, &exp_buf, sizeof(exp_buf));
     #endif
 
     #ifdef CONCRETE_PUBS
