@@ -2,6 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+export PATH="/usr/lib/llvm-13/bin:$PATH"
+export CC=wllvm
+export LLVM_COMPILER=clang
+
 KLEE_PATH="../../klee-controlflow"
 
 usage() {
