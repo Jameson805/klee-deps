@@ -91,7 +91,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     fi
 
     # The no-asm part of the code will be constant time
-    ./Configure no-shared no-asm -DOPENSSL_AES_CONST_TIME "${ARCH_FLAGS[@]}"
+    ./Configure no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME "${ARCH_FLAGS[@]}"
     make clean
     make CC=${CC} CFLAGS="${CFLAGS[*]}" LDFLAGS="${LDFLAGS[*]}" -j
 else
