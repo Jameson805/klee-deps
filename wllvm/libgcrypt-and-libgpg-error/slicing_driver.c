@@ -10,7 +10,7 @@ extern int Frama_C_interval(int a, int b);
 int main(void)
 {
     /* Nondeterministic small values for base, exponent, and modulus */
-    unsigned long A = (unsigned long) Frama_C_interval(-100, 100);
+    unsigned long A = (unsigned long) Frama_C_interval(0, 100);
     unsigned long E = (unsigned long) Frama_C_interval(0, 10);
     unsigned long N = (unsigned long) Frama_C_interval(2, 100);
 

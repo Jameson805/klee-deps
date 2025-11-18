@@ -144,11 +144,11 @@ BUILD_FILEVERSION = 1,44,0,21743
 BUILD_REVISION = 54eff9c
 BUILD_TIMESTAMP = <none>
 BUILD_VERSION = 1.44.0.21743
-CC = wllvm
+CC = gcc
 CCDEPMODE = depmode=gcc3
 CC_FOR_BUILD = $(CC)
-CFLAGS = -g -O0 -DNO_ASM -Wall -Wpointer-arith -fvisibility=hidden
-CPP = wllvm -E
+CFLAGS = -g -O2 -Wall -Wpointer-arith -Wno-psabi -fvisibility=hidden
+CPP = gcc -E
 CPPFLAGS = 
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
@@ -246,7 +246,7 @@ abs_srcdir = /home/james/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgpg-error
 abs_top_builddir = /home/james/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44
 abs_top_srcdir = /home/james/klee-deps/wllvm/libgcrypt-and-libgpg-error/libgpg-error-1.44
 ac_ct_AR = ar
-ac_ct_CC = wllvm
+ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
 am__include = include
 am__leading_dot = .
