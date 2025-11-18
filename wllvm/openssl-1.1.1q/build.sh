@@ -128,8 +128,8 @@ for algo in "${algos[@]}"; do
         extract-bc "klee_fix_pub_${algo}"
 
         # Replay builds
-        clang "${flags[@]}" -D${macro} -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o "klee_var_pub_replay_${algo}"
-        clang "${flags[@]}" -D${macro} -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_replay_${algo}"
+        clang "${flags[@]}" -static -D${macro} -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o "klee_var_pub_replay_${algo}"
+        clang "${flags[@]}" -static -D${macro} -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_replay_${algo}"
     fi
 
     if [[ "$MODE" == "binsec" ]]; then
@@ -140,7 +140,7 @@ for algo in "${algos[@]}"; do
 
     if [[ "$MODE" == "abacus" ]]; then
         # Abacus builds
-        gcc "${flags[@]}" -m32 -pthread -D${macro} -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -ldl -o "abacus_fix_pub_${algo}"
+        gcc "${flags[@]}" -static -m32 -pthread -D${macro} -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -ldl -o "abacus_fix_pub_${algo}"
     fi
 
     if [[ "$MODE" == "self_comp" ]]; then

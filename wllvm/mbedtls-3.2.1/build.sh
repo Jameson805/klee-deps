@@ -119,8 +119,8 @@ if [[ "$MODE" == "klee_cf" ]]; then
     extract-bc klee_fix_pub
 
     # Replay builds
-    clang "${flags[@]}" -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
-    clang "${flags[@]}" -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
+    clang "${flags[@]}" -static -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
+    clang "${flags[@]}" -static -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
 fi
 
 if [[ "$MODE" == "binsec" ]]; then
@@ -131,7 +131,7 @@ fi
 
 if [[ "$MODE" == "abacus" ]]; then
     # Abacus builds
-    gcc "${flags[@]}" -m32 -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
+    gcc "${flags[@]}" -static -m32 -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
 fi
 
 record_branch() {
