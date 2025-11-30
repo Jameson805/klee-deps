@@ -84,8 +84,8 @@ static int load_bytes(const char *filename, void *buf, size_t size)
     return 1;
 }
 
-#if SYM_SIZE != 2 && SYM_SIZE != 4 && SYM_SIZE != 8
-    #error "You must define SYM_SIZE to one of 2, 4, or 8."
+#if SYM_SIZE != 2 && SYM_SIZE != 4 && SYM_SIZE != 8 && SYM_SIZE != 16
+    #error "You must define SYM_SIZE to one of 2, 4, 8, or 16."
 #endif
 
 #ifdef SELF_COMP
@@ -149,6 +149,12 @@ static int load_bytes(const char *filename, void *buf, size_t size)
                 uint64_t mod_i = 18446744073709551557; // Closest prime less than uint64_t max
                 be_store_u64_tail(base_buf, SYM_SIZE, base_i);
                 be_store_u64_tail(mod_buf, SYM_SIZE, mod_i);
+            #elif SYM_SIZE == 16
+                uint64_t base_i = 251; // Closest prime less than uint8_t max
+                uint64_t mod_i = 18446744073709551557; // Closest prime less than uint64_t max
+                be_store_u64_tail(base_buf, 8, base_i);
+                be_store_u64_tail(mod_buf, 8, mod_i);
+                be_store_u64_tail(mod_buf + 8, 8, mod_i);
             #endif
         #else
             klee_make_symbolic(base_buf, SYM_SIZE, "base");
@@ -277,6 +283,12 @@ static int load_bytes(const char *filename, void *buf, size_t size)
                 uint64_t mod_i = 18446744073709551557; // Closest prime less than uint64_t max
                 be_store_u64_tail(base_buf, SYM_SIZE, base_i);
                 be_store_u64_tail(mod_buf, SYM_SIZE, mod_i);
+            #elif SYM_SIZE == 16
+                uint64_t base_i = 251; // Closest prime less than uint8_t max
+                uint64_t mod_i = 18446744073709551557; // Closest prime less than uint64_t max
+                be_store_u64_tail(base_buf, 8, base_i);
+                be_store_u64_tail(mod_buf, 8, mod_i);
+                be_store_u64_tail(mod_buf + 8, 8, mod_i);
             #endif
         #else
             #ifdef KLEE_CF
