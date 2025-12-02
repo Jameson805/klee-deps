@@ -173,5 +173,6 @@ wllvm/openssl-1.1.1q/libssl.pc
 wllvm/openssl-1.1.1q/openssl.pc
 wllvm/openssl-1.1.1q/tools/c_rehash
 wllvm/openssl-1.1.1q/util/shlib_wrap.sh
+wllvm/openssl-1.1.1q/**/*.d.tmp
 
 .vscode/

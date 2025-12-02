@@ -84,8 +84,8 @@ static int load_bytes(const char *filename, void *buf, size_t size)
     return 1;
 }
 
-#if SYM_SIZE != 2 && SYM_SIZE != 4 && SYM_SIZE != 8 && SYM_SIZE != 16
-    #error "You must define SYM_SIZE to one of 2, 4, 8, or 16."
+#if SYM_SIZE != 1 && SYM_SIZE != 2 && SYM_SIZE != 4 && SYM_SIZE != 8 && SYM_SIZE != 16
+    #error "You must define SYM_SIZE to one of 1, 2, 4, 8, or 16."
 #endif
 
 #ifdef SELF_COMP
@@ -127,14 +127,16 @@ static int load_bytes(const char *filename, void *buf, size_t size)
     int main(int argc, char *argv[]) {
         klee_make_symbolic(exp_1_buf, SYM_SIZE, "exp_1");
         klee_make_symbolic(exp_2_buf, SYM_SIZE, "exp_2");
-        // exp_1_buf > 0 and exp_2_buf > 0
-        klee_assume(buf_nonzero(exp_1_buf, SYM_SIZE) != 0);
-        klee_assume(buf_nonzero(exp_2_buf, SYM_SIZE) != 0);
-        // exp1 and exp2 must be of the same bit length
-        klee_assume(buf_bitlen(exp_1_buf, SYM_SIZE) == buf_bitlen(exp_2_buf, SYM_SIZE));
+        klee_assume(exp_1_buf[0] & 0x80); // Set highest bit
+        klee_assume(exp_2_buf[0] & 0x80); // Set highest bit
 
         #ifdef CONCRETE_PUBS
-            #if SYM_SIZE == 2
+            #if SYM_SIZE == 1
+                uint8_t base_i = 3;
+                uint8_t mod_i = 251; // Closest prime less than uint8_t max
+                base_buf[0] = base_i;
+                mod_buf[0] = mod_i;
+            #elif SYM_SIZE == 2
                 uint16_t base_i = 251; // Closest prime less than uint8_t max
                 uint16_t mod_i = 65521; // Closest prime less than uint16_t max
                 be_store_u16_tail(base_buf, SYM_SIZE, base_i);
@@ -159,9 +161,9 @@ static int load_bytes(const char *filename, void *buf, size_t size)
         #else
             klee_make_symbolic(base_buf, SYM_SIZE, "base");
             klee_make_symbolic(mod_buf, SYM_SIZE, "mod");
-            // base_buf > 0 and mod_buf > 0
-            klee_assume(buf_nonzero(base_buf, SYM_SIZE) != 0);
-            klee_assume(buf_nonzero(mod_buf, SYM_SIZE) != 0);
+            // Set highest bit
+            klee_assume(base_buf[0] & 0x80);
+            klee_assume(mod_buf[0] & 0x80);
             // mod_buf is odd
             klee_assume(mod_buf[SYM_SIZE - 1] & 1);
         #endif
@@ -253,13 +255,7 @@ static int load_bytes(const char *filename, void *buf, size_t size)
 
         #ifdef KLEE_CF
             klee_make_symbolic_sc(exp_buf, SYM_SIZE, "exp", 1);
-            // exp_buf > 0
-            klee_assume(buf_nonzero(exp_buf, SYM_SIZE) != 0);
-
-            unsigned int bitlen;
-            klee_make_symbolic_sc(&bitlen, SYM_SIZE, "exp_bitlen", 0);
-            // exp and exp' must be of the same bit length
-            klee_assume(buf_bitlen(exp_buf, SYM_SIZE) == bitlen);
+            klee_assume(exp_buf[0] & 0x80); // Set highest bit
         #elif defined(REPLAY)
             if (!load_bytes(exp_filename, exp_buf, SYM_SIZE)) return 1;
         #elif defined(ABACUS)
@@ -268,7 +264,12 @@ static int load_bytes(const char *filename, void *buf, size_t size)
         #endif
 
         #ifdef CONCRETE_PUBS
-            #if SYM_SIZE == 2
+            #if SYM_SIZE == 1
+                uint8_t base_i = 3;
+                uint8_t mod_i = 251; // Closest prime less than uint8_t max
+                base_buf[0] = base_i;
+                mod_buf[0] = mod_i;
+            #elif SYM_SIZE == 2
                 uint16_t base_i = 251; // Closest prime less than uint8_t max
                 uint16_t mod_i = 65521; // Closest prime less than uint16_t max
                 be_store_u16_tail(base_buf, SYM_SIZE, base_i);
@@ -294,9 +295,9 @@ static int load_bytes(const char *filename, void *buf, size_t size)
             #ifdef KLEE_CF
                 klee_make_symbolic_sc(base_buf, SYM_SIZE, "base", 0);
                 klee_make_symbolic_sc(mod_buf, SYM_SIZE, "mod", 0);
-                // base_buf > 0 and mod_buf > 0
-                klee_assume(buf_nonzero(base_buf, SYM_SIZE) != 0);
-                klee_assume(buf_nonzero(mod_buf, SYM_SIZE) != 0);
+                // Set highest bit
+                klee_assume(base_buf[0] & 0x80);
+                klee_assume(mod_buf[0] & 0x80);
                 // mod_buf is odd
                 klee_assume(mod_buf[SYM_SIZE - 1] & 1);
             #elif defined(REPLAY)

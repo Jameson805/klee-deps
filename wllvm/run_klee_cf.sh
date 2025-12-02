@@ -5,13 +5,15 @@ bin_path=$(realpath ../klee-controlflow/build/bin)
 script_path=$(realpath ../klee-controlflow/scripts)
 export PATH="$bin_path:$script_path:$PATH"
 
+ulimit -v 70000000
+
 # defaults
 max_time=""
 loop_max_iterations=10
 max_solver_time="10s"
 kill_after="30s"
 sym_size=4
-max_memory=8000
+max_memory=10000
 
 usage() {
     cat <<EOF
@@ -90,6 +92,11 @@ echo "##########"
 klee_timeout() {
     timeout --foreground --signal=INT --kill-after="$kill_after" $max_time \
     klee --libc=uclibc \
+        --kdalloc \
+        --kdalloc-constants-size=5 \
+        --kdalloc-globals-size=5 \
+        --kdalloc-heap-size=20 \
+        --kdalloc-stack-size=10 \
         --posix-runtime \
         --dump-states-on-halt=false \
         --use-batching-search=true \
@@ -129,11 +136,11 @@ run_case() {
     echo "$title"
     echo "========="
     rm -f "$bc_dir/klee-last"
-    rm -rf "$bc_dir/klee-out-*"
+    rm -rf "$bc_dir/klee-out-"*
     klee_timeout "$bc"
     mv "$bc_dir/klee-out-0" "$results_dir/$result_name"
     rm -f "$bc_dir/klee-last"
-    rm -rf "$bc_dir/klee-out-*"
+    rm -rf "$bc_dir/klee-out-"*
 
     compare_with_ctchecker.py branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" "$@"
     reproduce_positives.py "$results_dir/${result_name}_branch.json" "$results_dir/$result_name" "$replay_script" $replay_opts --output "$results_dir/${result_name}_branch.json"
