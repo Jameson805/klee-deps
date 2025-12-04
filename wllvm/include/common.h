@@ -259,8 +259,28 @@ static int load_bytes(const char *filename, void *buf, size_t size)
         #elif defined(REPLAY)
             if (!load_bytes(exp_filename, exp_buf, SYM_SIZE)) return 1;
         #elif defined(ABACUS)
+            #if SYM_SIZE == 1
+                uint8_t exp_i = 241; // Second closest prime less than uint8_t max
+                exp_buf[0] = exp_i;
+            #elif SYM_SIZE == 2
+                uint16_t exp_i = 65519; // Second closest prime less than uint16_t max
+                be_store_u16_tail(exp_buf, SYM_SIZE, exp_i);
+            #elif SYM_SIZE == 4
+                uint32_t exp_i = 4294967279; // Second closest prime less than uint32_t max
+                be_store_u32_tail(exp_buf, SYM_SIZE, exp_i);
+            #elif SYM_SIZE == 8
+                uint64_t exp_i = 18446744073709551533; // Second Closest prime less than uint64_t max
+                be_store_u64_tail(exp_buf, SYM_SIZE, exp_i);
+            #elif SYM_SIZE == 16
+                uint64_t exp_i = 18446744073709551533; // Second closest prime less than uint64_t max
+                be_store_u64_tail(exp_buf, 8, exp_i);
+                be_store_u64_tail(exp_buf + 8, 8, exp_i);
+            #endif
+
             char *type = "1";
             abacus_make_symbolic(type, &exp_buf, SYM_SIZE);
+
+            exp_buf[0] |= 0x80; // Set highest bit
         #endif
 
         #ifdef CONCRETE_PUBS
