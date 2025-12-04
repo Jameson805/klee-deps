@@ -76,7 +76,7 @@ run_openssl() {
     echo "Begin experiments for OpenSSL 1.1.1q"
     echo "##########"
 
-    libgcrypt-and-libgpg-error/build.sh --abacus --sym-size ${sym_size}
+    openssl-1.1.1q/build.sh --abacus --sym-size ${sym_size}
     for algo in recp mont mont_consttime mont_word; do
         run_case "openssl-1.1.1q/abacus_fix_pub_${algo}" "openssl_${algo}.txt"
     done
