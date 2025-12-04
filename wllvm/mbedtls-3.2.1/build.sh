@@ -131,7 +131,7 @@ fi
 
 if [[ "$MODE" == "abacus" ]]; then
     # Abacus builds
-    gcc "${flags[@]}" -static -m32 -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
+    gcc "${flags[@]}" -m32 -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
 fi
 
 record_branch() {

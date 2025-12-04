@@ -140,7 +140,7 @@ for algo in "${algos[@]}"; do
 
     if [[ "$MODE" == "abacus" ]]; then
         # Abacus builds
-        gcc "${flags[@]}" -static -m32 -pthread -D${macro} -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -ldl -o "abacus_fix_pub_${algo}"
+        gcc "${flags[@]}" -m32 -pthread -D${macro} -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -ldl -o "abacus_fix_pub_${algo}"
     fi
 
     if [[ "$MODE" == "self_comp" ]]; then
