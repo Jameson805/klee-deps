@@ -198,7 +198,7 @@ run_mbedtls() {
         -o mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc \
         mbedtls-3.2.1/klee_var_pub.bc
 
-    EXTRA_ARGS=()
+    EXTRA_ARGS=( --ctchecker-prefix "library" )
     if [ "$mod_exp_only" = "true" ]; then
         EXTRA_ARGS+=( --filename bignum.c --lines 1968:2202 )
     fi
