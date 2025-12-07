@@ -1999,7 +1999,7 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
     mbedtls_mpi_init( &RR ); mbedtls_mpi_init( &T );
     mbedtls_mpi_init( &Apos );
     mbedtls_mpi_init( &WW );
-    memset( W, 0, sizeof( W ) );
+    for (char *p = (char *)W; p < (char *)(W) + sizeof(W); ++p) *p = 0; // memset( W, 0, sizeof( W ) ); // number of instructions executed by memset depends on alignment
 
     i = mbedtls_mpi_bitlen( E );
 
