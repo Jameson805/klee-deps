@@ -5,26 +5,31 @@ bin_path=$(realpath ../klee-controlflow/build/bin)
 script_path=$(realpath ../klee-controlflow/scripts)
 export PATH="$bin_path:$script_path:$PATH"
 
+# set virtual memory limit to 70GB to prevent excessive memory usage
 ulimit -v 70000000
 
 # defaults
 max_time=""
 loop_max_iterations=10
-max_solver_time="10s"
+max_solver_time="30s"
 kill_after="30s"
 sym_size=4
 max_memory=10000
+mod_exp_only="false"
+search_strategies="random-path,nurs:covnew,nurs:depth"
 
 usage() {
     cat <<EOF
-Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <duration>] [--kill-after <duration>] [--max-memory <n>] <max_time>
+Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <duration>] [--kill-after <duration>] [--max-memory <n>] [--mod-exp-only] [--search <strategies>] <max_time>
 
   <max_time>               - required, e.g. 1h, 30m, 600s
   --sym-size <n>           - optional, default: 4 (size in bytes for bignum symbols)
   --loop-max-iterations n  - optional, default: 10
-  --max-solver-time <dur>  - optional, default: 10s
+  --max-solver-time <dur>  - optional, default: 30s
   --kill-after <duration>  - optional, default: 30s
   --max-memory <n>         - optional, default: 8000 (MB KLEE state cap)
+  --mod-exp-only           - optional, default: false
+  --search <strategies>    - optional, default: random-path,nurs:covnew,nurs:depth (comma-separated)
 EOF
     exit 1
 }
@@ -42,6 +47,10 @@ while [[ $# -gt 0 ]]; do
             sym_size="$2"; shift 2;;
         --max-memory)
             max_memory="$2"; shift 2;;
+        --mod-exp-only)
+            mod_exp_only="true"; shift;;
+        --search)
+            search_strategies="$2"; shift 2;;
         --)
             shift; break;;
         -*)
@@ -87,19 +96,29 @@ echo "loop_max_iterations=$loop_max_iterations"
 echo "max_solver_time=$max_solver_time"
 echo "kill_after=$kill_after"
 echo "max_memory=$max_memory"
+echo "mod_exp_only=$mod_exp_only"
+echo "search_strategies=$search_strategies"
 echo "##########"
 
 klee_timeout() {
+    local search_args=()
+    IFS=',' read -ra ADDR <<< "$search_strategies"
+    for i in "${ADDR[@]}"; do
+        search_args+=( "--search=$i" )
+    done
+
     timeout --foreground --signal=INT --kill-after="$kill_after" $max_time \
     klee --libc=uclibc \
+        --posix-runtime \
+        --external-calls=all \
         --kdalloc \
         --kdalloc-constants-size=5 \
         --kdalloc-globals-size=5 \
         --kdalloc-heap-size=20 \
         --kdalloc-stack-size=10 \
-        --posix-runtime \
         --dump-states-on-halt=false \
-        --use-batching-search=true \
+        --use-batching-search=false \
+        "${search_args[@]}" \
         --max-solver-time="$max_solver_time" \
         --max-memory=$max_memory "$1" || true
 }
@@ -142,8 +161,8 @@ run_case() {
     rm -f "$bc_dir/klee-last"
     rm -rf "$bc_dir/klee-out-"*
 
-    compare_with_ctchecker.py branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" "$@"
-    reproduce_positives.py "$results_dir/${result_name}_branch.json" "$results_dir/$result_name" "$replay_script" $replay_opts --output "$results_dir/${result_name}_branch.json"
+    compare_with_ctchecker.py branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" "$@" $replay_opts
+    reproduce_positives.py --json "$results_dir/${result_name}_branch.json" --klee-output "$results_dir/$result_name" --executable "$replay_script" $replay_opts --output "$results_dir/${result_name}_branch.json"
     make_report.py "$results_dir/${result_name}_branch.json" "$results_dir/${result_name}_branch_report.html"
     make_plot.py "$results_dir/${result_name}_branch.json" "$title (Branch)" "$results_dir/${result_name}_branch_plot.png"
 
@@ -179,12 +198,17 @@ run_mbedtls() {
         -o mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc \
         mbedtls-3.2.1/klee_var_pub.bc
 
-    run_case "Mbed TLS 3.2.1 (Fix Pub)" "mbedtls-3.2.1/klee_fix_pub.bc" "mbedtls_fix_pub" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_lim_loop.bc" "mbedtls_fix_pub_lim_loop" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc" "mbedtls_fix_pub_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    run_case "Mbed TLS 3.2.1 (Var Pub)" "mbedtls-3.2.1/klee_var_pub.bc" "mbedtls_var_pub" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    # run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop)" "mbedtls-3.2.1/klee_var_pub_lim_loop.bc" "mbedtls_var_pub_lim_loop" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
-    run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc" "mbedtls_var_pub_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false --filename bignum.c --lines 1968:2202
+    EXTRA_ARGS=()
+    if [ "$mod_exp_only" = "true" ]; then
+        EXTRA_ARGS+=( --filename bignum.c --lines 1968:2202 )
+    fi
+
+    run_case "Mbed TLS 3.2.1 (Fix Pub)" "mbedtls-3.2.1/klee_fix_pub.bc" "mbedtls_fix_pub" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_lim_loop.bc" "mbedtls_fix_pub_lim_loop" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc" "mbedtls_fix_pub_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
+    run_case "Mbed TLS 3.2.1 (Var Pub)" "mbedtls-3.2.1/klee_var_pub.bc" "mbedtls_var_pub" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
+    # run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop)" "mbedtls-3.2.1/klee_var_pub_lim_loop.bc" "mbedtls_var_pub_lim_loop" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
+    run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc" "mbedtls_var_pub_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
 }
 
 run_libgcrypt() {
@@ -212,12 +236,17 @@ run_libgcrypt() {
         -o libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc \
         libgcrypt-and-libgpg-error/klee_var_pub.bc
 
-    run_case "Libgcrypt 1.10.1 (Fix Pub)" "libgcrypt-and-libgpg-error/klee_fix_pub.bc" "libgcrypt_fix_pub" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-    # run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc" "libgcrypt_fix_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-    # run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc" "libgcrypt_fix_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-    run_case "Libgcrypt 1.10.1 (Var Pub)" "libgcrypt-and-libgpg-error/klee_var_pub.bc" "libgcrypt_var_pub" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-    # run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc" "libgcrypt_var_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
-    run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc" "libgcrypt_var_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false --filename mpi-pow.c --lines 404:771
+    EXTRA_ARGS=()
+    if [ "$mod_exp_only" = "true" ]; then
+        EXTRA_ARGS+=( --filename mpi-pow.c --lines 404:771 )
+    fi
+
+    run_case "Libgcrypt 1.10.1 (Fix Pub)" "libgcrypt-and-libgpg-error/klee_fix_pub.bc" "libgcrypt_fix_pub" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false "${EXTRA_ARGS[@]}"
+    # run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc" "libgcrypt_fix_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false "${EXTRA_ARGS[@]}"
+    # run_case "Libgcrypt 1.10.1 (Fix Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc" "libgcrypt_fix_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false "${EXTRA_ARGS[@]}"
+    run_case "Libgcrypt 1.10.1 (Var Pub)" "libgcrypt-and-libgpg-error/klee_var_pub.bc" "libgcrypt_var_pub" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false "${EXTRA_ARGS[@]}"
+    # run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc" "libgcrypt_var_pub_lim_loop" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false "${EXTRA_ARGS[@]}"
+    run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc" "libgcrypt_var_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false "${EXTRA_ARGS[@]}"
 }
 
 run_openssl() {
