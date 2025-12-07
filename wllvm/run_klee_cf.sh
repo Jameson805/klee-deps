@@ -17,10 +17,11 @@ sym_size=4
 max_memory=10000
 mod_exp_only="false"
 search_strategies="random-path,nurs:covnew,nurs:depth"
+concretize_on_solver_timeout="true"
 
 usage() {
     cat <<EOF
-Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <duration>] [--kill-after <duration>] [--max-memory <n>] [--mod-exp-only] [--search <strategies>] <max_time>
+Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <duration>] [--kill-after <duration>] [--max-memory <n>] [--mod-exp-only] [--search <strategies>] [--concretize-on-solver-timeout <bool>] <max_time>
 
   <max_time>               - required, e.g. 1h, 30m, 600s
   --sym-size <n>           - optional, default: 4 (size in bytes for bignum symbols)
@@ -30,6 +31,7 @@ Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <durat
   --max-memory <n>         - optional, default: 8000 (MB KLEE state cap)
   --mod-exp-only           - optional, default: false
   --search <strategies>    - optional, default: random-path,nurs:covnew,nurs:depth (comma-separated)
+  --concretize-on-solver-timeout <bool> - optional, default: true
 EOF
     exit 1
 }
@@ -51,6 +53,8 @@ while [[ $# -gt 0 ]]; do
             mod_exp_only="true"; shift;;
         --search)
             search_strategies="$2"; shift 2;;
+        --concretize-on-solver-timeout)
+            concretize_on_solver_timeout="$2"; shift 2;;
         --)
             shift; break;;
         -*)
@@ -98,6 +102,7 @@ echo "kill_after=$kill_after"
 echo "max_memory=$max_memory"
 echo "mod_exp_only=$mod_exp_only"
 echo "search_strategies=$search_strategies"
+echo "concretize_on_solver_timeout=$concretize_on_solver_timeout"
 echo "##########"
 
 klee_timeout() {
@@ -119,6 +124,7 @@ klee_timeout() {
         --dump-states-on-halt=false \
         --use-batching-search=false \
         "${search_args[@]}" \
+        --concretize-on-solver-timeout="$concretize_on_solver_timeout" \
         --max-solver-time="$max_solver_time" \
         --max-memory=$max_memory "$1" || true
 }
