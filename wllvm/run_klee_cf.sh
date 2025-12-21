@@ -28,7 +28,7 @@ Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <durat
   --loop-max-iterations n  - optional, default: 10
   --max-solver-time <dur>  - optional, default: 30s
   --kill-after <duration>  - optional, default: 30s
-  --max-memory <n>         - optional, default: 8000 (MB KLEE state cap)
+  --max-memory <n>         - optional, default: 10000 (MB KLEE state cap)
   --mod-exp-only           - optional, default: false
   --search <strategies>    - optional, default: random-path,nurs:covnew,nurs:depth (comma-separated)
   --concretize-on-solver-timeout <bool> - optional, default: true

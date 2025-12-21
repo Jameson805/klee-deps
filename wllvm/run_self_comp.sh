@@ -2,14 +2,16 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# set virtual memory limit to 70GB to prevent excessive memory usage
+ulimit -v 70000000
+
 klee_root=""
 max_time=""
-max_solver_time="10s"
-kill_after="5m"
+max_solver_time="30s"
+kill_after="30s"
 sym_size=4
-max_memory=8000
-max_depth=0
-dfs=false
+max_memory=10000
+search_strategies="random-path,nurs:covnew,nurs:depth"
 
 usage() {
     cat <<EOF
@@ -21,11 +23,10 @@ Required:
 
 Optional:
   --sym-size <n>         Default: 4
-  --max-solver-time <d>  Default: 10s
-  --kill-after <d>       Default: 5m
-  --max-memory <n>       Default: 8000 (MB KLEE cap)
-  --max-depth <n>        Default: 0 (0 means unlimited search depth)
-  --dfs                  Default: false (use DFS search when present)
+  --max-solver-time <d>  Default: 30s
+  --kill-after <duration> Default: 30s
+  --max-memory <n>       Default: 10000 (MB KLEE cap)
+  --search <strategies>  Default: random-path,nurs:covnew,nurs:depth (comma-separated)
   --results-dir <name>   Default: self_comp_results
   --help                 Show this help
 EOF
@@ -42,8 +43,7 @@ while [[ $# -gt 0 ]]; do
         --max-solver-time) max_solver_time="$2"; shift 2;;
         --kill-after) kill_after="$2"; shift 2;;
         --max-memory) max_memory="$2"; shift 2;;
-        --max-depth) max_depth="$2"; shift 2;;
-        --dfs) dfs=true; shift;;
+        --search) search_strategies="$2"; shift 2;;
         --results-dir) results_dir="$2"; shift 2;;
         --help|-h) usage;;
         --) shift; break;;
@@ -69,9 +69,6 @@ fi
 if ! [[ "$max_memory" =~ ^[0-9]+$ ]]; then
     echo "Error: max_memory must be a non-negative integer (got '$max_memory')"; exit 1
 fi
-if ! [[ "$max_depth" =~ ^[0-9]+$ ]]; then
-    echo "Error: max_depth must be a non-negative integer (got '$max_depth')"; exit 1
-fi
 
 rm -rf "$results_dir"
 mkdir -p "$results_dir"
@@ -85,27 +82,32 @@ echo "sym_size=$sym_size"
 echo "max_solver_time=$max_solver_time"
 echo "kill_after=$kill_after"
 echo "max_memory=$max_memory"
-echo "max_depth=$max_depth"
-echo "dfs=$dfs"
+echo "search_strategies=$search_strategies"
 echo "results_dir=$results_dir"
 echo "##########"
 
 klee_timeout() {
-    local search_flag=()
-    if [[ "$dfs" == "true" ]]; then
-        search_flag+=( --search=dfs )
-    fi
+    local search_args=()
+    IFS=',' read -ra ADDR <<< "$search_strategies"
+    for i in "${ADDR[@]}"; do
+        search_args+=( "--search=$i" )
+    done
 
     timeout --foreground --signal=INT --kill-after="$kill_after" "$max_time" \
         stdbuf -oL -eL "$klee_root/klee" --libc=uclibc \
             --posix-runtime \
-            --emit-all-errors=true \
+            --external-calls=all \
+            --kdalloc \
+            --kdalloc-constants-size=5 \
+            --kdalloc-globals-size=5 \
+            --kdalloc-heap-size=20 \
+            --kdalloc-stack-size=10 \
             --dump-states-on-halt=false \
-            --use-batching-search=true \
+            --use-batching-search=false \
+            "${search_args[@]}" \
             --max-solver-time="$max_solver_time" \
-            --max-depth="$max_depth" \
-            "${search_flag[@]}" \
-            --max-memory=$max_memory "$1" 2>&1 \
+            --max-memory=$max_memory \
+            --emit-all-errors=true "$1" 2>&1 \
     | python3 -u -c 'import sys,time
 for line in sys.stdin:
     sys.stdout.write(f"[{time.time():.3f}] {line}")
