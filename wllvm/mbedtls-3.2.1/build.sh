@@ -118,9 +118,17 @@ if [[ "$MODE" == "klee_cf" ]]; then
     wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SYM_SIZE} -DKLEE_CF -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
     extract-bc klee_fix_pub
 
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DKLEE_CF klee_main.c bignum_sliced.c "${libs[@]}" -o klee_var_pub_sliced
+    extract-bc klee_var_pub_sliced
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DKLEE_CF -DCONCRETE_PUBS klee_main.c bignum_sliced.c "${libs[@]}" -o klee_fix_pub_sliced
+    extract-bc klee_fix_pub_sliced
+
     # Replay builds
     clang "${flags[@]}" -static -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
     clang "${flags[@]}" -static -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
+
+    clang "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c bignum_sliced.c "${libs[@]}" -o klee_var_pub_sliced_replay
+    clang "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c bignum_sliced.c "${libs[@]}" -o klee_fix_pub_sliced_replay
 fi
 
 if [[ "$MODE" == "binsec" ]]; then
