@@ -618,12 +618,10 @@ _gcry_mpi_powm (gcry_mpi_t res,
 
     e = ep[i];
     count_leading_zeros (c, e);
-    //@ assert 0 <= c && c <= BITS_PER_MPI_LIMB - 1;
     e = (e << c) << 1;
     c = BITS_PER_MPI_LIMB - 1 - c;
 
     j = 0;
-
     for (;;) {
       if (e == 0)
         {
@@ -646,7 +644,6 @@ _gcry_mpi_powm (gcry_mpi_t res,
           w.d = base_u;
 
           count_leading_zeros (c0, e);
-          //@ assert 0 <= c0 && c0 <= BITS_PER_MPI_LIMB - 1;
           e = (e << c0);
           c -= c0;
           j += c0;
@@ -660,7 +657,6 @@ _gcry_mpi_powm (gcry_mpi_t res,
             {
               if ( --i < 0 )
                 {
-                  //@ assert 0 <= c0 && c0 <= BITS_PER_MPI_LIMB - 1;
                   e0 = (e >> (BITS_PER_MPI_LIMB - c));
                   j += c - W;
                   goto last_step;
