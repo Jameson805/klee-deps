@@ -16,7 +16,7 @@ kill_after="30s"
 sym_size=4
 max_memory=10000
 mod_exp_only="false"
-search_strategies="random-path,nurs:covnew,nurs:depth"
+search_strategies="random-path,nurs:covnew"
 concretize_on_solver_timeout="true"
 
 usage() {
@@ -293,6 +293,45 @@ run_libgcrypt() {
     run_case "Libgcrypt 1.10.1 (Var Pub Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc" "libgcrypt_var_pub_lim_loop_break" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi" false "${EXTRA_ARGS[@]}"
 }
 
+
+run_libgcrypt_sliced() {
+    echo "##########"
+    echo "Begin experiments for Libgcrypt 1.10.1 (Sliced)"
+    echo "##########"
+
+    libgcrypt-and-libgpg-error/build.sh --klee-cf --sym-size ${sym_size} --sliced
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift \
+        -o libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc \
+        libgcrypt-and-libgpg-error/klee_fix_pub.bc
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift \
+        -o libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc \
+        libgcrypt-and-libgpg-error/klee_var_pub.bc
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen \
+        -break \
+        -o libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc \
+        libgcrypt-and-libgpg-error/klee_fix_pub.bc
+    limit_loop \
+        -blacklist=buf_nonzero,buf_bitlen \
+        -break \
+        -o libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc \
+        libgcrypt-and-libgpg-error/klee_var_pub.bc
+
+    EXTRA_ARGS=()
+    if [ "$mod_exp_only" = "true" ]; then
+        EXTRA_ARGS+=( --filename mpi-pow.c --lines 404:771 )
+    fi
+
+    run_case "Libgcrypt 1.10.1 (Fix Pub Sliced)" "libgcrypt-and-libgpg-error/klee_fix_pub.bc" "libgcrypt_fix_pub_sliced" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1-sliced/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi" false "${EXTRA_ARGS[@]}"
+    # run_case "Libgcrypt 1.10.1 (Fix Pub Sliced Lim Loop)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc" "libgcrypt_fix_pub_sliced_lim_loop" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1-sliced/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi" false "${EXTRA_ARGS[@]}"
+    # run_case "Libgcrypt 1.10.1 (Fix Pub Sliced Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc" "libgcrypt_fix_pub_sliced_lim_loop_break" "libgcrypt-and-libgpg-error/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/libgcrypt1.10.1-sliced/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi" false "${EXTRA_ARGS[@]}"
+    run_case "Libgcrypt 1.10.1 (Var Pub Sliced)" "libgcrypt-and-libgpg-error/klee_var_pub.bc" "libgcrypt_var_pub_sliced" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1-sliced/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi" false "${EXTRA_ARGS[@]}"
+    # run_case "Libgcrypt 1.10.1 (Var Pub Sliced Lim Loop)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc" "libgcrypt_var_pub_sliced_lim_loop" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1-sliced/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi" false "${EXTRA_ARGS[@]}"
+    run_case "Libgcrypt 1.10.1 (Var Pub Sliced Lim Loop Break)" "libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc" "libgcrypt_var_pub_sliced_lim_loop_break" "libgcrypt-and-libgpg-error/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/libgcrypt1.10.1-sliced/3.json" "libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi" false "${EXTRA_ARGS[@]}"
+}
+
 run_openssl() {
     echo "##########"
     echo "Begin experiments for OpenSSL 1.1.1q"
@@ -352,7 +391,8 @@ run_openssl() {
     run_openssl_algo mont_word false 1138:1283
 }
 
-# run_mbedtls
+run_mbedtls
 run_mbedtls_sliced
-# run_libgcrypt
-# run_openssl
+run_libgcrypt
+run_libgcrypt_sliced
+run_openssl

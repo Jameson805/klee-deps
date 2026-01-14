@@ -9,8 +9,9 @@ export LLVM_COMPILER=clang
 KLEE_PATH="../../klee-controlflow"
 
 usage() {
-    echo "Usage: $0 [--skip-deps] (--klee-cf | --binsec | --abacus | --self-comp) --sym-size N"
+    echo "Usage: $0 [--skip-deps] [--sliced] (--klee-cf | --binsec | --abacus | --self-comp) --sym-size N"
     echo "  --skip-deps    Skip building libgpg-error and libgcrypt"
+    echo "  --sliced       Build libgcrypt-1.10.1-sliced instead of libgcrypt-1.10.1"
     echo "  --klee-cf      Build KLEE bitcode and Replay binaries"
     echo "  --binsec       Build BINSEC binaries"
     echo "  --abacus       Build Abacus binaries"
@@ -19,6 +20,7 @@ usage() {
 }
 
 SKIP_DEPS=0
+SLICED=0
 MODE=""
 SYM_SIZE=""
 
@@ -26,6 +28,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --skip-deps)
             SKIP_DEPS=1
+            shift
+            ;;
+        --sliced)
+            SLICED=1
             shift
             ;;
         --klee-cf|--binsec|--abacus|--self-comp)
@@ -106,7 +112,11 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     make install
     cd -
 
-    cd libgcrypt-1.10.1
+    LIBGCRYPT_DIR="libgcrypt-1.10.1"
+    if [ "$SLICED" -eq 1 ]; then
+        LIBGCRYPT_DIR="libgcrypt-1.10.1-sliced"
+    fi
+    cd "$LIBGCRYPT_DIR"
     CFLAGS+=( -DNO_ASM )
     ./configure CC=${CC} CFLAGS="${CFLAGS[*]}" LDFLAGS="${LDFLAGS[*]}" \
         --enable-static \

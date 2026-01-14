@@ -1,0 +1,35 @@
+{
+  "branches": [
+    {
+      "filename": "mpi-pow.c",
+      "line": 103,
+      "column": 3
+    },
+    {
+      "filename": "mpi-pow.c",
+      "line": 185,
+      "column": 35
+    },
+    {
+      "filename": "mpi-pow.c",
+      "line": 208,
+      "column": 13
+    },
+    {
+      "filename": "mpi-pow.c",
+      "line": 234,
+      "column": 17
+    },
+    {
+      "filename": "mpi-pow.c",
+      "line": 259,
+      "column": 13
+    },
+    {
+      "filename": "mpi-pow.c",
+      "line": 273,
+      "column": 5
+    }
+  ],
+  "indices": []
+}

@@ -78,7 +78,7 @@ _gcry_mpi_powm (gcry_mpi_t res, gcry_mpi_t base, gcry_mpi_t expo, gcry_mpi_t mod
   mpi_size_t esize, msize, bsize, rsize;
   int msign, bsign, rsign, esec, msec, bsec;
   mpi_size_t size;
-  int mod_shift_cnt, int negative_result;
+  int mod_shift_cnt, negative_result;
   mpi_ptr_t mp_marker = NULL;
   mpi_ptr_t bp_marker = NULL;
   mpi_ptr_t ep_marker = NULL;
