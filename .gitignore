@@ -253,4 +253,6 @@ wllvm/openssl-1.1.1q/tools/c_rehash
 wllvm/openssl-1.1.1q/util/shlib_wrap.sh
 wllvm/openssl-1.1.1q/**/*.d.tmp
 
+wllvm/mbedtls-3.2.1/test_mod
+
 .vscode/
