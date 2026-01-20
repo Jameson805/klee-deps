@@ -127,8 +127,8 @@ static int load_bytes(const char *filename, void *buf, size_t size)
     int main(int argc, char *argv[]) {
         klee_make_symbolic(exp_1_buf, SYM_SIZE, "exp_1");
         klee_make_symbolic(exp_2_buf, SYM_SIZE, "exp_2");
-        klee_assume(exp_1_buf[0] & 0x80); // Set highest bit
-        klee_assume(exp_2_buf[0] & 0x80); // Set highest bit
+        // klee_assume(exp_1_buf[0] & 0x80); // Set highest bit
+        // klee_assume(exp_2_buf[0] & 0x80); // Set highest bit
 
         #ifdef CONCRETE_PUBS
             #if SYM_SIZE == 1
@@ -162,7 +162,7 @@ static int load_bytes(const char *filename, void *buf, size_t size)
             klee_make_symbolic(base_buf, SYM_SIZE, "base");
             klee_make_symbolic(mod_buf, SYM_SIZE, "mod");
             // Set highest bit
-            klee_assume(base_buf[0] & 0x80);
+            // klee_assume(base_buf[0] & 0x80);
             klee_assume(mod_buf[0] & 0x80);
             // mod_buf is odd
             klee_assume(mod_buf[SYM_SIZE - 1] & 1);
@@ -255,7 +255,7 @@ static int load_bytes(const char *filename, void *buf, size_t size)
 
         #ifdef KLEE_CF
             klee_make_symbolic_sc(exp_buf, SYM_SIZE, "exp", 1);
-            klee_assume(exp_buf[0] & 0x80); // Set highest bit
+            // klee_assume(exp_buf[0] & 0x80); // Set highest bit
         #elif defined(REPLAY)
             if (!load_bytes(exp_filename, exp_buf, SYM_SIZE)) return 1;
         #elif defined(ABACUS)
@@ -280,7 +280,7 @@ static int load_bytes(const char *filename, void *buf, size_t size)
             char *type = "1";
             abacus_make_symbolic(type, &exp_buf, SYM_SIZE);
 
-            exp_buf[0] |= 0x80; // Set highest bit
+            // exp_buf[0] |= 0x80; // Set highest bit
         #endif
 
         #ifdef CONCRETE_PUBS
@@ -316,7 +316,7 @@ static int load_bytes(const char *filename, void *buf, size_t size)
                 klee_make_symbolic_sc(base_buf, SYM_SIZE, "base", 0);
                 klee_make_symbolic_sc(mod_buf, SYM_SIZE, "mod", 0);
                 // Set highest bit
-                klee_assume(base_buf[0] & 0x80);
+                // klee_assume(base_buf[0] & 0x80);
                 klee_assume(mod_buf[0] & 0x80);
                 // mod_buf is odd
                 klee_assume(mod_buf[SYM_SIZE - 1] & 1);
