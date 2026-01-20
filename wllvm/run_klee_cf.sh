@@ -209,12 +209,12 @@ run_mbedtls() {
         EXTRA_ARGS+=( --filename bignum.c --lines 1968:2202 )
     fi
 
-    run_case "Mbed TLS 3.2.1 (Fix Pub)" "mbedtls-3.2.1/klee_fix_pub.bc" "mbedtls_fix_pub" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_lim_loop.bc" "mbedtls_fix_pub_lim_loop" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc" "mbedtls_fix_pub_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    run_case "Mbed TLS 3.2.1 (Var Pub)" "mbedtls-3.2.1/klee_var_pub.bc" "mbedtls_var_pub" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    # run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop)" "mbedtls-3.2.1/klee_var_pub_lim_loop.bc" "mbedtls_var_pub_lim_loop" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc" "mbedtls_var_pub_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
+    run_case "Mbed TLS 3.2.1 (Fix Pub)" "mbedtls-3.2.1/klee_fix_pub.bc" "mbedtls_fix_pub" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_lim_loop.bc" "mbedtls_fix_pub_lim_loop" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc" "mbedtls_fix_pub_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    run_case "Mbed TLS 3.2.1 (Var Pub)" "mbedtls-3.2.1/klee_var_pub.bc" "mbedtls_var_pub" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    # run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop)" "mbedtls-3.2.1/klee_var_pub_lim_loop.bc" "mbedtls_var_pub_lim_loop" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    run_case "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc" "mbedtls_var_pub_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1/3.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
 }
 
 run_mbedtls_sliced() {
@@ -242,17 +242,14 @@ run_mbedtls_sliced() {
         -o mbedtls-3.2.1/klee_var_pub_sliced_lim_loop_break.bc \
         mbedtls-3.2.1/klee_var_pub_sliced.bc
 
-    EXTRA_ARGS=( --ctchecker-prefix "library" ) # bignum_sliced.c is not really in library now, maybe fix later
-    if [ "$mod_exp_only" = "true" ]; then
-        EXTRA_ARGS+=( --filename bignum.c --lines 1968:2202 )
-    fi
+    EXTRA_ARGS=()
 
-    run_case "Mbed TLS 3.2.1 (Fix Pub Sliced)" "mbedtls-3.2.1/klee_fix_pub_sliced.bc" "mbedtls_fix_pub_sliced" "mbedtls-3.2.1/klee_fix_pub_sliced_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    # run_case "Mbed TLS 3.2.1 (Fix Pub Sliced Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_sliced_lim_loop.bc" "mbedtls_fix_pub_sliced_lim_loop" "mbedtls-3.2.1/klee_fix_pub_sliced_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    # run_case "Mbed TLS 3.2.1 (Fix Pub Sliced Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_sliced_lim_loop_break.bc" "mbedtls_fix_pub_sliced_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_sliced_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    run_case "Mbed TLS 3.2.1 (Var Pub Sliced)" "mbedtls-3.2.1/klee_var_pub_sliced.bc" "mbedtls_var_pub_sliced" "mbedtls-3.2.1/klee_var_pub_sliced_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    # run_case "Mbed TLS 3.2.1 (Var Pub Sliced Lim Loop)" "mbedtls-3.2.1/klee_var_pub_sliced_lim_loop.bc" "mbedtls_var_pub_sliced_lim_loop" "mbedtls-3.2.1/klee_var_pub_sliced_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
-    run_case "Mbed TLS 3.2.1 (Var Pub Sliced Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_sliced_lim_loop_break.bc" "mbedtls_var_pub_sliced_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_sliced_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1/library" false "${EXTRA_ARGS[@]}"
+    run_case "Mbed TLS 3.2.1 (Fix Pub Sliced)" "mbedtls-3.2.1/klee_fix_pub_sliced.bc" "mbedtls_fix_pub_sliced" "mbedtls-3.2.1/klee_fix_pub_sliced_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Sliced Lim Loop)" "mbedtls-3.2.1/klee_fix_pub_sliced_lim_loop.bc" "mbedtls_fix_pub_sliced_lim_loop" "mbedtls-3.2.1/klee_fix_pub_sliced_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    # run_case "Mbed TLS 3.2.1 (Fix Pub Sliced Lim Loop Break)" "mbedtls-3.2.1/klee_fix_pub_sliced_lim_loop_break.bc" "mbedtls_fix_pub_sliced_lim_loop_break" "mbedtls-3.2.1/klee_fix_pub_sliced_replay" "--secret exp" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    run_case "Mbed TLS 3.2.1 (Var Pub Sliced)" "mbedtls-3.2.1/klee_var_pub_sliced.bc" "mbedtls_var_pub_sliced" "mbedtls-3.2.1/klee_var_pub_sliced_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    # run_case "Mbed TLS 3.2.1 (Var Pub Sliced Lim Loop)" "mbedtls-3.2.1/klee_var_pub_sliced_lim_loop.bc" "mbedtls_var_pub_sliced_lim_loop" "mbedtls-3.2.1/klee_var_pub_sliced_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
+    run_case "Mbed TLS 3.2.1 (Var Pub Sliced Lim Loop Break)" "mbedtls-3.2.1/klee_var_pub_sliced_lim_loop_break.bc" "mbedtls_var_pub_sliced_lim_loop_break" "mbedtls-3.2.1/klee_var_pub_sliced_replay" "--secret exp --public base,mod" "../ctchecker_results/mbedtls3.2.1-sliced/2.json" "mbedtls-3.2.1" false "${EXTRA_ARGS[@]}"
 }
 
 run_libgcrypt() {
