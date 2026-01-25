@@ -80,7 +80,15 @@ run_mbedtls() {
     echo "##########"
 
     mbedtls-3.2.1/build.sh --binsec --sym-size ${sym_size}
+
+    echo "========="
+    echo "Mbed TLS 3.2.1 (Fix Pub)"
+    echo "========="
     run_case "binsec_fix_pub.cfg" "mbedtls_fix_pub.toml" "mbedtls-3.2.1/binsec_fix_pub"
+
+    echo "========="
+    echo "Mbed TLS 3.2.1 (Var Pub)"
+    echo "========="
     run_case "binsec_var_pub.cfg" "mbedtls_var_pub.toml" "mbedtls-3.2.1/binsec_var_pub"
 }
 
@@ -90,7 +98,15 @@ run_libgcrypt() {
     echo "##########"
 
     libgcrypt-and-libgpg-error/build.sh --binsec --sym-size ${sym_size}
+
+    echo "========="
+    echo "Libgcrypt 1.10.1 (Fix Pub)"
+    echo "========="
     run_case "binsec_fix_pub.cfg" "libgcrypt_fix_pub.toml" "libgcrypt-and-libgpg-error/binsec_fix_pub"
+
+    echo "========="
+    echo "Libgcrypt 1.10.1 (Var Pub)"
+    echo "========="
     run_case "binsec_var_pub.cfg" "libgcrypt_var_pub.toml" "libgcrypt-and-libgpg-error/binsec_var_pub"
 }
 
@@ -101,7 +117,14 @@ run_openssl() {
 
     openssl-1.1.1q/build.sh --binsec --sym-size ${sym_size}
     for algo in recp mont mont_consttime mont_word; do
+        echo "========="
+        echo "OpenSSL 1.1.1q ${algo} (Fix Pub)"
+        echo "========="
         run_case "binsec_fix_pub.cfg" "openssl_${algo}_fix_pub.toml" "openssl-1.1.1q/binsec_fix_pub_${algo}"
+
+        echo "========="
+        echo "OpenSSL 1.1.1q ${algo} (Var Pub)"
+        echo "========="
         run_case "binsec_var_pub.cfg" "openssl_${algo}_var_pub.toml" "openssl-1.1.1q/binsec_var_pub_${algo}"
     done
 }

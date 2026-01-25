@@ -96,7 +96,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     CFLAGS=( -g -O0 )
     LDFLAGS=()
     ARCH_FLAGS=()
-    if [[ "$MODE" == "abacus" ]]; then
+    if [[ "$MODE" == "binsec" || "$MODE" == "abacus" ]]; then
         CFLAGS+=( -m32 )
         LDFLAGS+=( -m32 )
         ARCH_FLAGS+=( --host=i686-pc-linux-gnu )
@@ -162,8 +162,8 @@ fi
 
 if [[ "$MODE" == "binsec" ]]; then
     # BINSEC builds
-    gcc "${flags[@]}" -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
-    gcc "${flags[@]}" -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
+    gcc "${flags[@]}" -m32 -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
+    gcc "${flags[@]}" -m32 -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
 
     # gcc "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c powm_sliced.c "${libs[@]}" -o binsec_var_pub_sliced
     # gcc "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o binsec_fix_pub_sliced

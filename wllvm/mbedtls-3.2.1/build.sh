@@ -83,7 +83,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
 
     CFLAGS=( -g -O0 )
     LDFLAGS=( )
-    if [[ "$MODE" == "abacus" ]]; then
+    if [[ "$MODE" == "binsec" || "$MODE" == "abacus" ]]; then
         CFLAGS+=( -m32 )
         LDFLAGS+=( -m32 )
     fi
@@ -133,8 +133,8 @@ fi
 
 if [[ "$MODE" == "binsec" ]]; then
     # BINSEC builds
-    gcc "${flags[@]}" -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
-    gcc "${flags[@]}" -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
+    gcc "${flags[@]}" -m32 -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
+    gcc "${flags[@]}" -m32 -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
 fi
 
 if [[ "$MODE" == "abacus" ]]; then

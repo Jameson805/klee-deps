@@ -84,7 +84,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     CFLAGS=( -g -O0 )
     LDFLAGS=( )
     ARCH_FLAGS=( linux-generic64 )
-    if [[ "$MODE" == "abacus" ]]; then
+    if [[ "$MODE" == "binsec" || "$MODE" == "abacus" ]]; then
         CFLAGS+=( -m32 )
         LDFLAGS+=( -m32 )
         ARCH_FLAGS=( linux-generic32 )
@@ -134,8 +134,8 @@ for algo in "${algos[@]}"; do
 
     if [[ "$MODE" == "binsec" ]]; then
         # BINSEC builds
-        gcc "${flags[@]}" -static -D${macro} -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o "binsec_var_pub_${algo}"
-        gcc "${flags[@]}" -static -D${macro} -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_${algo}"
+        gcc "${flags[@]}" -m32 -static -D${macro} -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o "binsec_var_pub_${algo}"
+        gcc "${flags[@]}" -m32 -static -D${macro} -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_${algo}"
     fi
 
     if [[ "$MODE" == "abacus" ]]; then
