@@ -390,6 +390,6 @@ run_openssl() {
 
 run_mbedtls
 run_mbedtls_sliced
-run_libgcrypt
-run_libgcrypt_sliced
-run_openssl
+#run_libgcrypt
+#run_libgcrypt_sliced
+#run_openssl

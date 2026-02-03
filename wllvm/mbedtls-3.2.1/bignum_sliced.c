@@ -68,8 +68,6 @@ int mbedtls_mpi_mod_mpi_slice_1(mbedtls_mpi *R, mbedtls_mpi const *A,
 int mbedtls_mpi_exp_mod_slice_1(mbedtls_mpi *X, mbedtls_mpi const *A,
                                 mbedtls_mpi const *E, mbedtls_mpi const *N);
 
-extern int Frama_C_interval(int a, int b);
-
 void mbedtls_mpi_core_mla_slice_1(mbedtls_mpi_uint *d, size_t d_len,
                                   mbedtls_mpi_uint const *s, size_t s_len,
                                   mbedtls_mpi_uint b);
@@ -77,10 +75,6 @@ void mbedtls_mpi_core_mla_slice_1(mbedtls_mpi_uint *d, size_t d_len,
 void mbedtls_platform_zeroize(void *buf, size_t len);
 
 unsigned int mbedtls_ct_size_bool_eq(size_t x, size_t y);
-
-void mbedtls_ct_mpi_uint_cond_assign(size_t n, mbedtls_mpi_uint *dest,
-                                     mbedtls_mpi_uint const *src,
-                                     unsigned char condition);
 
 static void mbedtls_mpi_zeroize_slice_1(mbedtls_mpi_uint *v, size_t n)
 {
@@ -309,47 +303,28 @@ int mbedtls_mpi_shift_r_slice_1(mbedtls_mpi *X, size_t count)
   return_label: return __retres;
 }
 
-int mbedtls_mpi_cmp_abs_slice_1(mbedtls_mpi const *X, mbedtls_mpi const *Y)
+int mbedtls_mpi_cmp_abs_slice_1( const mbedtls_mpi *X, const mbedtls_mpi *Y )
 {
-  int __retres;
-  size_t i;
-  size_t j;
-  i = X->private_n;
-  while (i > (size_t)0) {
-    if (*(X->private_p + (i - (size_t)1)) != (mbedtls_mpi_uint)0) break;
-    i --;
-  }
-  j = Y->private_n;
-  while (j > (size_t)0) {
-    if (*(Y->private_p + (j - (size_t)1)) != (mbedtls_mpi_uint)0) break;
-    j --;
-  }
-  if (i == (size_t)0) 
-    if (j == (size_t)0) {
-      __retres = 0;
-      goto return_label;
+    size_t i, j;
+    if( X == NULL )
+      return -4;
+    if( Y == NULL )
+      return -4;
+    for( i = X->private_n; i > 0; i-- )
+        if( X->private_p[i - 1] != 0 )
+            break;
+    for( j = Y->private_n; j > 0; j-- )
+        if( Y->private_p[j - 1] != 0 )
+            break;
+    if( i == 0 && j == 0 )
+        return( 0 );
+    if( i > j ) return(  1 );
+    if( j > i ) return( -1 );
+    for( ; i > 0; i-- ) {
+        if( X->private_p[i - 1] > Y->private_p[i - 1] ) return(  1 );
+        if( X->private_p[i - 1] < Y->private_p[i - 1] ) return( -1 );
     }
-  if (i > j) {
-    __retres = 1;
-    goto return_label;
-  }
-  if (j > i) {
-    __retres = -1;
-    goto return_label;
-  }
-  while (i > (size_t)0) {
-    if (*(X->private_p + (i - (size_t)1)) > *(Y->private_p + (i - (size_t)1))) {
-      __retres = 1;
-      goto return_label;
-    }
-    if (*(X->private_p + (i - (size_t)1)) < *(Y->private_p + (i - (size_t)1))) {
-      __retres = -1;
-      goto return_label;
-    }
-    i --;
-  }
-  __retres = 0;
-  return_label: return __retres;
+    return 0;
 }
 
 int mbedtls_mpi_cmp_mpi_slice_1(mbedtls_mpi const *X, mbedtls_mpi const *Y)
