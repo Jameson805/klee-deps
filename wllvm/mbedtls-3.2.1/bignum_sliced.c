@@ -1000,6 +1000,11 @@ static void mpi_montg_init_slice_1(mbedtls_mpi_uint *mm, mbedtls_mpi const *N)
   return;
 }
 
+void mbedtls_ct_mpi_uint_cond_assign( size_t n,
+                                      mbedtls_mpi_uint *dest,
+                                      const mbedtls_mpi_uint *src,
+                                      unsigned char condition );
+
 static void mpi_montmul_slice_1(mbedtls_mpi *A, mbedtls_mpi const *B,
                                 mbedtls_mpi const *N, mbedtls_mpi_uint mm,
                                 mbedtls_mpi const *T)

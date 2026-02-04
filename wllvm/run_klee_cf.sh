@@ -388,8 +388,66 @@ run_openssl() {
     run_openssl_algo mont_word false 1138:1283
 }
 
+run_openssl_sliced() {
+    echo "##########"
+    echo "Begin experiments for OpenSSL 1.1.1q (Sliced)"
+    echo "##########"
+
+    openssl-1.1.1q/build.sh --klee-cf --sym-size ${sym_size} --sliced
+
+    for algo in recp mont mont_word; do
+    # for algo in recp mont mont_consttime mont_word; do
+        limit_loop \
+            -blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF \
+            -o "openssl-1.1.1q/klee_fix_pub_lim_loop_${algo}.bc" \
+            "openssl-1.1.1q/klee_fix_pub_${algo}.bc"
+
+        limit_loop \
+            -blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF \
+            -o "openssl-1.1.1q/klee_var_pub_lim_loop_${algo}.bc" \
+            "openssl-1.1.1q/klee_var_pub_${algo}.bc"
+
+        limit_loop \
+            -blacklist=buf_nonzero,buf_bitlen \
+            -break \
+            -o "openssl-1.1.1q/klee_fix_pub_lim_loop_break_${algo}.bc" \
+            "openssl-1.1.1q/klee_fix_pub_${algo}.bc"
+
+        limit_loop \
+            -blacklist=buf_nonzero,buf_bitlen \
+            -break \
+            -o "openssl-1.1.1q/klee_var_pub_lim_loop_break_${algo}.bc" \
+            "openssl-1.1.1q/klee_var_pub_${algo}.bc"
+    done
+
+    run_openssl_algo_sliced() {
+        local algo="$1"
+        local memory_flag="$2"    # "true" or "false"
+        local lines_range="$3"    # e.g. "161:295"
+
+        if [[ "$memory_flag" != "true" && "$memory_flag" != "false" ]]; then
+            echo "Error: memory_flag must be 'true' or 'false' (got '$memory_flag')" >&2
+            exit 1
+        fi
+
+        echo "##########"
+        echo "Running OpenSSL 1.1.1q (Sliced) ${algo} tests"
+        echo "##########"
+
+        run_case "OpenSSL 1.1.1q (Sliced) ${algo} (Fix Pub)" "openssl-1.1.1q/klee_fix_pub_${algo}.bc" "openssl_${algo}_fix_pub_sliced" "openssl-1.1.1q/klee_fix_pub_replay_${algo}" "--secret exp" "../ctchecker_results/openSSL_1_1_1q-sliced/${algo}-3.json" "openssl-1.1.1q" "$memory_flag" --ctchecker-prefix "crypto/bn"
+        run_case "OpenSSL 1.1.1q (Sliced) ${algo} (Var Pub)" "openssl-1.1.1q/klee_var_pub_${algo}.bc" "openssl_${algo}_var_pub_sliced" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q-sliced/${algo}-3.json" "openssl-1.1.1q" "$memory_flag" --ctchecker-prefix "crypto/bn"
+        run_case "OpenSSL 1.1.1q (Sliced) ${algo} (Var Pub Lim Loop Break)" "openssl-1.1.1q/klee_var_pub_lim_loop_break_${algo}.bc" "openssl_${algo}_var_pub_lim_loop_break_sliced" "openssl-1.1.1q/klee_var_pub_replay_${algo}" "--secret exp --public base,mod" "../ctchecker_results/openSSL_1_1_1q-sliced/${algo}-3.json" "openssl-1.1.1q" "$memory_flag" --ctchecker-prefix "crypto/bn"
+    }
+
+    run_openssl_algo_sliced recp false 161:295
+    run_openssl_algo_sliced mont false 297:471
+    # run_openssl_algo_sliced mont_consttime false 593:1136
+    run_openssl_algo_sliced mont_word false 1138:1283
+}
+
 run_mbedtls
 run_mbedtls_sliced
-#run_libgcrypt
-#run_libgcrypt_sliced
-#run_openssl
+run_libgcrypt
+run_libgcrypt_sliced
+run_openssl
+run_openssl_sliced

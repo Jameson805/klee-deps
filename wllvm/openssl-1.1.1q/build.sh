@@ -5,8 +5,9 @@ cd "$(dirname "$0")"
 KLEE_PATH="../../klee-controlflow"
 
 usage() {
-    echo "Usage: $0 [--skip-deps] (--klee-cf | --binsec | --abacus | --self-comp) --sym-size N"
-    echo "  --skip-deps    Skip building libgpg-error and libgcrypt"
+    echo "Usage: $0 [--skip-deps] [--sliced] (--klee-cf | --binsec | --abacus | --self-comp) --sym-size N"
+    echo "  --skip-deps    Skip building OpenSSL (Configure/make)"
+    echo "  --sliced       Link crypto/bin/bn_exp.c -> crypto/bin/bn_exp_sliced.c (default: -> bn_exp_orig.c)"
     echo "  --klee-cf      Build KLEE bitcode and Replay binaries"
     echo "  --binsec       Build BINSEC binaries"
     echo "  --abacus       Build Abacus binaries"
@@ -15,6 +16,7 @@ usage() {
 }
 
 SKIP_DEPS=0
+SLICED=0
 MODE=""
 SYM_SIZE=""
 
@@ -22,6 +24,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --skip-deps)
             SKIP_DEPS=1
+            shift
+            ;;
+        --sliced)
+            SLICED=1
             shift
             ;;
         --klee-cf|--binsec|--abacus|--self-comp)
@@ -70,6 +76,30 @@ fi
 if ! [[ "$SYM_SIZE" =~ ^[0-9]+$ ]]; then
     echo "SYM_SIZE must be a non-negative integer, got: $SYM_SIZE"
     exit 1
+fi
+
+ensure_bn_exp_link() {
+    local bn_dir="crypto/bn"
+    local link_path="${bn_dir}/bn_exp.c"
+    local target="${bn_dir}/$1"
+
+    if [[ ! -d "${bn_dir}" ]]; then
+        echo "Expected OpenSSL directory '${bn_dir}' not found"
+        exit 1
+    fi
+    if [[ ! -f "${target}" ]]; then
+        echo "Expected target '${target}' not found"
+        exit 1
+    fi
+
+    cp -f "${target}" "${link_path}"
+    echo "copy ${target} -> ${link_path}"
+}
+
+if [[ "$SLICED" -eq 1 ]]; then
+    ensure_bn_exp_link "bn_exp_sliced.c"
+else
+    ensure_bn_exp_link "bn_exp_orig.c"
 fi
 
 if [ "$SKIP_DEPS" -eq 0 ]; then
