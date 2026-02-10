@@ -15,4 +15,6 @@ int main()
         a[sec & 2] = 1;
         a[sec] = 1;
     }
+    
+    return 0;
 }
