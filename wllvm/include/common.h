@@ -10,7 +10,7 @@
 
 
 /* Returns nonzero if any byte in buf is nonzero */
-static unsigned buf_nonzero(const unsigned char *buf, size_t size) {
+unsigned buf_nonzero(const unsigned char *buf, size_t size) {
     unsigned v = 0;
     for (size_t i = 0; i < size; ++i)
         v |= buf[i];
@@ -20,7 +20,7 @@ static unsigned buf_nonzero(const unsigned char *buf, size_t size) {
 /* Compute bit-length of big-endian unsigned integer stored in buf (MSB at index 0).
    Returns 0 if all bits are zero.
    Constant-time: no data-dependent branches or memory accesses. */
-static unsigned buf_bitlen(const unsigned char *buf, size_t size) {
+unsigned buf_bitlen(const unsigned char *buf, size_t size) {
     unsigned found = 0;   /* becomes 1 once any '1' bit is found */
     unsigned bitpos = 0;  /* stores the highest set bit position */
 
@@ -40,33 +40,39 @@ static unsigned buf_bitlen(const unsigned char *buf, size_t size) {
 }
 
 /* Store 16-bit big-endian value at end of buffer; zero pad leading bytes. */
-static void be_store_u16_tail(unsigned char *dst, size_t dst_len, uint16_t x) {
+void be_store_u16_tail(unsigned char *dst, size_t dst_len, uint16_t x) {
     assert(dst_len >= 2);
-    memset(dst, 0, dst_len);
+    for (size_t i = 0; i < dst_len; ++i) {
+        dst[i] = 0;
+    }
     for (int i = 0; i < 2; ++i) {
         dst[dst_len - 2 + i] = (unsigned char)((x >> (8 * (1 - i))) & 0xFF);
     }
 }
 
 /* Store 32-bit big-endian value at end of buffer; zero pad leading bytes. */
-static void be_store_u32_tail(unsigned char *dst, size_t dst_len, uint32_t x) {
+void be_store_u32_tail(unsigned char *dst, size_t dst_len, uint32_t x) {
     assert(dst_len >= 4);
-    memset(dst, 0, dst_len);
+    for (size_t i = 0; i < dst_len; ++i) {
+        dst[i] = 0;
+    }
     for (int i = 0; i < 4; ++i) {
         dst[dst_len - 4 + i] = (unsigned char)((x >> (8 * (3 - i))) & 0xFF);
     }
 }
 
 /* Store 64-bit big-endian value at end of buffer; zero pad leading bytes. */
-static void be_store_u64_tail(unsigned char *dst, size_t dst_len, uint64_t x) {
+void be_store_u64_tail(unsigned char *dst, size_t dst_len, uint64_t x) {
     assert(dst_len >= 8);
-    memset(dst, 0, dst_len);
+    for (size_t i = 0; i < dst_len; ++i) {
+        dst[i] = 0;
+    }
     for (int i = 0; i < 8; ++i) {
         dst[dst_len - 8 + i] = (unsigned char)((x >> (8 * (7 - i))) & 0xFF);
     }
 }
 
-static int load_bytes(const char *filename, void *buf, size_t size)
+int load_bytes(const char *filename, void *buf, size_t size)
 {
     FILE *f = fopen(filename, "rb");
     if (!f) {
@@ -92,10 +98,10 @@ static int load_bytes(const char *filename, void *buf, size_t size)
 
     #include "klee/klee.h"
 
-    static unsigned char exp_1_buf[SYM_SIZE];
-    static unsigned char exp_2_buf[SYM_SIZE];
-    static unsigned char base_buf[SYM_SIZE];
-    static unsigned char mod_buf[SYM_SIZE];
+    unsigned char exp_1_buf[SYM_SIZE];
+    unsigned char exp_2_buf[SYM_SIZE];
+    unsigned char base_buf[SYM_SIZE];
+    unsigned char mod_buf[SYM_SIZE];
 
     #define MAX_BRANCH_RECORDS 65536
 
@@ -106,11 +112,11 @@ static int load_bytes(const char *filename, void *buf, size_t size)
         int col;
     } BranchRecord;
 
-    static BranchRecord branchRecords[MAX_BRANCH_RECORDS];
-    static int branchRecordsLen;
+    BranchRecord branchRecords[MAX_BRANCH_RECORDS];
+    int branchRecordsLen;
 
-    static BranchRecord branchRecords1[MAX_BRANCH_RECORDS];
-    static int branchRecords1Len;
+    BranchRecord branchRecords1[MAX_BRANCH_RECORDS];
+    int branchRecords1Len;
 
     void __record_branch(int decision, const char *file, int line, int col) {
         klee_assert(branchRecordsLen < MAX_BRANCH_RECORDS);
@@ -153,10 +159,12 @@ static int load_bytes(const char *filename, void *buf, size_t size)
                 be_store_u64_tail(mod_buf, SYM_SIZE, mod_i);
             #elif SYM_SIZE == 16
                 uint64_t base_i = 251; // Closest prime less than uint8_t max
-                uint64_t mod_i = 18446744073709551557; // Closest prime less than uint64_t max
-                be_store_u64_tail(base_buf, 8, base_i);
-                be_store_u64_tail(mod_buf, 8, mod_i);
-                be_store_u64_tail(mod_buf + 8, 8, mod_i);
+                // Closest prime less than uint128_t max
+                uint64_t mod_i_high = 18446744073709551615;
+                uint64_t mod_i_low = 18446744073709551457;
+                be_store_u64_tail(base_buf, 16, base_i);
+                be_store_u64_tail(mod_buf, 8, mod_i_high);
+                be_store_u64_tail(mod_buf + 8, 8, mod_i_low);
             #endif
         #else
             klee_make_symbolic(base_buf, SYM_SIZE, "base");
@@ -233,9 +241,9 @@ static int load_bytes(const char *filename, void *buf, size_t size)
         }
     #endif
 
-    static unsigned char exp_buf[SYM_SIZE];
-    static unsigned char base_buf[SYM_SIZE];
-    static unsigned char mod_buf[SYM_SIZE];
+    unsigned char exp_buf[SYM_SIZE];
+    unsigned char base_buf[SYM_SIZE];
+    unsigned char mod_buf[SYM_SIZE];
 
     /* User-provided entry that consumes the prepared buffers. */
     int driver_main(const unsigned char *exp_buf, const unsigned char *base_buf, const unsigned char *mod_buf, size_t len);
@@ -269,12 +277,14 @@ static int load_bytes(const char *filename, void *buf, size_t size)
                 uint32_t exp_i = 4294967279; // Second closest prime less than uint32_t max
                 be_store_u32_tail(exp_buf, SYM_SIZE, exp_i);
             #elif SYM_SIZE == 8
-                uint64_t exp_i = 18446744073709551533; // Second Closest prime less than uint64_t max
+                uint64_t exp_i = 18446744073709551533; // Second closest prime less than uint64_t max
                 be_store_u64_tail(exp_buf, SYM_SIZE, exp_i);
             #elif SYM_SIZE == 16
-                uint64_t exp_i = 18446744073709551533; // Second closest prime less than uint64_t max
-                be_store_u64_tail(exp_buf, 8, exp_i);
-                be_store_u64_tail(exp_buf + 8, 8, exp_i);
+                // Second closest prime less than uint128_t max
+                uint64_t exp_i_high = 18446744073709551615;
+                uint64_t exp_i_low = 18446744073709551443;
+                be_store_u64_tail(exp_buf, 8, exp_i_high);
+                be_store_u64_tail(exp_buf + 8, 8, exp_i_low);
             #endif
 
             char *type = "1";
@@ -306,10 +316,12 @@ static int load_bytes(const char *filename, void *buf, size_t size)
                 be_store_u64_tail(mod_buf, SYM_SIZE, mod_i);
             #elif SYM_SIZE == 16
                 uint64_t base_i = 251; // Closest prime less than uint8_t max
-                uint64_t mod_i = 18446744073709551557; // Closest prime less than uint64_t max
-                be_store_u64_tail(base_buf, 8, base_i);
-                be_store_u64_tail(mod_buf, 8, mod_i);
-                be_store_u64_tail(mod_buf + 8, 8, mod_i);
+                // Closest prime less than uint128_t max
+                uint64_t mod_i_high = 18446744073709551615;
+                uint64_t mod_i_low = 18446744073709551457;
+                be_store_u64_tail(base_buf, 16, base_i);
+                be_store_u64_tail(mod_buf, 8, mod_i_high);
+                be_store_u64_tail(mod_buf + 8, 8, mod_i_low);
             #endif
         #else
             #ifdef KLEE_CF
