@@ -24,6 +24,15 @@ SLICED=0
 MODE=""
 SYM_SIZE=""
 
+# Flags that reduce indirect control-flow artifacts (e.g., PLT indirections / PIE thunks)
+# that can confuse binary-level analyzers like BINSEC.
+# We also force "no PIE" at link-time. Since some autotools projects build shared
+# libraries by default, we configure deps with --disable-shared (static-only) so
+# this flag cannot accidentally affect a shared-library link.
+BINSEC_CFLAGS_NOIND=( -fno-pie -fno-plt )
+BINSEC_LDFLAGS_NOIND=( -Wl,-no-pie )
+BINSEC_EXE_NOIND_FLAGS=( "${BINSEC_CFLAGS_NOIND[@]}" "${BINSEC_LDFLAGS_NOIND[@]}" )
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --skip-deps)
@@ -87,7 +96,7 @@ install_root=$(realpath "./build")
 if [ "$SKIP_DEPS" -eq 0 ]; then
     echo "Building dependencies..."
 
-    CC=gcc
+    CC=clang
     if [[ "$MODE" == "klee_cf" || "$MODE" == "self_comp" ]]; then
         export LLVM_COMPILER=clang
         CC=wllvm
@@ -101,10 +110,16 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
         LDFLAGS+=( -m32 )
         ARCH_FLAGS+=( --host=i686-pc-linux-gnu )
     fi
+    # Always keep the deps non-PIE/no-PLT to reduce indirect control-flow artifacts,
+    # and always force static-only libs so libtool won't build any .so.
+    CFLAGS+=( "${BINSEC_CFLAGS_NOIND[@]}" )
+    LDFLAGS+=( "${BINSEC_LDFLAGS_NOIND[@]}" )
+
+    CONFIGURE_STATIC_ONLY_FLAGS=( --enable-static --disable-shared )
 
     cd libgpg-error-1.44
     ./configure CC=${CC} CFLAGS="${CFLAGS[*]}" LDFLAGS="${LDFLAGS[*]}" \
-        --enable-static \
+        "${CONFIGURE_STATIC_ONLY_FLAGS[@]}" \
         --prefix="${install_root}" \
         "${ARCH_FLAGS[@]}"
     make clean
@@ -119,7 +134,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     cd "$LIBGCRYPT_DIR"
     CFLAGS+=( -DNO_ASM )
     ./configure CC=${CC} CFLAGS="${CFLAGS[*]}" LDFLAGS="${LDFLAGS[*]}" \
-        --enable-static \
+        "${CONFIGURE_STATIC_ONLY_FLAGS[@]}" \
         --disable-asm \
         --disable-doc \
         --with-sysroot="${install_root}" \
@@ -162,17 +177,24 @@ fi
 
 if [[ "$MODE" == "binsec" ]]; then
     # BINSEC builds
-    gcc "${flags[@]}" -m32 -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
-    gcc "${flags[@]}" -m32 -static -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
+    clang "${flags[@]}" -m32 -static "${BINSEC_EXE_NOIND_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
+    clang "${flags[@]}" -m32 -static "${BINSEC_EXE_NOIND_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
 
-    # gcc "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c powm_sliced.c "${libs[@]}" -o binsec_var_pub_sliced
-    # gcc "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o binsec_fix_pub_sliced
+    # Replay binaries for BINSEC (built separately; REPLAY and BINSEC are mutually exclusive)
+    clang "${flags[@]}" -m32 -static "${BINSEC_EXE_NOIND_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o binsec_var_pub_replay
+    clang "${flags[@]}" -m32 -static "${BINSEC_EXE_NOIND_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_replay
+
+    # clang "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c powm_sliced.c "${libs[@]}" -o binsec_var_pub_sliced
+    # clang "${flags[@]}" -static -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o binsec_fix_pub_sliced
 fi
 
 if [[ "$MODE" == "abacus" ]]; then
     # Abacus builds
-    gcc "${flags[@]}" -m32 -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
-    # gcc "${flags[@]}" -m32 -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c powm_sliced.c "${libs[@]}" -o abacus_fix_pub_sliced
+    clang "${flags[@]}" -m32 -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
+    # clang "${flags[@]}" -m32 -DUSE_SLICED -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c powm_sliced.c "${libs[@]}" -o abacus_fix_pub_sliced
+
+    # Replay binary for Abacus (fix_pub uses concrete publics)
+    clang "${flags[@]}" -m32 -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o abacus_fix_pub_replay
 fi
 
 record_branch() {
