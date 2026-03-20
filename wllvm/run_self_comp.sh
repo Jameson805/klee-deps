@@ -119,8 +119,11 @@ run_case() {
     local title="$1"      # descriptive title
     local bc="$2"         # bitcode path
     local result_name="$3"
+    local json_name="$4"
 
     local bc_dir=$(dirname "$bc")
+    local case_log="$results_dir/${result_name}.log"
+    local case_json="$results_dir/${json_name}"
 
     echo "========="
     echo "$title"
@@ -128,8 +131,16 @@ run_case() {
 
     rm -f "$bc_dir/klee-last"
     rm -rf "$bc_dir"/klee-out-*
-    klee_timeout "$bc"
-    mv "$bc_dir/klee-out-0" "$results_dir/$result_name"
+    klee_timeout "$bc" | tee "$case_log"
+    if [[ -d "$bc_dir/klee-out-0" ]]; then
+        mv "$bc_dir/klee-out-0" "$results_dir/$result_name"
+    else
+        echo "Warning: missing output directory '$bc_dir/klee-out-0'"
+    fi
+    python3 self_comp_log_to_json.py \
+        --log "$case_log" \
+        --out "$case_json" \
+        --code-root "$bc_dir"
     rm -f "$bc_dir/klee-last"
     rm -rf "$bc_dir"/klee-out-*
 }
@@ -139,8 +150,8 @@ run_mbedtls() {
     echo "Begin experiments for Mbed TLS 3.2.1"
     echo "##########"
     mbedtls-3.2.1/build.sh --self-comp --sym-size "$sym_size"
-    run_case "Mbed TLS 3.2.1 (Fix Pub Self-Comp)" "mbedtls-3.2.1/self_comp_fix_pub.bc" "mbedtls_self_comp_fix_pub"
-    run_case "Mbed TLS 3.2.1 (Var Pub Self-Comp)" "mbedtls-3.2.1/self_comp_var_pub.bc" "mbedtls_self_comp_var_pub"
+    run_case "Mbed TLS 3.2.1 (Fix Pub Self-Comp)" "mbedtls-3.2.1/self_comp_fix_pub.bc" "mbedtls_self_comp_fix_pub" "mbedtls_fix_pub.json"
+    run_case "Mbed TLS 3.2.1 (Var Pub Self-Comp)" "mbedtls-3.2.1/self_comp_var_pub.bc" "mbedtls_self_comp_var_pub" "mbedtls_var_pub.json"
 }
 
 run_libgcrypt() {
@@ -148,8 +159,8 @@ run_libgcrypt() {
     echo "Begin experiments for Libgcrypt 1.10.1"
     echo "##########"
     libgcrypt-and-libgpg-error/build.sh --self-comp --sym-size "$sym_size"
-    run_case "Libgcrypt 1.10.1 (Fix Pub Self-Comp)" "libgcrypt-and-libgpg-error/self_comp_fix_pub.bc" "libgcrypt_self_comp_fix_pub"
-    run_case "Libgcrypt 1.10.1 (Var Pub Self-Comp)" "libgcrypt-and-libgpg-error/self_comp_var_pub.bc" "libgcrypt_self_comp_var_pub"
+    run_case "Libgcrypt 1.10.1 (Fix Pub Self-Comp)" "libgcrypt-and-libgpg-error/self_comp_fix_pub.bc" "libgcrypt_self_comp_fix_pub" "libgcrypt_fix_pub.json"
+    run_case "Libgcrypt 1.10.1 (Var Pub Self-Comp)" "libgcrypt-and-libgpg-error/self_comp_var_pub.bc" "libgcrypt_self_comp_var_pub" "libgcrypt_var_pub.json"
 }
 
 run_openssl() {
@@ -158,8 +169,8 @@ run_openssl() {
     echo "##########"
     openssl-1.1.1q/build.sh --self-comp --sym-size "$sym_size"
     for algo in recp mont mont_consttime mont_word; do
-        run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Self-Comp)" "openssl-1.1.1q/self_comp_fix_pub_${algo}.bc" "openssl_${algo}_self_comp_fix_pub"
-        run_case "OpenSSL 1.1.1q ${algo} (Var Pub Self-Comp)" "openssl-1.1.1q/self_comp_var_pub_${algo}.bc" "openssl_${algo}_self_comp_var_pub"
+        run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Self-Comp)" "openssl-1.1.1q/self_comp_fix_pub_${algo}.bc" "openssl_${algo}_self_comp_fix_pub" "openssl_${algo}_fix_pub.json"
+        run_case "OpenSSL 1.1.1q ${algo} (Var Pub Self-Comp)" "openssl-1.1.1q/self_comp_var_pub_${algo}.bc" "openssl_${algo}_self_comp_var_pub" "openssl_${algo}_var_pub.json"
     done
 }
 
