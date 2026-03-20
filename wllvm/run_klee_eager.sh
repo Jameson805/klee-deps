@@ -12,26 +12,30 @@ ulimit -v 70000000
 max_time=""
 loop_max_iterations=10
 max_solver_time="30s"
-kill_after="30s"
+kill_after="1800s"
 sym_size=4
 max_memory=10000
 mod_exp_only="false"
 search_strategies="random-path,nurs:covnew"
 product_program_fallback="false"
+solver_backend="stp"
+optimize_array="false"
 
 usage() {
     cat <<EOF
-Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <duration>] [--kill-after <duration>] [--max-memory <n>] [--mod-exp-only] [--search <strategies>] <max_time>
+Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <duration>] [--kill-after <duration>] [--max-memory <n>] [--mod-exp-only] [--search <strategies>] [--solver-backend <stp|metasmt|dummy|z3>] [--optimize-array <false|all|index|value>] <max_time>
 
   <max_time>               - required, e.g. 1h, 30m, 600s
   --sym-size <n>           - optional, default: 4 (size in bytes for bignum symbols)
   --loop-max-iterations n  - optional, default: 10
   --max-solver-time <dur>  - optional, default: 30s
-  --kill-after <duration>  - optional, default: 30s
+  --kill-after <duration>  - optional, default: 1800s
   --max-memory <n>         - optional, default: 10000 (MB KLEE state cap)
   --mod-exp-only           - optional, default: false
   --search <strategies>    - optional, default: random-path,nurs:covnew,nurs:depth (comma-separated)
   --product-program-fallback - optional, default: false (enables Executor::bindLocal fallback repair)
+  --solver-backend <name>  - optional, default: stp (stp|metasmt|dummy|z3)
+  --optimize-array <value> - optional, default: false (false|all|index|value)
 EOF
     exit 1
 }
@@ -55,6 +59,10 @@ while [[ $# -gt 0 ]]; do
             search_strategies="$2"; shift 2;;
         --product-program-fallback)
             product_program_fallback="true"; shift;;
+        --solver-backend)
+            solver_backend="$2"; shift 2;;
+        --optimize-array)
+            optimize_array="$2"; shift 2;;
         --)
             shift; break;;
         -*)
@@ -91,6 +99,22 @@ if [[ "$product_program_fallback" != "true" && "$product_program_fallback" != "f
     exit 1
 fi
 
+case "$solver_backend" in
+    stp|metasmt|dummy|z3) ;;
+    *)
+        echo "Error: solver_backend must be one of: stp, metasmt, dummy, z3 (got '$solver_backend')"
+        exit 1
+        ;;
+esac
+
+case "$optimize_array" in
+    false|all|index|value) ;;
+    *)
+        echo "Error: optimize_array must be one of: false, all, index, value (got '$optimize_array')"
+        exit 1
+        ;;
+esac
+
 results_dir="klee_eager_results"
 rm -rf "$results_dir"
 mkdir -p "$results_dir"
@@ -107,19 +131,27 @@ echo "max_memory=$max_memory"
 echo "mod_exp_only=$mod_exp_only"
 echo "search_strategies=$search_strategies"
 echo "product_program_fallback=$product_program_fallback"
+echo "solver_backend=$solver_backend"
+echo "optimize_array=$optimize_array"
 echo "##########"
 
 klee_timeout() {
     local search_args=()
+    local optimize_args=()
     IFS=',' read -ra ADDR <<< "$search_strategies"
     for i in "${ADDR[@]}"; do
         search_args+=( "--search=$i" )
     done
 
+    if [[ "$optimize_array" != "false" ]]; then
+        optimize_args+=( "--optimize-array=$optimize_array" )
+    fi
+
     timeout --foreground --signal=INT --kill-after="$kill_after" $max_time \
     klee --libc=uclibc \
         --posix-runtime \
         --external-calls=all \
+        --solver-backend="$solver_backend" \
         --product-program-fallback="$product_program_fallback" \
         --kdalloc \
         --kdalloc-constants-size=5 \
@@ -129,6 +161,7 @@ klee_timeout() {
         --dump-states-on-halt=false \
         --use-batching-search=false \
         "${search_args[@]}" \
+        "${optimize_args[@]}" \
         --max-solver-time="$max_solver_time" \
         --max-memory=$max_memory "$1" || true
 }
@@ -173,13 +206,13 @@ run_case() {
 
     compare_with_ctchecker.py branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" "$@" $replay_opts
     reproduce_positives.py --json "$results_dir/${result_name}_branch.json" --klee-output "$results_dir/$result_name" --executable "$replay_script" $replay_opts --output "$results_dir/${result_name}_branch.json"
-    make_report.py "$results_dir/${result_name}_branch.json" "$results_dir/${result_name}_branch_report.html"
-    make_plot.py "$results_dir/${result_name}_branch.json" "$title (Branch)" "$results_dir/${result_name}_branch_plot.png"
+    # make_report.py "$results_dir/${result_name}_branch.json" "$results_dir/${result_name}_branch_report.html"
+    # make_plot.py "$results_dir/${result_name}_branch.json" "$title (Branch)" "$results_dir/${result_name}_branch_plot.png"
 
     if [[ "$memory_flag" == "true" ]]; then
         compare_with_ctchecker.py memory "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_memory.json" --code-path "$code_path" "$@"
-        make_report.py "$results_dir/${result_name}_memory.json" "$results_dir/${result_name}_memory_report.html"
-        make_plot.py "$results_dir/${result_name}_memory.json" "$title" "$results_dir/${result_name}_memory_plot.png"
+        # make_report.py "$results_dir/${result_name}_memory.json" "$results_dir/${result_name}_memory_report.html"
+        # make_plot.py "$results_dir/${result_name}_memory.json" "$title" "$results_dir/${result_name}_memory_plot.png"
     fi
 }
 
