@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 
 # BINSEC -> JSON converter (Python 3.11+ for tomllib)
 repo_root="$(cd .. && pwd)"
-converter_py="$repo_root/utils/binsec_toml_to_json.py"
+converter_py="$repo_root/wllvm/binsec_toml_to_json.py"
 python_bin="$repo_root/.venv/bin/python"
 if [[ ! -x "$python_bin" ]]; then
     python_bin="$(command -v python3 || true)"
@@ -189,7 +189,7 @@ run_case() {
 
     local sse_script_to_use="$sse_script"
     if [[ "$patch_memset_ifunc" -eq 1 ]]; then
-        local patcher_py="$repo_root/utils/binsec_patch_memset_ifunc.py"
+        local patcher_py="$repo_root/wllvm/binsec_patch_memset_ifunc.py"
         if [[ -f "$patcher_py" && -n "$python_bin" ]]; then
             local out_cfg="$results_dir/patched_${sse_script%.cfg}_$(basename "$executable").cfg"
             "$python_bin" "$patcher_py" \
