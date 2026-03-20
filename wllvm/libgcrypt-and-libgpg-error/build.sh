@@ -110,10 +110,10 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
         LDFLAGS+=( -m32 )
         ARCH_FLAGS+=( --host=i686-pc-linux-gnu )
     fi
-    # Always keep the deps non-PIE/no-PLT to reduce indirect control-flow artifacts,
-    # and always force static-only libs so libtool won't build any .so.
-    CFLAGS+=( "${BINSEC_CFLAGS_NOIND[@]}" )
-    LDFLAGS+=( "${BINSEC_LDFLAGS_NOIND[@]}" )
+    if [[ "$MODE" == "binsec" ]]; then
+        CFLAGS+=( "${BINSEC_CFLAGS_NOIND[@]}" )
+        LDFLAGS+=( "${BINSEC_LDFLAGS_NOIND[@]}" )
+    fi
 
     CONFIGURE_STATIC_ONLY_FLAGS=( --enable-static --disable-shared )
 
