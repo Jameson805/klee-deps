@@ -38,6 +38,11 @@ static cl::list<std::string> Whitelist(
 
 struct BranchRecorder : public PassInfoMixin<BranchRecorder> {
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM) {
+    // Never instrument the recorder itself, otherwise inserted calls can recurse.
+    if (F.getName() == "__record_branch") {
+      return PreservedAnalyses::all();
+    }
+
     bool InstrumentThis = true;
     if (!Whitelist.empty()) {
       InstrumentThis = false;
@@ -60,7 +65,7 @@ struct BranchRecorder : public PassInfoMixin<BranchRecorder> {
     // Declare (or reuse) stub: void __record_branch(i32 decision, i8* file, i32 line, i32 col)
     FunctionType *FT =
         FunctionType::get(Type::getVoidTy(C),
-                          {I32, Type::getInt8PtrTy(C), I32, I32}, false);
+                {I32, Type::getInt8PtrTy(C), I32, I32}, false);
     FunctionCallee Recorder = M.getOrInsertFunction("__record_branch", FT);
 
     for (BasicBlock &BB : F) {

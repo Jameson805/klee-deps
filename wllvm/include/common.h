@@ -117,14 +117,110 @@ int load_bytes(const char *filename, void *buf, size_t size)
 
     BranchRecord branchRecords1[MAX_BRANCH_RECORDS];
     int branchRecords1Len;
+    int branchRecordingEnabled;
+
+    typedef struct {
+        const char *file;
+        int line;
+        int col;
+    } ReportedLocation;
+
+    ReportedLocation reportedLocations[MAX_BRANCH_RECORDS];
+    int reportedLocationsLen;
 
     void __record_branch(int decision, const char *file, int line, int col) {
+        if (!branchRecordingEnabled) {
+            return;
+        }
+
         klee_assert(branchRecordsLen < MAX_BRANCH_RECORDS);
         branchRecords[branchRecordsLen].decision = decision;
         branchRecords[branchRecordsLen].file = file;
         branchRecords[branchRecordsLen].line = line;
         branchRecords[branchRecordsLen].col = col;
         branchRecordsLen++;
+    }
+
+    static void buf_to_hex(const unsigned char *buf, size_t len, char *out) {
+        static const char hex[] = "0123456789abcdef";
+        out[0] = '0';
+        out[1] = 'x';
+        for (size_t i = 0; i < len; ++i) {
+            /* Force concrete model bytes before formatting so output is stable ASCII hex. */
+            unsigned char b = (unsigned char)klee_get_value_i32((unsigned)buf[i]);
+            out[2 + i * 2] = hex[(b >> 4) & 0x0F];
+            out[2 + i * 2 + 1] = hex[b & 0x0F];
+        }
+        out[2 + len * 2] = '\0';
+    }
+
+    static int location_already_reported(const char *file, int line, int col) {
+        for (int i = 0; i < reportedLocationsLen; ++i) {
+            if (reportedLocations[i].line == line && reportedLocations[i].col == col && strcmp(reportedLocations[i].file, file) == 0) {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    static void report_non_ct_with_counterexample(
+        const char *kind,
+        const char *file,
+        int line,
+        int col,
+        const char *other_file,
+        int other_line,
+        int other_col,
+        int len_a,
+        int len_b
+    ) {
+        if (location_already_reported(file, line, col)) {
+            return;
+        }
+
+        klee_assert(reportedLocationsLen < MAX_BRANCH_RECORDS);
+        reportedLocations[reportedLocationsLen].file = file;
+        reportedLocations[reportedLocationsLen].line = line;
+        reportedLocations[reportedLocationsLen].col = col;
+        reportedLocationsLen++;
+
+        fprintf(stderr, "[NON-CT BRANCH] %s:%d:%d type=%s", file, line, col, kind);
+        if (other_file != NULL) {
+            fprintf(stderr, " other=%s:%d:%d", other_file, other_line, other_col);
+        }
+        if (len_a >= 0 && len_b >= 0) {
+            fprintf(stderr, " len_a=%d len_b=%d", len_a, len_b);
+        }
+        fprintf(stderr, "\n");
+
+        char exp_hex[2 * SYM_SIZE + 3];
+        char exp_prime_hex[2 * SYM_SIZE + 3];
+        buf_to_hex(exp_1_buf, SYM_SIZE, exp_hex);
+        buf_to_hex(exp_2_buf, SYM_SIZE, exp_prime_hex);
+
+        #ifdef CONCRETE_PUBS
+            fprintf(stderr,
+                    "[NON-CT CEX] %s:%d:%d exp=%s exp__prime=%s\n",
+                    file,
+                    line,
+                    col,
+                    exp_hex,
+                    exp_prime_hex);
+        #else
+            char base_hex[2 * SYM_SIZE + 3];
+            char mod_hex[2 * SYM_SIZE + 3];
+            buf_to_hex(base_buf, SYM_SIZE, base_hex);
+            buf_to_hex(mod_buf, SYM_SIZE, mod_hex);
+            fprintf(stderr,
+                    "[NON-CT CEX] %s:%d:%d exp=%s exp__prime=%s base=%s mod=%s\n",
+                    file,
+                    line,
+                    col,
+                    exp_hex,
+                    exp_prime_hex,
+                    base_hex,
+                    mod_hex);
+        #endif
     }
 
     /* User-provided entry that consumes the prepared buffers. */
@@ -176,13 +272,22 @@ int load_bytes(const char *filename, void *buf, size_t size)
             klee_assume(mod_buf[SYM_SIZE - 1] & 1);
         #endif
 
-        if (driver_main(exp_1_buf, base_buf, mod_buf, SYM_SIZE)) return 1;
+        branchRecordsLen = 0;
+        branchRecords1Len = 0;
+        reportedLocationsLen = 0;
+        branchRecordingEnabled = 0;
+        int run1_ret = driver_main(exp_1_buf, base_buf, mod_buf, SYM_SIZE);
+        branchRecordingEnabled = 0;
+        if (run1_ret) return 1;
 
         memcpy(branchRecords1, branchRecords, sizeof(branchRecords));
         branchRecords1Len = branchRecordsLen;
         branchRecordsLen = 0;
 
-        if (driver_main(exp_2_buf, base_buf, mod_buf, SYM_SIZE)) return 1;
+        branchRecordingEnabled = 0;
+        int run2_ret = driver_main(exp_2_buf, base_buf, mod_buf, SYM_SIZE);
+        branchRecordingEnabled = 0;
+        if (run2_ret) return 1;
 
         // Compare traces
         int minLen = (branchRecordsLen < branchRecords1Len) ? branchRecordsLen : branchRecords1Len;
@@ -194,16 +299,34 @@ int load_bytes(const char *filename, void *buf, size_t size)
             int sameDecision = (a->decision == b->decision);
 
             if (sameLoc && !sameDecision) {
-                // Case 1: differs just by condition
-                fprintf(stderr, "[NON-CT BRANCH] %s:%d:%d\n", a->file, a->line, a->col);
+                // Case 1: differs just by condition.
+                report_non_ct_with_counterexample(
+                    "condition",
+                    a->file,
+                    a->line,
+                    a->col,
+                    NULL,
+                    -1,
+                    -1,
+                    -1,
+                    -1
+                );
                 klee_assert(0 && "non-CT branch");
             }
 
             if (!sameLoc) {
-                // Case 2: location differs (report both)
-                fprintf(stderr, "[NON-CT BRANCH] mismatch %s:%d:%d (dec=%d) vs %s:%d:%d (dec=%d)\n",
-                        a->file, a->line, a->col, a->decision,
-                        b->file, b->line, b->col, b->decision);
+                // Case 2: location differs; report first divergence from first run.
+                report_non_ct_with_counterexample(
+                    "location",
+                    a->file,
+                    a->line,
+                    a->col,
+                    b->file,
+                    b->line,
+                    b->col,
+                    -1,
+                    -1
+                );
                 klee_assert(0 && "non-CT branch");
             }
         }
@@ -216,7 +339,17 @@ int load_bytes(const char *filename, void *buf, size_t size)
             } else {
                 extra = &branchRecords1[minLen];
             }
-            fprintf(stderr, "[NON-CT BRANCH] extra %s:%d:%d\n", extra->file, extra->line, extra->col);
+            report_non_ct_with_counterexample(
+                "length",
+                extra->file,
+                extra->line,
+                extra->col,
+                NULL,
+                -1,
+                -1,
+                branchRecordsLen,
+                branchRecords1Len
+            );
             klee_assert(0 && "non-CT branch");
         }
 

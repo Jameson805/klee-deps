@@ -8,10 +8,12 @@ ulimit -v 70000000
 klee_root=""
 max_time=""
 max_solver_time="30s"
-kill_after="30s"
+kill_after="1800s"
 sym_size=4
 max_memory=10000
-search_strategies="random-path,nurs:covnew,nurs:depth"
+search_strategies="random-path,nurs:covnew"
+do_reproduce=1
+reproduce_timeout=180
 
 usage() {
     cat <<EOF
@@ -24,10 +26,12 @@ Required:
 Optional:
   --sym-size <n>         Default: 4
   --max-solver-time <d>  Default: 30s
-  --kill-after <duration> Default: 30s
+  --kill-after <duration> Default: 1800s
   --max-memory <n>       Default: 10000 (MB KLEE cap)
-  --search <strategies>  Default: random-path,nurs:covnew,nurs:depth (comma-separated)
+  --search <strategies>  Default: random-path,nurs:covnew (comma-separated)
   --results-dir <name>   Default: self_comp_results
+    --no-reproduce         Disable replay-based validation (enabled by default)
+    --reproduce-timeout <s> Timeout per replay attempt in seconds (default: 180)
   --help                 Show this help
 EOF
     exit 1
@@ -45,6 +49,8 @@ while [[ $# -gt 0 ]]; do
         --max-memory) max_memory="$2"; shift 2;;
         --search) search_strategies="$2"; shift 2;;
         --results-dir) results_dir="$2"; shift 2;;
+        --no-reproduce) do_reproduce=0; shift 1;;
+        --reproduce-timeout) reproduce_timeout="$2"; shift 2;;
         --help|-h) usage;;
         --) shift; break;;
         -*)
@@ -69,6 +75,9 @@ fi
 if ! [[ "$max_memory" =~ ^[0-9]+$ ]]; then
     echo "Error: max_memory must be a non-negative integer (got '$max_memory')"; exit 1
 fi
+if ! [[ "$reproduce_timeout" =~ ^[0-9]+$ ]]; then
+    echo "Error: reproduce_timeout must be a non-negative integer (got '$reproduce_timeout')"; exit 1
+fi
 
 rm -rf "$results_dir"
 mkdir -p "$results_dir"
@@ -84,6 +93,8 @@ echo "kill_after=$kill_after"
 echo "max_memory=$max_memory"
 echo "search_strategies=$search_strategies"
 echo "results_dir=$results_dir"
+echo "do_reproduce=$do_reproduce"
+echo "reproduce_timeout=$reproduce_timeout"
 echo "##########"
 
 klee_timeout() {
@@ -109,7 +120,8 @@ klee_timeout() {
             --max-memory=$max_memory \
             --emit-all-errors=true "$1" 2>&1 \
     | python3 -u -c 'import sys,time
-for line in sys.stdin:
+for raw in sys.stdin.buffer:
+    line = raw.decode("utf-8", errors="replace")
     sys.stdout.write(f"[{time.time():.3f}] {line}")
     sys.stdout.flush()' \
     || true
@@ -120,6 +132,7 @@ run_case() {
     local bc="$2"         # bitcode path
     local result_name="$3"
     local json_name="$4"
+    local replay_exe="$5"
 
     local bc_dir=$(dirname "$bc")
     local case_log="$results_dir/${result_name}.log"
@@ -137,10 +150,28 @@ run_case() {
     else
         echo "Warning: missing output directory '$bc_dir/klee-out-0'"
     fi
-    python3 self_comp_log_to_json.py \
-        --log "$case_log" \
-        --out "$case_json" \
+    local cmd=(
+        python3 self_comp_log_to_json.py
+        --log "$case_log"
+        --out "$case_json"
         --code-root "$bc_dir"
+        --sym-size "$sym_size"
+    )
+
+    if [[ "$do_reproduce" -eq 1 ]]; then
+        local replay_path="$bc_dir/$replay_exe"
+        if [[ ! -x "$replay_path" ]]; then
+            echo "Error: replay executable not found or not executable: $replay_path"
+            exit 2
+        fi
+        cmd+=(
+            --reproduce
+            --replay-executable "$replay_path"
+            --reproduce-timeout "$reproduce_timeout"
+        )
+    fi
+
+    "${cmd[@]}"
     rm -f "$bc_dir/klee-last"
     rm -rf "$bc_dir"/klee-out-*
 }
@@ -150,8 +181,8 @@ run_mbedtls() {
     echo "Begin experiments for Mbed TLS 3.2.1"
     echo "##########"
     mbedtls-3.2.1/build.sh --self-comp --sym-size "$sym_size"
-    run_case "Mbed TLS 3.2.1 (Fix Pub Self-Comp)" "mbedtls-3.2.1/self_comp_fix_pub.bc" "mbedtls_self_comp_fix_pub" "mbedtls_fix_pub.json"
-    run_case "Mbed TLS 3.2.1 (Var Pub Self-Comp)" "mbedtls-3.2.1/self_comp_var_pub.bc" "mbedtls_self_comp_var_pub" "mbedtls_var_pub.json"
+    run_case "Mbed TLS 3.2.1 (Fix Pub Self-Comp)" "mbedtls-3.2.1/self_comp_fix_pub.bc" "mbedtls_self_comp_fix_pub" "mbedtls_fix_pub.json" "klee_fix_pub_replay"
+    run_case "Mbed TLS 3.2.1 (Var Pub Self-Comp)" "mbedtls-3.2.1/self_comp_var_pub.bc" "mbedtls_self_comp_var_pub" "mbedtls_var_pub.json" "klee_var_pub_replay"
 }
 
 run_libgcrypt() {
@@ -159,8 +190,8 @@ run_libgcrypt() {
     echo "Begin experiments for Libgcrypt 1.10.1"
     echo "##########"
     libgcrypt-and-libgpg-error/build.sh --self-comp --sym-size "$sym_size"
-    run_case "Libgcrypt 1.10.1 (Fix Pub Self-Comp)" "libgcrypt-and-libgpg-error/self_comp_fix_pub.bc" "libgcrypt_self_comp_fix_pub" "libgcrypt_fix_pub.json"
-    run_case "Libgcrypt 1.10.1 (Var Pub Self-Comp)" "libgcrypt-and-libgpg-error/self_comp_var_pub.bc" "libgcrypt_self_comp_var_pub" "libgcrypt_var_pub.json"
+    run_case "Libgcrypt 1.10.1 (Fix Pub Self-Comp)" "libgcrypt-and-libgpg-error/self_comp_fix_pub.bc" "libgcrypt_self_comp_fix_pub" "libgcrypt_fix_pub.json" "klee_fix_pub_replay"
+    run_case "Libgcrypt 1.10.1 (Var Pub Self-Comp)" "libgcrypt-and-libgpg-error/self_comp_var_pub.bc" "libgcrypt_self_comp_var_pub" "libgcrypt_var_pub.json" "klee_var_pub_replay"
 }
 
 run_openssl() {
@@ -169,8 +200,8 @@ run_openssl() {
     echo "##########"
     openssl-1.1.1q/build.sh --self-comp --sym-size "$sym_size"
     for algo in recp mont mont_consttime mont_word; do
-        run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Self-Comp)" "openssl-1.1.1q/self_comp_fix_pub_${algo}.bc" "openssl_${algo}_self_comp_fix_pub" "openssl_${algo}_fix_pub.json"
-        run_case "OpenSSL 1.1.1q ${algo} (Var Pub Self-Comp)" "openssl-1.1.1q/self_comp_var_pub_${algo}.bc" "openssl_${algo}_self_comp_var_pub" "openssl_${algo}_var_pub.json"
+        run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Self-Comp)" "openssl-1.1.1q/self_comp_fix_pub_${algo}.bc" "openssl_${algo}_self_comp_fix_pub" "openssl_${algo}_fix_pub.json" "klee_fix_pub_replay_${algo}"
+        run_case "OpenSSL 1.1.1q ${algo} (Var Pub Self-Comp)" "openssl-1.1.1q/self_comp_var_pub_${algo}.bc" "openssl_${algo}_self_comp_var_pub" "openssl_${algo}_var_pub.json" "klee_var_pub_replay_${algo}"
     done
 }
 
