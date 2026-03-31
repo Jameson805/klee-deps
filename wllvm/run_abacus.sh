@@ -48,8 +48,17 @@ exec > >(tee -a "$results_dir/output.log") 2>&1
 run_case() {
     local exe="$1"
     local outfile="$2"
-    "${abacus_root}/Intel-Pin-Archive/pin" -t "${abacus_root}/Pintools/obj-ia32/MyPinToolLinux.so" -- "$exe"
-    "${abacus_root}/build/App/QIF/QIF" ./Inst_data.txt -f Function.txt -d "$exe" -o "${results_dir}/$outfile"
+    local case_log="${results_dir}/${outfile%.txt}.log"
+    local case_json="${results_dir}/${outfile%.txt}.json"
+    {
+        "${abacus_root}/Intel-Pin-Archive/pin" -t "${abacus_root}/Pintools/obj-ia32/MyPinToolLinux.so" -- "$exe"
+        "${abacus_root}/build/App/QIF/QIF" ./Inst_data.txt -f Function.txt -d "$exe" -o "${results_dir}/$outfile"
+    } 2>&1 | tee "$case_log"
+    python3 abacus_log_to_json.py \
+        --log "$case_log" \
+        --out "$case_json" \
+        --sym-size "$sym_size" \
+        --code-root "$(pwd)"
     rm -f Inst_data.txt Function.txt
 }
 

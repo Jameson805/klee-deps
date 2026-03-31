@@ -18,12 +18,11 @@ SKIP_DEPS=0
 MODE=""
 SYM_SIZE=""
 
-# Flags that reduce indirect control-flow artifacts (e.g., PLT indirections / PIE thunks)
-# that can confuse binary-level analyzers like BINSEC.
+# Flags that reduce indirect control-flow artifacts (e.g., PLT indirections / PIE thunks).
 # Note: `-no-pie` is a linker flag, so keep it in LDFLAGS for library builds.
-BINSEC_CFLAGS_NOIND=( -fno-pie -fno-plt )
-BINSEC_LDFLAGS_NOIND=( -Wl,-no-pie )
-BINSEC_EXE_NOIND_FLAGS=( "${BINSEC_CFLAGS_NOIND[@]}" "${BINSEC_LDFLAGS_NOIND[@]}" )
+NOIND_CFLAGS=( -fno-pie -fno-plt )
+NOIND_LDFLAGS=( -Wl,-no-pie )
+NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -83,7 +82,9 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     echo "Building dependencies..."
 
     CC=clang
-    if [[ "$MODE" == "klee_cf" || "$MODE" == "self_comp" ]]; then
+    if [[ "$MODE" == "abacus" ]]; then
+        CC=gcc
+    elif [[ "$MODE" == "klee_cf" || "$MODE" == "self_comp" ]]; then
         export LLVM_COMPILER=clang
         CC=wllvm
     fi
@@ -95,8 +96,8 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
         LDFLAGS+=( -m32 )
     fi
     if [[ "$MODE" == "binsec" ]]; then
-        CFLAGS+=( "${BINSEC_CFLAGS_NOIND[@]}" )
-        LDFLAGS+=( "${BINSEC_LDFLAGS_NOIND[@]}" )
+        CFLAGS+=( "${NOIND_CFLAGS[@]}" )
+        LDFLAGS+=( "${NOIND_LDFLAGS[@]}" )
     fi
 
     rm -rf build
@@ -144,29 +145,24 @@ fi
 
 if [[ "$MODE" == "binsec" ]]; then
     # BINSEC builds
-    clang "${flags[@]}" -m32 -static "${BINSEC_EXE_NOIND_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
-    clang "${flags[@]}" -m32 -static "${BINSEC_EXE_NOIND_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
+    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
+    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
 
     # Replay binaries for BINSEC (built separately; REPLAY and BINSEC are mutually exclusive)
-    clang "${flags[@]}" -m32 -static "${BINSEC_EXE_NOIND_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o binsec_var_pub_replay
-    clang "${flags[@]}" -m32 -static "${BINSEC_EXE_NOIND_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_replay
+    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o binsec_var_pub_replay
+    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_replay
 fi
 
 if [[ "$MODE" == "abacus" ]]; then
     # Abacus builds
-    clang "${flags[@]}" -m32 -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
-
-    # Replay binary for Abacus (fix_pub uses concrete publics)
-    clang "${flags[@]}" -m32 -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o abacus_fix_pub_replay
+    gcc "${flags[@]}" -m32 -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
 fi
 
 record_branch() {
     pass_path="../../branch-recorder/build/libBranchRecorder.so"
-    target_fun="mbedtls_mpi_exp_mod"
     opt -load "${pass_path}" \
         -load-pass-plugin="${pass_path}" \
         -passes=branch-recorder \
-        -whitelist="${target_fun}" \
         "$1" -o "$1"
 }
 
