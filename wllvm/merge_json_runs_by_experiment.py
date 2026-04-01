@@ -10,7 +10,7 @@ from glob import glob
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
-FINAL_COLUMNS = [
+FINAL_COLUMN_ORDER = [
     "filename",
     "line",
     "column",
@@ -105,7 +105,7 @@ def _group_input_files(dst_dir: str) -> Dict[str, List[str]]:
 
 
 def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
-    by_location: Dict[Tuple[str, int, int], Dict[str, Any]] = {}
+    by_location: Dict[Tuple[str, int, Optional[int]], Dict[str, Any]] = {}
 
     for path in paths:
         rows = _read_rows(path)
@@ -126,7 +126,7 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
             filename = _basename_only(filename)
             if filename == "":
                 continue
-            if line is None or column is None:
+            if line is None:
                 continue
             if non_ct_time is None:
                 continue
@@ -158,7 +158,10 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
                 slot["counterexamples"] = row.get("counterexamples")
 
     merged_rows: List[Dict[str, Any]] = []
-    for (filename, line, column), slot in sorted(by_location.items(), key=lambda item: (item[0][0], item[0][1], item[0][2])):
+    for (filename, line, column), slot in sorted(
+        by_location.items(),
+        key=lambda item: (item[0][0], item[0][1], -1 if item[0][2] is None else item[0][2]),
+    ):
         visit_count = _geometric_mean(slot["visit_count_values"])
         non_ct_count = _geometric_mean(slot["non_ct_count_values"])
         visit_time = _geometric_mean(slot["visit_time_values"])
@@ -167,19 +170,22 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
         if non_ct_time is None:
             continue
 
-        merged_rows.append(
-            {
-                "filename": filename,
-                "line": line,
-                "column": column,
-                "visit_count": visit_count,
-                "non_ct_count": non_ct_count,
-                "visit_time": visit_time,
-                "non_ct_time": non_ct_time,
-                "code": slot["code"],
-                "counterexamples": slot["counterexamples"],
-            }
-        )
+        row = {
+            "filename": filename,
+            "line": line,
+            "non_ct_time": non_ct_time,
+            "code": slot["code"],
+            "counterexamples": slot["counterexamples"],
+        }
+        if column is not None:
+            row["column"] = column
+        if visit_count is not None:
+            row["visit_count"] = visit_count
+        if non_ct_count is not None:
+            row["non_ct_count"] = non_ct_count
+        if visit_time is not None:
+            row["visit_time"] = visit_time
+        merged_rows.append(row)
 
     return merged_rows
 
@@ -191,8 +197,17 @@ def merge_all(dst_dir: str) -> int:
     for base, paths in sorted(grouped.items(), key=lambda kv: _natural_key(kv[0])):
         merged_rows = _merge_single_experiment(paths)
         out_path = os.path.join(dst_dir, base)
+
+        if merged_rows:
+            observed = set()
+            for row in merged_rows:
+                observed.update(row.keys())
+            final_columns = [c for c in FINAL_COLUMN_ORDER if c in observed]
+        else:
+            final_columns = ["filename", "line", "non_ct_time", "code", "counterexamples"]
+
         payload = {
-            "columns": FINAL_COLUMNS,
+            "columns": final_columns,
             "data": merged_rows,
         }
         with open(out_path, "w", encoding="utf-8") as f:

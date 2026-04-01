@@ -9,7 +9,19 @@ import sys
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 
-Location = Tuple[str, str, int, int]  # (library, file, line, column)
+Location = Tuple[str, str, int, Optional[int]]  # (library, file, line, column)
+
+
+def _is_true(value) -> bool:
+	if value is True:
+		return True
+	if value is False or value is None:
+		return False
+	if isinstance(value, (int, float)):
+		return value == 1
+	if isinstance(value, str):
+		return value.strip().lower() in {"true", "1", "yes", "y"}
+	return False
 
 
 def _column_and_library_from_json_filename(name: str, run_name: str, sliced_only: bool) -> Optional[Tuple[str, str]]:
@@ -86,6 +98,8 @@ def _load_violations_from_json(path: str, library: str) -> Dict[Location, float]
 	for row in rows:
 		if not isinstance(row, dict):
 			continue
+		if "reproduced" in row and not _is_true(row.get("reproduced")):
+			continue
 		non_ct_time = _to_float(row.get("non_ct_time"))
 		if non_ct_time is None:
 			continue
@@ -100,9 +114,15 @@ def _load_violations_from_json(path: str, library: str) -> Dict[Location, float]
 			continue
 		try:
 			line_i = int(line)
-			col_i = int(column)
 		except (TypeError, ValueError):
 			continue
+
+		col_i: Optional[int]
+		try:
+			col_i = int(column)
+		except (TypeError, ValueError):
+			# Missing/invalid column is treated as wildcard for this line.
+			col_i = None
 		key: Location = (library, filename, line_i, col_i)
 		prev = out.get(key)
 		out[key] = non_ct_time if prev is None else max(prev, non_ct_time)
@@ -163,19 +183,35 @@ def write_csv(
 	by_col: Dict[str, Dict[Location, float]],
 ) -> int:
 	all_locations: Set[Location] = set()
-	for col in ordered_columns:
-		all_locations |= set(by_col.get(col, {}).keys())
+	wildcard_locations: Set[Tuple[str, str, int]] = set()
 
-	rows = sorted(all_locations, key=lambda x: (x[0], x[1], x[2], x[3]))
+	for col in ordered_columns:
+		for library, filename, line, col_i in by_col.get(col, {}).keys():
+			if col_i is None:
+				wildcard_locations.add((library, filename, line))
+			else:
+				all_locations.add((library, filename, line, col_i))
+
+	# If a line has only wildcard entries across all experiments, emit one synthetic row with column 0.
+	concrete_lines = {(lib, file, line) for lib, file, line, _ in all_locations}
+	for lib, file, line in wildcard_locations:
+		if (lib, file, line) not in concrete_lines:
+			all_locations.add((lib, file, line, 0))
+
+	rows = sorted(all_locations, key=lambda x: (x[0], x[1], x[2], x[3] if x[3] is not None else -1))
 
 	os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
 	with open(output_path, "w", newline="", encoding="utf-8") as f:
 		w = csv.writer(f)
 		w.writerow(["library", "file", "line", "column", *ordered_columns])
 		for library, filename, line, col in rows:
-			row_out: List[str] = [library, filename, str(line), str(col)]
+			row_out: List[str] = [library, filename, str(line), str(col if col is not None else "")]
 			for exp in ordered_columns:
-				val = by_col.get(exp, {}).get((library, filename, line, col))
+				exp_map = by_col.get(exp, {})
+				val = exp_map.get((library, filename, line, col))
+				if val is None:
+					# Fallback to wildcard (missing-column) value for same line.
+					val = exp_map.get((library, filename, line, None))
 				row_out.append("" if val is None else f"{val:.2f}")
 			w.writerow(row_out)
 	return len(rows)

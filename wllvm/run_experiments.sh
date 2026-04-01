@@ -6,9 +6,9 @@ merge_json_runner="./merge_json_runs_by_experiment.py"
 merge_results_runner="./merge_results.py"
 num_copies=10
 temp_dir="/datapool/theta-lin-experiments/tmp"
-output="/datapool/theta-lin-experiments/20260316"
-run_time="2h"
-run_time_seconds="7200"
+output="/datapool/theta-lin-experiments/20260331"
+run_time="4h"
+run_time_seconds="14400"
 klee_root="/home/theta-lin/klee/build/bin"
 postprocess_only=false
 
@@ -124,14 +124,32 @@ run_postprocess() {
 	run_tagged "MERGE CSV SLICED" \
 		"$merge_results_runner" "$output" --sliced -o "$output/sliced_merged_results.csv" || return 1
 }
-# launch_run "KLEE CF 4" "wllvm/klee_cf_results" "$output/klee_cf_4" -- wllvm/run_klee_cf.sh "$run_time" --sym-size 4
-# launch_run "KLEE CF 16" "wllvm/klee_cf_results" "$output/klee_cf_16" -- wllvm/run_klee_cf.sh "$run_time" --sym-size 16
-launch_run "KLEE Eager 4" "wllvm/klee_eager_results" "$output/klee_eager_4" -- wllvm/run_klee_eager.sh "$run_time" --sym-size 4
-launch_run "KLEE Eager 16" "wllvm/klee_eager_results" "$output/klee_eager_16" -- wllvm/run_klee_eager.sh "$run_time" --sym-size 16
-# launch_run "Self Comp 4" "wllvm/self_comp_results" "$output/self_comp_4" -- wllvm/run_self_comp.sh --klee-root "$klee_root" --max-time "$run_time" --search dfs --sym-size 4
-# launch_run "Self Comp 16" "wllvm/self_comp_results" "$output/self_comp_16" -- wllvm/run_self_comp.sh --klee-root "$klee_root" --max-time "$run_time" --search dfs --sym-size 16
-# launch_run "Binsec 4" "wllvm/binsec_results" "$output/binsec_4" -- wllvm/run_binsec.sh "$run_time_seconds" --sym-size 4
-# launch_run "Binsec 16" "wllvm/binsec_results" "$output/binsec_16" -- wllvm/run_binsec.sh "$run_time_seconds" --sym-size 16
+
+launch_run "KLEE CF Default 4" "wllvm/klee_cf_results" "$output/klee_cf_default_4" -- wllvm/run_klee_cf.sh "$run_time" --sym-size 4
+launch_run "KLEE CF Default 16" "wllvm/klee_cf_results" "$output/klee_cf_default_16" -- wllvm/run_klee_cf.sh "$run_time" --sym-size 16
+launch_run "KLEE CF DFS 4" "wllvm/klee_cf_results" "$output/klee_cf_dfs_4" -- wllvm/run_klee_cf.sh "$run_time" --sym-size 4 --search dfs
+launch_run "KLEE CF DFS 16" "wllvm/klee_cf_results" "$output/klee_cf_dfs_16" -- wllvm/run_klee_cf.sh "$run_time" --sym-size 16 --search dfs
+launch_run "KLEE CF Rand Path DFS 4" "wllvm/klee_cf_results" "$output/klee_cf_rand_path_dfs_4" -- wllvm/run_klee_cf.sh "$run_time" --sym-size 4 --search random-path,dfs
+launch_run "KLEE CF Rand Path DFS 16" "wllvm/klee_cf_results" "$output/klee_cf_rand_path_dfs_16" -- wllvm/run_klee_cf.sh "$run_time" --sym-size 16 --search random-path,dfs
+
+launch_run "KLEE CF NO CONC 4" "wllvm/klee_cf_results" "$output/klee_cf_no_conc_4" -- wllvm/run_klee_cf.sh "$run_time" --sym-size 4 --concretize-on-solver-timeout false
+
+launch_run "KLEE Eager Default 4" "wllvm/klee_eager_results" "$output/klee_eager_default_4" -- wllvm/run_klee_eager.sh "$run_time" --sym-size 4
+launch_run "KLEE Eager Default 16" "wllvm/klee_eager_results" "$output/klee_eager_default_16" -- wllvm/run_klee_eager.sh "$run_time" --sym-size 16
+launch_run "KLEE Eager DFS 4" "wllvm/klee_eager_results" "$output/klee_eager_dfs_4" -- wllvm/run_klee_eager.sh "$run_time" --sym-size 4 --search dfs
+launch_run "KLEE Eager DFS 16" "wllvm/klee_eager_results" "$output/klee_eager_dfs_16" -- wllvm/run_klee_eager.sh "$run_time" --sym-size 16 --search dfs
+launch_run "KLEE Eager Rand Path DFS 4" "wllvm/klee_eager_results" "$output/klee_eager_rand_path_dfs_4" -- wllvm/run_klee_eager.sh "$run_time" --sym-size 4 --search random-path,dfs
+launch_run "KLEE Eager Rand Path DFS 16" "wllvm/klee_eager_results" "$output/klee_eager_rand_path_dfs_16" -- wllvm/run_klee_eager.sh "$run_time" --sym-size 16 --search random-path,dfs
+
+launch_run "Self Comp Default 4" "wllvm/self_comp_results" "$output/self_comp_default_4" -- wllvm/run_self_comp.sh --klee-root "$klee_root" --max-time "$run_time" --sym-size 4
+launch_run "Self Comp Default 16" "wllvm/self_comp_results" "$output/self_comp_default_16" -- wllvm/run_self_comp.sh --klee-root "$klee_root" --max-time "$run_time" --sym-size 16
+launch_run "Self Comp DFS 4" "wllvm/self_comp_results" "$output/self_comp_dfs_4" -- wllvm/run_self_comp.sh --klee-root "$klee_root" --max-time "$run_time" --search dfs --sym-size 4
+launch_run "Self Comp DFS 16" "wllvm/self_comp_results" "$output/self_comp_dfs_16" -- wllvm/run_self_comp.sh --klee-root "$klee_root" --max-time "$run_time" --search dfs --sym-size 16
+launch_run "Self Comp Rand Path DFS 4" "wllvm/self_comp_results" "$output/self_comp_rand_path_dfs_4" -- wllvm/run_self_comp.sh --klee-root "$klee_root" --max-time "$run_time" --search random-path,dfs --sym-size 4
+launch_run "Self Comp Rand Path DFS 16" "wllvm/self_comp_results" "$output/self_comp_rand_path_dfs_16" -- wllvm/run_self_comp.sh --klee-root "$klee_root" --max-time "$run_time" --search random-path,dfs --sym-size 16
+
+launch_run "Binsec 4" "wllvm/binsec_results" "$output/binsec_4" -- wllvm/run_binsec.sh "$run_time_seconds" --sym-size 4
+launch_run "Binsec 16" "wllvm/binsec_results" "$output/binsec_16" -- wllvm/run_binsec.sh "$run_time_seconds" --sym-size 16
 
 wait_all || exit 1
 
