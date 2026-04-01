@@ -196,7 +196,7 @@ def main(argv: List[str]) -> int:
     p.add_argument(
         "--reproduce-script",
         default=None,
-        help="Path to reproduce_positives.py (defaults to klee-controlflow/scripts/reproduce_positives.py)",
+        help="Path to reproduce_positives.py (defaults to wllvm/reproduce_positives.py)",
     )
     p.add_argument("--reproduce-timeout", type=int, default=180, help="Timeout in seconds per reproduction (default: 180)")
     p.add_argument(
@@ -214,7 +214,7 @@ def main(argv: List[str]) -> int:
     if args.reproduce and not reproduce_script:
         here = os.path.dirname(os.path.abspath(__file__))
         repo_root = os.path.normpath(os.path.join(here, ".."))
-        reproduce_script = os.path.join(repo_root, "klee-controlflow", "scripts", "reproduce_positives.py")
+        reproduce_script = os.path.join(repo_root, "wllvm", "reproduce_positives.py")
 
     if args.reproduce:
         if not args.replay_executable:

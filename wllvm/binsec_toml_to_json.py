@@ -16,12 +16,12 @@ except Exception:  # pragma: no cover
     tomllib = None  # type: ignore
 
 
-# Try to import addrinfo.py from klee-controlflow (preferred)
+# Import addrinfo.py from wllvm utilities.
 _ADDRINFO_IMPORT_ERROR: Optional[str] = None
 try:
     _HERE = os.path.dirname(os.path.abspath(__file__))
     _REPO_ROOT = os.path.normpath(os.path.join(_HERE, ".."))
-    _ADDRINFO_DIR = os.path.join(_REPO_ROOT, "klee-controlflow", "scripts")
+    _ADDRINFO_DIR = os.path.join(_REPO_ROOT, "wllvm")
     if os.path.isdir(_ADDRINFO_DIR):
         sys.path.insert(0, _ADDRINFO_DIR)
     from addrinfo import get_addr_info  # type: ignore
@@ -485,7 +485,7 @@ def main(argv: List[str]) -> int:
     p.add_argument(
         "--reproduce-script",
         default=None,
-        help="Path to reproduce_positives.py (defaults to klee-controlflow/scripts/reproduce_positives.py).",
+        help="Path to reproduce_positives.py (defaults to wllvm/reproduce_positives.py).",
     )
     p.add_argument(
         "--reproduce-timeout",
@@ -527,7 +527,7 @@ def main(argv: List[str]) -> int:
 
     reproduce_script = args.reproduce_script
     if args.reproduce and reproduce_script is None:
-        reproduce_script = os.path.join(_REPO_ROOT, "klee-controlflow", "scripts", "reproduce_positives.py")
+        reproduce_script = os.path.join(_REPO_ROOT, "wllvm", "reproduce_positives.py")
 
     if args.reproduce:
         if not reproduce_script or not os.path.isfile(reproduce_script):

@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 bin_path=$(realpath ../klee-controlflow/build/bin)
-script_path=$(realpath ../klee-controlflow/scripts)
+script_path=$(realpath .)
 export PATH="$bin_path:$script_path:$PATH"
 
 # set virtual memory limit to 70GB to prevent excessive memory usage
@@ -32,7 +32,7 @@ Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <durat
   --kill-after <duration>  - optional, default: 1800s
   --max-memory <n>         - optional, default: 10000 (MB KLEE state cap)
   --mod-exp-only           - optional, default: false
-  --search <strategies>    - optional, default: random-path,nurs:covnew,nurs:depth (comma-separated)
+  --search <strategies>    - optional, default: random-path,nurs:covnew (comma-separated)
   --concretize-on-solver-timeout <bool> - optional, default: true
   --solver-backend <name>  - optional, default: stp (stp|metasmt|dummy|z3)
   --optimize-array <value> - optional, default: false (false|all|index|value)
@@ -203,12 +203,10 @@ run_case() {
     compare_with_ctchecker.py branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" "$@" $replay_opts
     reproduce_positives.py --json "$results_dir/${result_name}_branch.json" --klee-output "$results_dir/$result_name" --executable "$replay_script" $replay_opts --output "$results_dir/${result_name}_branch.json"
     # make_report.py "$results_dir/${result_name}_branch.json" "$results_dir/${result_name}_branch_report.html"
-    # make_plot.py "$results_dir/${result_name}_branch.json" "$title (Branch)" "$results_dir/${result_name}_branch_plot.png"
 
     if [[ "$memory_flag" == "true" ]]; then
         compare_with_ctchecker.py memory "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_memory.json" --code-path "$code_path" "$@"
         # make_report.py "$results_dir/${result_name}_memory.json" "$results_dir/${result_name}_memory_report.html"
-        # make_plot.py "$results_dir/${result_name}_memory.json" "$title" "$results_dir/${result_name}_memory_plot.png"
     fi
 }
 

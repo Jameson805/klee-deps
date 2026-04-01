@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 bin_path=$(realpath ../klee-controlflow/build/bin)
-script_path=$(realpath ../klee-controlflow/scripts)
+script_path=$(realpath .)
 export PATH="$bin_path:$script_path:$PATH"
 
 # set virtual memory limit to 70GB to prevent excessive memory usage
