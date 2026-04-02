@@ -1,0 +1,70 @@
+array exp_1[4] : w32 -> w8 = symbolic
+array exp_2[4] : w32 -> w8 = symbolic
+(query [(Eq 0
+             (Or w64 (Or w64 (Or w64 (Shl w64 N0:(Concat w64 (Read w8 3 exp_1)
+                                                             (Concat w56 (Read w8 2 exp_1)
+                                                                         (Concat w48 (Read w8 1 exp_1)
+                                                                                     (Concat w40 (Read w8 0 exp_1) (w32 0)))))
+                                              56)
+                                     (And w64 (Shl w64 N0 40) 71776119061217280))
+                             (Or w64 (And w64 (Shl w64 N0 24) 280375465082880)
+                                     (And w64 (Shl w64 N0 8) 1095216660480)))
+                     (Or w64 (Or w64 (And w64 (LShr w64 N0 8) 4278190080)
+                                     (And w64 (LShr w64 N0 24) 16711680))
+                             (Or w64 (And w64 (LShr w64 N0 40) 65280)
+                                     (LShr w64 N0 56)))))
+         (Eq false
+             (Eq 0
+                 N1:(Or w64 (Or w64 (Or w64 (Shl w64 N2:(Concat w64 (Read w8 3 exp_2)
+                                                                    (Concat w56 (Read w8 2 exp_2)
+                                                                                (Concat w48 (Read w8 1 exp_2)
+                                                                                            (Concat w40 (Read w8 0 exp_2) (w32 0)))))
+                                                     56)
+                                            (And w64 (Shl w64 N2 40) 71776119061217280))
+                                    (Or w64 (And w64 (Shl w64 N2 24) 280375465082880)
+                                            (And w64 (Shl w64 N2 8) 1095216660480)))
+                            (Or w64 (Or w64 (And w64 (LShr w64 N2 8) 4278190080)
+                                            (And w64 (LShr w64 N2 24) 16711680))
+                                    (Or w64 (And w64 (LShr w64 N2 40) 65280)
+                                            (LShr w64 N2 56))))))
+         (Eq 0 (And w64 N1 2147483648))
+         (Eq 0 (And w64 N1 1073741824))
+         (Eq 0 (And w64 N1 536870912))
+         (Eq 0 (And w64 N1 268435456))
+         (Eq 0 (And w64 N1 134217728))
+         (Eq 0 (And w64 N1 67108864))
+         (Eq 0 (And w64 N1 33554432))
+         (Eq 0 (And w64 N1 16777216))
+         (Eq 0 (And w64 N1 8388608))
+         (Eq 0 (And w64 N1 4194304))
+         (Eq 0 (And w64 N1 2097152))
+         (Eq 0 (And w64 N1 1048576))
+         (Eq 0 (And w64 N1 524288))
+         (Eq 0 (And w64 N1 262144))
+         (Eq 0 (And w64 N1 131072))
+         (Eq 0 (And w64 N1 65536))
+         (Eq 0 (And w64 N1 32768))
+         (Eq 0 (And w64 N1 16384))
+         (Eq 0 (And w64 N1 8192))
+         (Eq 0 (And w64 N1 4096))
+         (Eq 0 (And w64 N1 2048))
+         (Eq 0 (And w64 N1 1024))
+         (Eq 0 (And w64 N1 512))
+         (Eq 0 (And w64 N1 256))
+         (Eq 0 (And w64 N1 128))
+         (Eq 0 (And w64 N1 64))
+         (Eq 0 (And w64 N1 32))
+         (Eq false
+             (Eq 0 (And w64 N1 16)))
+         (Eq 0
+             (And w64 (LShr w64 N1 3) 1))
+         (Eq false
+             (Eq 0
+                 (And w64 (LShr w64 N1 2) 1)))
+         (Eq false
+             (Eq 0
+                 (And w64 (LShr w64 N1 1) 1)))
+         (Eq false
+             (Eq 0
+                 (And w64 (LShr w64 N1 0) 1)))]
+        false)

@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "filename": "library/bignum.c",
+      "line": 2124,
+      "column": 21,
+      "non_ct_time": 17.0,
+      "code": "        if( ei == 0 && state == 0 )"
+    }
+  ],
+  "dtypes": {
+    "filename": "object",
+    "line": "Int64",
+    "column": "Int64",
+    "non_ct_time": "float64",
+    "code": "object"
+  }
+}

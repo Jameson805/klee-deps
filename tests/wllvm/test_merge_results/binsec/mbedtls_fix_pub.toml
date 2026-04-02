@@ -1,0 +1,43 @@
+["CT report"."Insecurity models".0x804aaaa.public]
+ebp = ["0x3ae2ebf1"]
+edi = ["0x3e41d0a4"]
+edx = ["0x36d48a39"]
+esi = ["0x0489219e"]
+["CT report"."Insecurity models".0x804aaaa.secret1]
+exp_buf = ["0x2a66dd20"]
+["CT report"."Insecurity models".0x804aaaa.secret2]
+exp_buf = ["0xffffffff"]
+["CT report"."Insecurity models".0x804c22e.public]
+ebp = ["0x3ae2ebf1"]
+edi = ["0x3e41d0a4"]
+edx = ["0x36d48a39"]
+esi = ["0x0489219e"]
+["CT report"."Insecurity models".0x804c22e.secret1]
+exp_buf = ["0x2a66dd20"]
+["CT report"."Insecurity models".0x804c22e.secret2]
+exp_buf = ["0x00000000"]
+["CT report"."Instructions status"]
+insecure = ["0x804aaaa", "0x804c22e"]
+unknown = []
+[Exploration]
+instructions = 43854315
+max_depth = 43854315
+unique_insts = 3187
+[Exploration.paths]
+pending = 4
+total = 4
+[Exploration.paths.completed]
+assertion_failure = 0
+cut = 0
+halt = 0
+unsatisfiable_assumption = 0
+[Exploration.paths.discontinued]
+enumeration_limit = 0
+error = 0
+max_depth = 0
+non_executable_code = 0
+unresolved_formula = 0
+[Exploration.topology]
+assertions = 0
+branches = 4651179
+jumps = 775126

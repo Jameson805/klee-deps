@@ -1,0 +1,23 @@
+klee --libc=uclibc --posix-runtime --external-calls=all --kdalloc --kdalloc-constants-size=5 --kdalloc-globals-size=5 --kdalloc-heap-size=20 --kdalloc-stack-size=10 --dump-states-on-halt=false --use-batching-search=false --search=random-path --search=nurs:covnew --concretize-on-solver-timeout=true --max-solver-time=30s --max-memory=10000 mbedtls-3.2.1/klee_fix_pub.bc
+PID: 508247
+Using monotonic steady clock with 1/1000000000s resolution
+Started: 2026-02-23 05:32:20
+BEGIN searcher description
+<InterleavedSearcher> containing 2 searchers:
+RandomPathSearcher
+WeightedRandomSearcher::CoveringNew
+</InterleavedSearcher>
+END searcher description
+Finished: 2026-02-23 05:32:29
+Elapsed: 00:00:09
+KLEE: done: explored paths = 77
+KLEE: done: avg. constructs per query = 438
+KLEE: done: total queries = 379
+KLEE: done: valid queries = 200
+KLEE: done: invalid queries = 179
+KLEE: done: query cex = 379
+
+KLEE: done: total instructions = 467835
+KLEE: done: completed paths = 1
+KLEE: done: partially completed paths = 76
+KLEE: done: generated tests = 1

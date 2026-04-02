@@ -1,0 +1,10 @@
+Error: ASSERTION FAIL: 0 && "non-CT branch"
+File: ../include/common.h
+Line: 199
+assembly.ll line: 9590
+State: 35
+Stack: 
+	#000009590 in __klee_posix_wrapped_main(1, 127292741255168) at ../include/common.h:199
+	#100007224 in __user_main(1, 127316095139840, 127316095139856) at runtime/POSIX/klee_init_env.c:244
+	#200000707 in __uClibc_main(127308172099584, 1, 127316095139840, 0, 0, 0, 0) at libc/misc/internals/__uClibc_main.c:401
+	#300000872 in main(1, 127316095139840)

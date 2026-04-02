@@ -1,0 +1,6 @@
+KLEE: WARNING ONCE: calling external: syscall(16, 0, 21505, 140280581849088) at runtime/POSIX/fd.c:997 10
+KLEE: WARNING ONCE: Alignment of memory from call "malloc" is not modelled. Using alignment of 8.
+KLEE: WARNING ONCE: calling __klee_posix_wrapped_main with extra arguments.
+KLEE: WARNING ONCE: Alignment of memory from call "calloc" is not modelled. Using alignment of 8.
+KLEE: WARNING: STP timed out
+KLEE: WARNING: STP timed out

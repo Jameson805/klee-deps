@@ -1,0 +1,4 @@
+library,file,line,column,binsec_fix_pub,binsec_var_pub,klee_cf_fix_pub,self_comp_fix_pub,self_comp_var_pub
+mbedtls,library/bignum.c,365,13,0.14,,0.64,,
+mbedtls,library/bignum.c,1077,13,0.09,,0.06,,
+mbedtls,library/bignum.c,2124,21,,,3.86,17.00,

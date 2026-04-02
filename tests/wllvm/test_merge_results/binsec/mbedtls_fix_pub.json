@@ -1,0 +1,37 @@
+{
+  "data": [
+    {
+      "filename": "library/bignum.c",
+      "line": 365,
+      "column": 13,
+      "non_ct_time": 0.143,
+      "code": "        if( x & mask ) break;",
+      "counterexamples": {
+        "exp": 711384352,
+        "exp__prime": 4294967295
+      },
+      "reproduced": true
+    },
+    {
+      "filename": "library/bignum.c",
+      "line": 1077,
+      "column": 13,
+      "non_ct_time": 0.089,
+      "code": "        if( X->p[i - 1] != 0 )",
+      "counterexamples": {
+        "exp": 711384352,
+        "exp__prime": 0
+      },
+      "reproduced": true
+    }
+  ],
+  "dtypes": {
+    "filename": "object",
+    "line": "Int64",
+    "column": "Int64",
+    "non_ct_time": "float64",
+    "code": "object",
+    "counterexamples": "object",
+    "reproduced": "object"
+  }
+}

@@ -1,0 +1,20 @@
+/home/theta-lin/klee/build/bin/klee --libc=uclibc --posix-runtime --external-calls=all --kdalloc --kdalloc-constants-size=5 --kdalloc-globals-size=5 --kdalloc-heap-size=20 --kdalloc-stack-size=10 --dump-states-on-halt=false --use-batching-search=false --search=dfs --max-solver-time=30s --max-memory=10000 --emit-all-errors=true mbedtls-3.2.1/self_comp_fix_pub.bc
+PID: 3003322
+Using monotonic steady clock with 1/1000000000s resolution
+Started: 2026-03-16 13:18:07
+BEGIN searcher description
+DFSSearcher
+END searcher description
+Finished: 2026-03-16 13:19:06
+Elapsed: 00:00:59
+KLEE: done: explored paths = 118
+KLEE: done: avg. constructs per query = 1261
+KLEE: done: total queries = 578
+KLEE: done: valid queries = 460
+KLEE: done: invalid queries = 118
+KLEE: done: query cex = 578
+
+KLEE: done: total instructions = 94415926
+KLEE: done: completed paths = 1
+KLEE: done: partially completed paths = 117
+KLEE: done: generated tests = 88

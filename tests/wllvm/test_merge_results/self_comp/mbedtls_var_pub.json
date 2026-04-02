@@ -1,0 +1,10 @@
+{
+  "data": [],
+  "dtypes": {
+    "filename": "object",
+    "line": "Int64",
+    "column": "Int64",
+    "non_ct_time": "float64",
+    "code": "object"
+  }
+}
