@@ -10,6 +10,7 @@ import sys
 import shutil
 
 from tools.shared.common import save_combined_json
+from tools.shared.result_schema import STATUS_NOT_REPRODUCED, get_source_line
 
 parser = argparse.ArgumentParser(description="Join CtChecker and KLEE output and save combined data to JSON.")
 parser.add_argument("ct_type", choices=["branch", "memory"], help="Type of constant-time check: 'branch' or 'memory'")
@@ -31,6 +32,12 @@ parser.add_argument(
 )
 parser.add_argument("--secret", default="", help="Comma-separated list of secret variable names (e.g., key)")
 parser.add_argument("--public", default="", help="Comma-separated list of public variable names (e.g., length,nonce)")
+parser.add_argument(
+    "--library",
+    required=True,
+    choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "unknown"],
+    help="Library identifier for this dataset.",
+)
 args = parser.parse_args()
 
 def parse_list(s: str):
@@ -52,7 +59,7 @@ def load_ctchecker(ct_type, path, prefix=""):
 
 df_ctchecker = load_ctchecker(args.ct_type, args.ctchecker_output, args.ctchecker_prefix)
 
-def load_preaggregated_from_messages(path, tag, code_path_prefix=""):
+def load_preaggregated_from_messages(path, tag):
     """
     Parse KLEE messages.txt entries tagged as [tag] that already contain aggregated data.
     Each entry is expected to carry visit/non-constant-time counters and timing information.
@@ -114,9 +121,9 @@ def load_preaggregated_from_messages(path, tag, code_path_prefix=""):
 
 # Build df_klee from messages.txt based on ct_type
 if args.ct_type == "branch":
-    df_klee = load_preaggregated_from_messages(os.path.join(args.klee_output, "messages.txt"), "BRANCH", args.code_path)
+    df_klee = load_preaggregated_from_messages(os.path.join(args.klee_output, "messages.txt"), "BRANCH")
 else:
-    df_klee = load_preaggregated_from_messages(os.path.join(args.klee_output, "messages.txt"), "MEMORY", args.code_path)
+    df_klee = load_preaggregated_from_messages(os.path.join(args.klee_output, "messages.txt"), "MEMORY")
 
 # Optionally filter and normalize KLEE filenames by a source prefix
 if args.src_prefix:
@@ -181,21 +188,24 @@ df_klee_only["in_ctchecker"] = False
 
 df = pd.concat([df_joined, df_klee_only], ignore_index=True)
 
-def get_code(code_path, filenames, lines):
-    def get_line(filename, line_number):
-        try:
-            with open(filename, "r") as f:
-                for current, line in enumerate(f, start=1):
-                    if current == line_number:
-                        return line.rstrip("\n")
-            return None
-        except (FileNotFoundError, IOError):
-            return None
-
-    return [get_line(os.path.join(code_path, f), l) for f, l in zip(filenames, lines)]
-
 if args.code_path:
-    df["code"] = get_code(args.code_path, df["filename"], df["line"])
+    code_root = os.path.abspath(args.code_path)
+
+    def _lookup_code(row):
+        filename = row.get("filename")
+        line_no = row.get("line")
+        if not isinstance(filename, str):
+            return None
+        if isinstance(line_no, (np.integer, int)) and not isinstance(line_no, bool):
+            line_i = int(line_no)
+        else:
+            return None
+        library = row.get("library")
+        if not isinstance(library, str) or not library.strip():
+            library = args.library
+        return get_source_line(library, os.path.join(code_root, filename), line_i)
+
+    df["code"] = df.apply(_lookup_code, axis=1)
 
 if args.lines:
     line_range = args.lines.split(":")
@@ -296,6 +306,27 @@ publics = parse_list(args.public)
 
 if secrets or publics:
     df = extract_counterexamples(df, args, secrets, publics)
+
+# Enforce unified row contract mandatory keys.
+if "counterexamples" not in df.columns:
+    df["counterexamples"] = [dict() for _ in range(len(df))]
+else:
+    df["counterexamples"] = df["counterexamples"].apply(lambda v: v if isinstance(v, dict) else {})
+
+if "reproduced_status" not in df.columns:
+    df["reproduced_status"] = STATUS_NOT_REPRODUCED
+else:
+    df["reproduced_status"] = df["reproduced_status"].apply(
+        lambda v: v if isinstance(v, str) and v.strip() else STATUS_NOT_REPRODUCED
+    )
+
+default_library = args.library
+if "library" not in df.columns:
+    df["library"] = default_library
+else:
+    df["library"] = df["library"].apply(
+        lambda v: v if isinstance(v, str) and v.strip() else default_library
+    )
 
 out_dir = os.path.dirname(args.output_path)
 if out_dir:

@@ -10,7 +10,7 @@
         "exp": 711384352,
         "exp__prime": 4294967295
       },
-      "reproduced": true
+      "reproduced_status": "success"
     },
     {
       "filename": "library/bignum.c",
@@ -22,7 +22,7 @@
         "exp": 711384352,
         "exp__prime": 0
       },
-      "reproduced": true
+      "reproduced_status": "success"
     }
   ],
   "dtypes": {
@@ -32,6 +32,6 @@
     "non_ct_time": "float64",
     "code": "object",
     "counterexamples": "object",
-    "reproduced": "object"
+    "reproduced_status": "object"
   }
 }

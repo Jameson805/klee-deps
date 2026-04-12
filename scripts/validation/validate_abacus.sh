@@ -5,6 +5,11 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$repo_root"
 
+if ! command -v python >/dev/null 2>&1; then
+    echo "python not found in PATH" >&2
+    exit 1
+fi
+
 results_dir="results/abacus_results"
 output_dir=""
 timeout=300
@@ -20,7 +25,7 @@ Options:
     --output-dir DIR         Output directory for validated JSON files (default: <results-dir>, in-place overwrite)
   --sym-size N             Override sym size instead of reading it from each JSON file
   --timeout N              Replay timeout in seconds (default: 300)
-    --reproduce-script PATH  Path to reproduce_positives.py (legacy override)
+        --reproduce-module NAME  Python module to run for reproduction (default: tools.postprocess.reproduce_positives)
   -h, --help               Show this help
 
 Notes:
@@ -67,15 +72,13 @@ while [[ $# -gt 0 ]]; do
             timeout="${1#--timeout=}"
             shift
             ;;
-        --reproduce-script)
-            [[ $# -lt 2 ]] && echo "Missing value for --reproduce-script" >&2 && exit 1
-            reproduce_module=""
-            reproduce_script="$2"
+        --reproduce-module)
+            [[ $# -lt 2 ]] && echo "Missing value for --reproduce-module" >&2 && exit 1
+            reproduce_module="$2"
             shift 2
             ;;
-        --reproduce-script=*)
-            reproduce_module=""
-            reproduce_script="${1#--reproduce-script=}"
+        --reproduce-module=*)
+            reproduce_module="${1#--reproduce-module=}"
             shift
             ;;
         -h|--help)
@@ -99,16 +102,9 @@ if [[ ! -d "$results_dir" ]]; then
     exit 1
 fi
 
-if [[ -n "${reproduce_module:-}" ]]; then
-    if ! python3 -c "import ${reproduce_module}" >/dev/null 2>&1; then
-        echo "reproduce module not importable: $reproduce_module" >&2
-        exit 1
-    fi
-else
-    if [[ ! -f "$reproduce_script" ]]; then
-        echo "reproduce script not found: $reproduce_script" >&2
-        exit 1
-    fi
+if ! python -c "import ${reproduce_module}" >/dev/null 2>&1; then
+    echo "reproduce module not importable: $reproduce_module" >&2
+    exit 1
 fi
 
 if ! [[ "$timeout" =~ ^[0-9]+$ ]]; then
@@ -170,7 +166,7 @@ resolve_build_script() {
 
 read_sym_size() {
     local json_file="$1"
-    python3 - "$json_file" <<'PY'
+    python - "$json_file" <<'PY'
 import json
 import sys
 
@@ -186,7 +182,7 @@ PY
 
 json_has_counterexamples() {
     local json_file="$1"
-    python3 - "$json_file" <<'PY'
+    python - "$json_file" <<'PY'
 import json
 import sys
 
@@ -268,21 +264,12 @@ for json_file in "${json_files[@]}"; do
     fi
 
     echo "Validating $json_name with $replay_exe"
-    if [[ -n "${reproduce_module:-}" ]]; then
-        python3 -m "$reproduce_module" \
-            --abacus-json "$json_file" \
-            --output "$output_json" \
-            --executable "$replay_exe" \
-            --sym-size "$sym_size" \
-            --timeout "$timeout"
-    else
-        python3 "$reproduce_script" \
-            --abacus-json "$json_file" \
-            --output "$output_json" \
-            --executable "$replay_exe" \
-            --sym-size "$sym_size" \
-            --timeout "$timeout"
-    fi
+    python -m "$reproduce_module" \
+        --abacus-json "$json_file" \
+        --output "$output_json" \
+        --executable "$replay_exe" \
+        --sym-size "$sym_size" \
+        --timeout "$timeout"
 done
 
 echo "Validated Abacus outputs written to $output_dir"

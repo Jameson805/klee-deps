@@ -3,6 +3,10 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$repo_root"
+if ! command -v python >/dev/null 2>&1; then
+    echo "Error: python not found in PATH" >&2
+    exit 1
+fi
 bin_path="$repo_root/klee-eager/build/bin"
 export PATH="$bin_path:$PATH"
 
@@ -21,10 +25,13 @@ search_strategies="random-path,nurs:covnew"
 product_program_fallback="false"
 solver_backend="stp"
 optimize_array="false"
+benchmarks_csv=""
+default_benchmarks=(mbedtls libgcrypt openssl)
+selected_benchmarks=("${default_benchmarks[@]}")
 
 usage() {
     cat <<EOF
-Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <duration>] [--kill-after <duration>] [--max-memory <n>] [--mod-exp-only] [--search <strategies>] [--solver-backend <stp|metasmt|dummy|z3>] [--optimize-array <false|all|index|value>] <max_time>
+Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <duration>] [--kill-after <duration>] [--max-memory <n>] [--mod-exp-only] [--search <strategies>] [--solver-backend <stp|metasmt|dummy|z3>] [--optimize-array <false|all|index|value>] [--benchmarks <list>] <max_time>
 
   <max_time>               - required, e.g. 1h, 30m, 600s
   --sym-size <n>           - optional, default: 4 (size in bytes for bignum symbols)
@@ -37,6 +44,9 @@ Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <durat
   --product-program-fallback - optional, default: false (enables Executor::bindLocal fallback repair)
   --solver-backend <name>  - optional, default: stp (stp|metasmt|dummy|z3)
   --optimize-array <value> - optional, default: false (false|all|index|value)
+  --benchmarks <list>      - optional, comma-separated benchmark groups to run
+    valid: mbedtls,libgcrypt,openssl
+  default: all valid groups
 EOF
     exit 1
 }
@@ -64,6 +74,8 @@ while [[ $# -gt 0 ]]; do
             solver_backend="$2"; shift 2;;
         --optimize-array)
             optimize_array="$2"; shift 2;;
+        --benchmarks)
+            benchmarks_csv="$2"; shift 2;;
         --)
             shift; break;;
         -*)
@@ -100,6 +112,28 @@ if [[ "$product_program_fallback" != "true" && "$product_program_fallback" != "f
     exit 1
 fi
 
+if [[ -n "$benchmarks_csv" ]]; then
+    IFS=',' read -ra requested_benchmarks <<< "$benchmarks_csv"
+    selected_benchmarks=()
+    for raw in "${requested_benchmarks[@]}"; do
+        bench="${raw//[[:space:]]/}"
+        [[ -z "$bench" ]] && continue
+        case "$bench" in
+            mbedtls|libgcrypt|openssl)
+                selected_benchmarks+=("$bench")
+                ;;
+            *)
+                echo "Error: unknown benchmark '$bench' for --benchmarks" >&2
+                exit 1
+                ;;
+        esac
+    done
+    if [[ "${#selected_benchmarks[@]}" -eq 0 ]]; then
+        echo "Error: --benchmarks provided but no valid benchmark names were parsed" >&2
+        exit 1
+    fi
+fi
+
 case "$solver_backend" in
     stp|metasmt|dummy|z3) ;;
     *)
@@ -134,6 +168,7 @@ echo "search_strategies=$search_strategies"
 echo "product_program_fallback=$product_program_fallback"
 echo "solver_backend=$solver_backend"
 echo "optimize_array=$optimize_array"
+echo "benchmarks=$(IFS=','; echo "${selected_benchmarks[*]}")"
 echo "##########"
 
 klee_timeout() {
@@ -176,6 +211,24 @@ limit_loop() {
         $@
 }
 
+library_for_path() {
+    local path="$1"
+    case "$path" in
+        *mbedtls-3.2.1*)
+            echo "mbedtls"
+            ;;
+        *libgcrypt-and-libgpg-error*)
+            echo "libgcrypt"
+            ;;
+        *openssl-1.1.1q*)
+            echo "openssl"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
 run_case() {
     local title="$1"          # e.g. "Mbed TLS 3.2.1 (Fix Pub)"
     local bc="$2"             # e.g. benchmarks/mbedtls-3.2.1/klee_fix_pub.bc
@@ -194,6 +247,12 @@ run_case() {
 
     local bc_dir
     bc_dir=$(dirname "$bc")
+    local library
+    library="$(library_for_path "$bc")"
+    if [[ -z "$library" ]]; then
+        echo "Error: cannot infer library from path '$bc'" >&2
+        exit 2
+    fi
 
     echo "========="
     echo "$title"
@@ -205,12 +264,12 @@ run_case() {
     rm -f "$bc_dir/klee-last"
     rm -rf "$bc_dir/klee-out-"*
 
-    python3 -m tools.postprocess.compare_with_ctchecker branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" "$@" $replay_opts
-    python3 -m tools.postprocess.reproduce_positives --json "$results_dir/${result_name}_branch.json" --klee-output "$results_dir/$result_name" --executable "$replay_script" $replay_opts --output "$results_dir/${result_name}_branch.json"
+    python -m tools.postprocess.compare_with_ctchecker branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" --library "$library" "$@" $replay_opts
+    python -m tools.postprocess.reproduce_positives --json "$results_dir/${result_name}_branch.json" --klee-output "$results_dir/$result_name" --executable "$replay_script" --library "$library" $replay_opts --output "$results_dir/${result_name}_branch.json"
     # make_report.py "$results_dir/${result_name}_branch.json" "$results_dir/${result_name}_branch_report.html"
 
     if [[ "$memory_flag" == "true" ]]; then
-        python3 -m tools.postprocess.compare_with_ctchecker memory "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_memory.json" --code-path "$code_path" "$@"
+        python -m tools.postprocess.compare_with_ctchecker memory "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_memory.json" --code-path "$code_path" --library "$library" "$@"
         # make_report.py "$results_dir/${result_name}_memory.json" "$results_dir/${result_name}_memory_report.html"
     fi
 }
@@ -424,8 +483,16 @@ run_openssl() {
     run_openssl_algo mont_word false 1138:1283
 }
 
-run_mbedtls
-# run_mbedtls_sliced
-run_libgcrypt
-# run_libgcrypt_sliced
-run_openssl
+for benchmark in "${selected_benchmarks[@]}"; do
+    case "$benchmark" in
+        mbedtls)
+            run_mbedtls
+            ;;
+        libgcrypt)
+            run_libgcrypt
+            ;;
+        openssl)
+            run_openssl
+            ;;
+    esac
+done

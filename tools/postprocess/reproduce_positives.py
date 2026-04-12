@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
 
-import argparse
 import os
-import subprocess
 import sys
+
+import argparse
+from importlib.resources import files
+import subprocess
 from typing import List, Optional, Tuple, Dict
 import shutil
 import tempfile  # new
 from tools.utilities.addrinfo import get_addr_info
-
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
+from tools.shared.result_schema import (
+    STATUS_IDENTICAL_TRACE,
+    STATUS_LOCATION_MISMATCH,
+    STATUS_NOT_REPRODUCED,
+    STATUS_SUCCESS,
+    STATUS_TIMEOUT,
+)
 
 def resolve_trace_script() -> str:
-    """Resolve trace.gdb from its canonical location in the repo."""
-    repo_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
-    path = os.path.join(repo_root, "scripts", "validation", "trace.gdb")
-    if os.path.isfile(path):
-        return path
-    raise FileNotFoundError(f"trace.gdb not found at expected path: {path}")
+    """Resolve the packaged gdb trace script."""
+    path = files("tools.postprocess").joinpath("trace.gdb")
+    if path.is_file():
+        return str(path)
+    raise FileNotFoundError("trace.gdb not found in tools.postprocess package resources")
 
 
 def parse_list(s: str) -> List[str]:
@@ -163,7 +168,16 @@ def run_traces(executable: str, ktest_file: str, secrets: List[str], publics: Li
     return trace_a, trace_b
 
 
-def mode_dataframe(input_json: str, klee_output: str, executable: str, secret: str, public: str, timeout: int, output: Optional[str]) -> None:
+def mode_dataframe(
+    input_json: str,
+    klee_output: str,
+    executable: str,
+    secret: str,
+    public: str,
+    timeout: int,
+    output: Optional[str],
+    library: str,
+) -> None:
     """Original mode: iterate rows from a combined JSON and attempt reproduction."""
     # Lazy imports so --input mode does not require pandas.
     import pandas as pd  # type: ignore
@@ -175,7 +189,19 @@ def mode_dataframe(input_json: str, klee_output: str, executable: str, secret: s
     publics = parse_list(public)
 
     df = load_combined_json(input_json)
-    df["reproduced"] = pd.NA
+    if "reproduced" in df.columns:
+        df = df.drop(columns=["reproduced"])
+    if "counterexamples" not in df.columns:
+        df["counterexamples"] = [dict() for _ in range(len(df.index))]
+    else:
+        df["counterexamples"] = df["counterexamples"].apply(lambda v: v if isinstance(v, dict) else {})
+
+    if "library" not in df.columns:
+        df["library"] = library
+    else:
+        df["library"] = df["library"].apply(lambda v: v if isinstance(v, str) and v.strip() else library)
+
+    df["reproduced_status"] = STATUS_NOT_REPRODUCED
 
     for idx, row in df[df["non_ct_count"] > 0].iterrows():
         filename = f"branch_counterexample_{row['inst_id']}.ktest"
@@ -191,7 +217,7 @@ def mode_dataframe(input_json: str, klee_output: str, executable: str, secret: s
             trace_a, trace_b = run_traces(executable, ktest_file, secrets, publics, timeout)
         except subprocess.TimeoutExpired:
             print("Timeout")
-            df.at[idx, "reproduced"] = False
+            df.at[idx, "reproduced_status"] = STATUS_TIMEOUT
             continue
 
         analysis = analyze_traces(trace_a, trace_b)
@@ -199,7 +225,7 @@ def mode_dataframe(input_json: str, klee_output: str, executable: str, secret: s
         pos = analysis["first_diff_index"]
         if prev_addr is None:
             print("Failed with identical traces")
-            df.at[idx, "reproduced"] = False
+            df.at[idx, "reproduced_status"] = STATUS_IDENTICAL_TRACE
             continue
 
         info = get_addr_info(executable, prev_addr)
@@ -207,16 +233,16 @@ def mode_dataframe(input_json: str, klee_output: str, executable: str, secret: s
             print(f"Failed at 0x{prev_addr:x}, ", end="")
             start_idx = (pos - 1) if (pos is not None and pos > 0) else 0
             print_nearest_debug_info(executable, trace_a, start_idx)
-            df.at[idx, "reproduced"] = False
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
         else:
             f, l, c = info
             # NOTE: only compare basenames to avoid issues with different paths
             if os.path.basename(row["filename"]) == os.path.basename(f) and row["line"] == l and row["column"] == c:
                 print("Success")
-                df.at[idx, "reproduced"] = True
+                df.at[idx, "reproduced_status"] = STATUS_SUCCESS
             else:
                 print(f"Failed at 0x{prev_addr:x} -> {f}:{l}:{c}")
-                df.at[idx, "reproduced"] = False
+                df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
 
     if output:
         save_combined_json(df, output)
@@ -413,7 +439,14 @@ def mode_input_values(
         return 0
 
 
-def mode_abacus_json(input_json: str, executable: str, sym_size: int, timeout: int, output: Optional[str]) -> int:
+def mode_abacus_json(
+    input_json: str,
+    executable: str,
+    sym_size: int,
+    timeout: int,
+    output: Optional[str],
+    library: str,
+) -> int:
     """Batch reproduction for Abacus-style JSON rows containing counterexamples dicts."""
     import pandas as pd  # type: ignore
     from tools.shared.common import load_combined_json, save_combined_json  # type: ignore
@@ -426,19 +459,31 @@ def mode_abacus_json(input_json: str, executable: str, sym_size: int, timeout: i
         print("Error: counterexamples column missing in input JSON", file=sys.stderr)
         return 2
 
-    if "reproduced" not in df.columns:
-        df["reproduced"] = pd.NA
+    if "reproduced" in df.columns:
+        df = df.drop(columns=["reproduced"])
+
+    if "counterexamples" not in df.columns:
+        df["counterexamples"] = [dict() for _ in range(len(df.index))]
+    else:
+        df["counterexamples"] = df["counterexamples"].apply(lambda v: v if isinstance(v, dict) else {})
+
+    if "library" not in df.columns:
+        df["library"] = library
+    else:
+        df["library"] = df["library"].apply(lambda v: v if isinstance(v, str) and v.strip() else library)
+
+    df["reproduced_status"] = STATUS_NOT_REPRODUCED
 
     for idx, row in df.iterrows():
         cex = row.get("counterexamples")
         if not isinstance(cex, dict):
-            df.at[idx, "reproduced"] = False
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
             continue
 
         exp = cex.get("exp")
         exp_prime = cex.get("exp__prime")
         if exp is None or exp_prime is None:
-            df.at[idx, "reproduced"] = False
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
             continue
 
         filename = row.get("filename")
@@ -468,10 +513,19 @@ def mode_abacus_json(input_json: str, executable: str, sym_size: int, timeout: i
         )
         if rc == 0:
             print("Success")
-            df.at[idx, "reproduced"] = True
+            df.at[idx, "reproduced_status"] = STATUS_SUCCESS
+        elif rc == 124:
+            print("Failed (timeout)")
+            df.at[idx, "reproduced_status"] = STATUS_TIMEOUT
+        elif rc == 1:
+            print("Failed (identical traces)")
+            df.at[idx, "reproduced_status"] = STATUS_IDENTICAL_TRACE
+        elif rc == 3:
+            print("Failed (location mismatch)")
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
         else:
-            print("Failed")
-            df.at[idx, "reproduced"] = False
+            print(f"Failed (unexpected rc={rc})", file=sys.stderr)
+            return rc
 
     for col in ["visit_count", "non_ct_count", "visit_time"]:
         if col in df.columns:
@@ -549,14 +603,14 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
         "--output",
         required=False,
         default=None,
-        help="Path to write output JSON with reproduced column (only with --json).",
+        help="Path to write output JSON with reproduced_status column (only with --json/--abacus-json).",
     )
     parser.add_argument(
         "--timeout",
         required=False,
-        default=600,
+        default=1200,
         type=int,
-        help="Maximum time (in seconds) to allow for each replay (default: 600s).",
+        help="Maximum time (in seconds) to allow for each replay (default: 1200s).",
     )
     parser.add_argument(
         "--sym-size",
@@ -565,6 +619,12 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
         type=int,
         help="Symbol byte size for --abacus-json mode (default: 4).",
     )
+    parser.add_argument(
+        "--library",
+        required=False,
+        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "unknown"],
+        help="Library identifier for JSON-writing modes (--json, --abacus-json).",
+    )
     args = parser.parse_args(argv)
 
     if args.json_path:
@@ -572,6 +632,8 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
             parser.error("--klee-output is required when using --json")
         if not args.secret:
             parser.error("--secret is required when using --json")
+        if not args.library:
+            parser.error("--library is required when using --json")
         mode_dataframe(
             input_json=args.json_path,
             klee_output=args.klee_output,
@@ -580,6 +642,7 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
             public=args.public,
             timeout=args.timeout,
             output=args.output,
+            library=args.library,
         )
         return 0
 
@@ -595,12 +658,15 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
         )
 
     if args.abacus_json:
+        if not args.library:
+            parser.error("--library is required when using --abacus-json")
         return mode_abacus_json(
             input_json=args.abacus_json,
             executable=args.executable,
             sym_size=args.sym_size,
             timeout=args.timeout,
             output=args.output,
+            library=args.library,
         )
 
     # --input mode

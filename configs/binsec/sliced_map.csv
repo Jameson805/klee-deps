@@ -11,6 +11,7 @@ mbedtls,bignum.c,2124,21,bignum_sliced.c,1222,9
 openssl_mont,bn_exp.c,364,9,bn_exp.c,240,9
 openssl_mont,bn_exp.c,398,13,bn_exp.c,264,13
 openssl_mont,bn_exp.c,403,17,bn_exp.c,269,17
+openssl_mont,bn_exp.c,417,17,bn_exp.c,278,17
 openssl_mont,bn_exp.c,419,17,bn_exp.c,282,17
 openssl_mont,bn_exp.c,443,13,bn_exp.c,299,13
 openssl_mont,bn_lib.c,445,5,bn_lib.c,445,5
@@ -21,6 +22,7 @@ openssl_recp,bn_exp.c,219,14,bn_exp.c,141,14
 openssl_recp,bn_exp.c,220,9,bn_exp.c,142,9
 openssl_recp,bn_exp.c,242,13,bn_exp.c,161,13
 openssl_recp,bn_exp.c,246,17,bn_exp.c,165,17
+openssl_recp,bn_exp.c,260,17,bn_exp.c,174,17
 openssl_recp,bn_exp.c,262,17,bn_exp.c,178,17
 openssl_recp,bn_exp.c,286,13,bn_exp.c,195,13
 openssl_recp,bn_lib.c,445,5,bn_lib.c,445,5

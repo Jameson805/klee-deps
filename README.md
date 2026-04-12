@@ -26,7 +26,7 @@ This repository contains experimental infrastructure for evaluating constant-tim
 - configs/binsec: BINSEC config files and related mapping data
 - include/common.h: shared harness header
 - results: generated outputs (ignored by git)
-- tests/wllvm: migrated test assets from the previous wllvm layout
+- tests: fixture assets and expected outputs for repository tooling
 
 ## Quick Notes
 

@@ -13,6 +13,7 @@ fi
 
 # Use an explicit SMT solver that understands SMT-LIB set-option (e.g., z3/cvc5).
 binsec_fml_solver="z3"
+binsec_smt_solver="z3"
 
 sym_size=4
 jump_enum=10
@@ -22,6 +23,9 @@ max_time=""
 patch_memset_ifunc=0
 
 do_reproduce=1
+benchmarks_csv=""
+default_benchmarks=(mbedtls libgcrypt openssl)
+selected_benchmarks=("${default_benchmarks[@]}")
 
 usage() {
     cat <<'EOF'
@@ -31,8 +35,12 @@ Usage: $0 [--sym-size <n>] [--jump-enum <n>] [--sse-depth <n>] <max_time_seconds
   --sym-size <n>       Optional integer, default: 4
   --jump-enum <n>      Optional integer, default: 10
   --sse-depth <n>      Optional integer, default: 1000000000
-    --fml-solver <name>  Optional SMT backend for BINSEC, default: z3
+  --fml-solver <name>  Optional SMT backend for BINSEC, default: z3
+  --smt-solver <name>  Optional SMT solver command for BINSEC, default: z3
   --patch-memset-ifunc Optional, pin `memset_func`'s PLT/GOT slot to a concrete memset impl
+  --benchmarks <list>  Optional comma-separated benchmark groups to run
+    valid: mbedtls,libgcrypt,openssl
+  default: all valid groups
 EOF
     exit 1
 }
@@ -48,8 +56,12 @@ while [[ $# -gt 0 ]]; do
             sse_depth="${2:-}"; shift 2 ;;
         --fml-solver)
             binsec_fml_solver="${2:-}"; shift 2 ;;
+        --smt-solver)
+            binsec_smt_solver="${2:-}"; shift 2 ;;
         --patch-memset-ifunc)
             patch_memset_ifunc=1; shift ;;
+        --benchmarks)
+            benchmarks_csv="${2:-}"; shift 2 ;;
         -*)
             echo "Unknown option: $1"; usage ;;
         *)
@@ -81,6 +93,33 @@ if [[ -z "$binsec_fml_solver" ]]; then
     exit 1
 fi
 
+if [[ -z "$binsec_smt_solver" ]]; then
+    echo "Error: smt solver name must be non-empty (got '$binsec_smt_solver')" >&2
+    exit 1
+fi
+
+if [[ -n "$benchmarks_csv" ]]; then
+    IFS=',' read -ra requested_benchmarks <<< "$benchmarks_csv"
+    selected_benchmarks=()
+    for raw in "${requested_benchmarks[@]}"; do
+        bench="${raw//[[:space:]]/}"
+        [[ -z "$bench" ]] && continue
+        case "$bench" in
+            mbedtls|libgcrypt|openssl)
+                selected_benchmarks+=("$bench")
+                ;;
+            *)
+                echo "Error: unknown benchmark '$bench' for --benchmarks" >&2
+                exit 1
+                ;;
+        esac
+    done
+    if [[ "${#selected_benchmarks[@]}" -eq 0 ]]; then
+        echo "Error: --benchmarks provided but no valid benchmark names were parsed" >&2
+        exit 1
+    fi
+fi
+
 echo "##########"
 echo "Args:"
 echo "max_time=$max_time"
@@ -88,7 +127,9 @@ echo "sym_size=$sym_size"
 echo "jump_enum=$jump_enum"
 echo "sse_depth=$sse_depth"
 echo "binsec_fml_solver=$binsec_fml_solver"
+echo "binsec_smt_solver=$binsec_smt_solver"
 echo "patch_memset_ifunc=$patch_memset_ifunc"
+echo "benchmarks=$(IFS=','; echo "${selected_benchmarks[*]}")"
 echo "##########"
 
 results_dir="$repo_root/results/binsec_results"
@@ -107,6 +148,24 @@ code_path_for_executable() {
             ;;
         benchmarks/openssl-1.1.1q/*)
             echo "benchmarks/openssl-1.1.1q"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+library_for_executable() {
+    local exe="$1"
+    case "$exe" in
+        benchmarks/mbedtls-3.2.1/*)
+            echo "mbedtls"
+            ;;
+        benchmarks/libgcrypt-and-libgpg-error/*)
+            echo "libgcrypt"
+            ;;
+        benchmarks/openssl-1.1.1q/*)
+            echo "openssl"
             ;;
         *)
             echo ""
@@ -159,7 +218,13 @@ convert_case_to_json() {
 
     local out_json="$results_dir/${stats_file%.toml}.json"
     local code_path
+    local library
     code_path="$(code_path_for_executable "$executable")"
+    library="$(library_for_executable "$executable")"
+    if [[ -z "$library" ]]; then
+        echo "Error: cannot infer library for executable '$executable'" >&2
+        return 2
+    fi
 
     echo "-----"
     echo "Converting $results_dir/$stats_file -> $out_json"
@@ -170,6 +235,7 @@ convert_case_to_json() {
         --toml "$results_dir/$stats_file"
         --output-log "$results_dir/output.log"
         --executable "$executable"
+        --library "$library"
         --sym-size "$sym_size"
         --out "$out_json"
     )
@@ -222,6 +288,7 @@ run_case() {
 
     binsec -sse -checkct \
         -fml-solver "$binsec_fml_solver" \
+        -smt-solver "$binsec_smt_solver" \
         -sse-timeout "$max_time" \
         -sse-jump-enum "$jump_enum" \
         -sse-script "$sse_script_to_use" \
@@ -327,17 +394,25 @@ run_openssl_case() {
 # Cases (comment out any single line to skip)
 ########################
 
-run_mbedtls_case fix_pub
-run_mbedtls_case var_pub
-
-run_libgcrypt_case fix_pub
-run_libgcrypt_case var_pub
-
-run_openssl_case recp fix_pub
-run_openssl_case recp var_pub
-run_openssl_case mont fix_pub
-run_openssl_case mont var_pub
-run_openssl_case mont_consttime fix_pub
-run_openssl_case mont_consttime var_pub
-run_openssl_case mont_word fix_pub
-run_openssl_case mont_word var_pub
+for benchmark in "${selected_benchmarks[@]}"; do
+    case "$benchmark" in
+        mbedtls)
+            run_mbedtls_case fix_pub
+            run_mbedtls_case var_pub
+            ;;
+        libgcrypt)
+            run_libgcrypt_case fix_pub
+            run_libgcrypt_case var_pub
+            ;;
+        openssl)
+            run_openssl_case recp fix_pub
+            run_openssl_case recp var_pub
+            run_openssl_case mont fix_pub
+            run_openssl_case mont var_pub
+            run_openssl_case mont_consttime fix_pub
+            run_openssl_case mont_consttime var_pub
+            run_openssl_case mont_word fix_pub
+            run_openssl_case mont_word var_pub
+            ;;
+    esac
+done

@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+
 import argparse
 import json
-import os
 import re
 import subprocess
-import sys
 from typing import Dict, List, Optional, Tuple
+
+from tools.shared.result_schema import (
+    STATUS_IDENTICAL_TRACE,
+    STATUS_LOCATION_MISMATCH,
+    STATUS_NOT_REPRODUCED,
+    STATUS_SUCCESS,
+    STATUS_TIMEOUT,
+    build_payload,
+    format_location,
+    get_source_line,
+    make_result_row,
+)
 
 
 _NON_CT_RE = re.compile(
@@ -53,7 +66,7 @@ def _read_text_auto(path: str) -> str:
     return data.decode("latin-1")
 
 
-def parse_log_rows(log_path: str, code_root: Optional[str]) -> List[Dict[str, object]]:
+def parse_log_rows(log_path: str, code_root: Optional[str], library: str) -> List[Dict[str, object]]:
     start_ts: Optional[float] = None
     first_hit_by_loc: Dict[Tuple[str, int, int], float] = {}
     first_cex_by_loc: Dict[Tuple[str, int, int], Dict[str, int]] = {}
@@ -96,7 +109,6 @@ def parse_log_rows(log_path: str, code_root: Optional[str]) -> List[Dict[str, ob
     if start_ts is None:
         return []
 
-    source_cache: Dict[str, List[str]] = {}
     out: List[Dict[str, object]] = []
     ordered_rows = sorted(
         ((delta, filename, line_no, col_no) for (filename, line_no, col_no), delta in first_hit_by_loc.items()),
@@ -116,32 +128,17 @@ def parse_log_rows(log_path: str, code_root: Optional[str]) -> List[Dict[str, ob
             row["counterexamples"] = cex
 
         if code_root and line_no > 0:
-            source_path = os.path.join(code_root, filename)
-            if os.path.isfile(source_path):
-                lines = source_cache.get(source_path)
-                if lines is None:
-                    try:
-                        with open(source_path, "r", encoding="utf-8", errors="replace") as sf:
-                            lines = sf.read().splitlines()
-                    except OSError:
-                        lines = []
-                    source_cache[source_path] = lines
-                if line_no <= len(lines):
-                    row["code"] = lines[line_no - 1]
+            source_line = get_source_line(library, os.path.join(code_root, filename), line_no)
+            if source_line is not None:
+                row["code"] = source_line
 
         out.append(row)
 
     return out
 
 
-def _fmt_loc(file: Optional[str], line: Optional[int], col: Optional[int]) -> str:
-    if not file or line is None or col is None:
-        return "<unknown>"
-    return f"{file}:{line}:{col}"
-
-
 def _run_reproduce(
-    reproduce_script: str,
+    reproduce_module: str,
     replay_executable: str,
     sym_size: int,
     cex: Dict[str, int],
@@ -155,7 +152,8 @@ def _run_reproduce(
     secret_spec = f"exp:{sym_size}={exp}/{exp_prime}"
     cmd = [
         sys.executable,
-        reproduce_script,
+        "-m",
+        reproduce_module,
         "--input",
         "--executable",
         replay_executable,
@@ -169,7 +167,12 @@ def _run_reproduce(
         public_spec = f"base:{sym_size}={cex['base']},mod:{sym_size}={cex['mod']}"
         cmd += ["--public", public_spec]
 
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    proc = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     out = (proc.stdout or "") + "\n" + (proc.stderr or "")
     if proc.returncode != 0:
         return None, proc.returncode, out
@@ -194,9 +197,10 @@ def main(argv: List[str]) -> int:
     p.add_argument("--reproduce", action="store_true", help="Run replay reproduction for each row with counterexamples")
     p.add_argument("--replay-executable", default=None, help="Path to replay executable (required with --reproduce)")
     p.add_argument(
-        "--reproduce-script",
+        "--reproduce-module",
+        dest="reproduce_module",
         default=None,
-        help="Path to reproduce_positives.py (defaults to tools/postprocess/reproduce_positives.py)",
+        help="Python module to run for reproduction (defaults to tools.postprocess.reproduce_positives)",
     )
     p.add_argument("--reproduce-timeout", type=int, default=180, help="Timeout in seconds per reproduction (default: 180)")
     p.add_argument(
@@ -204,17 +208,21 @@ def main(argv: List[str]) -> int:
         default=None,
         help="Optional source tree root used to fill code lines (e.g., benchmarks/mbedtls-3.2.1)",
     )
+    p.add_argument(
+        "--library",
+        required=True,
+        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "constantine", "unknown"],
+        help="Library identifier for this dataset.",
+    )
     args = p.parse_args(argv)
 
     if not os.path.isfile(args.log):
         print(f"Error: log not found: {args.log}", file=sys.stderr)
         return 2
 
-    reproduce_script = args.reproduce_script
-    if args.reproduce and not reproduce_script:
-        here = os.path.dirname(os.path.abspath(__file__))
-        repo_root = os.path.normpath(os.path.join(here, "..", ".."))
-        reproduce_script = os.path.join(repo_root, "tools", "postprocess", "reproduce_positives.py")
+    reproduce_module = args.reproduce_module
+    if args.reproduce and not reproduce_module:
+        reproduce_module = "tools.postprocess.reproduce_positives"
 
     if args.reproduce:
         if not args.replay_executable:
@@ -223,12 +231,12 @@ def main(argv: List[str]) -> int:
         if not os.path.isfile(args.replay_executable):
             print(f"Error: replay executable not found: {args.replay_executable}", file=sys.stderr)
             return 2
-        if not reproduce_script or not os.path.isfile(reproduce_script):
-            print(f"Error: reproduce_positives.py not found: {reproduce_script}", file=sys.stderr)
+        if not reproduce_module:
+            print("Error: missing reproduction module", file=sys.stderr)
             return 2
 
     code_root = os.path.abspath(args.code_root) if args.code_root else None
-    data = parse_log_rows(args.log, code_root)
+    data = parse_log_rows(args.log, code_root, args.library)
 
     if args.reproduce:
         for row in data:
@@ -239,15 +247,15 @@ def main(argv: List[str]) -> int:
             if not isinstance(filename, str) or not isinstance(line_no, int) or not isinstance(col_no, int):
                 continue
             if not isinstance(cex, dict):
-                row["reproduced"] = False
+                row["reproduced_status"] = STATUS_LOCATION_MISMATCH
                 print("[reproduce] skipped: missing counterexamples", file=sys.stderr, flush=True)
                 continue
 
-            reported_loc = _fmt_loc(filename, line_no, col_no)
+            reported_loc = format_location(filename, line_no, col_no)
             print(f"[reproduce] reported={reported_loc}", file=sys.stderr, flush=True)
 
             loc, rc, _ = _run_reproduce(
-                reproduce_script=str(reproduce_script),
+                reproduce_module=str(reproduce_module),
                 replay_executable=str(args.replay_executable),
                 sym_size=int(args.sym_size),
                 cex=cex,
@@ -255,8 +263,24 @@ def main(argv: List[str]) -> int:
             )
 
             if loc is None:
-                print(f"[reproduce] failed rc={rc}", file=sys.stderr, flush=True)
-                row["reproduced"] = False
+                if rc == 124:
+                    row["reproduced_status"] = STATUS_TIMEOUT
+                elif rc == 1:
+                    row["reproduced_status"] = STATUS_IDENTICAL_TRACE
+                elif rc in (0, 3):
+                    row["reproduced_status"] = STATUS_LOCATION_MISMATCH
+                else:
+                    print(
+                        f"[reproduce] operational failure rc={rc}; aborting batch",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    return rc if rc != 0 else 2
+                print(
+                    f"[reproduce] {row['reproduced_status']} rc={rc}",
+                    file=sys.stderr,
+                    flush=True,
+                )
                 continue
 
             rep_file, rep_line, rep_col = loc
@@ -265,25 +289,41 @@ def main(argv: List[str]) -> int:
                 and rep_line == line_no
                 and rep_col == col_no
             )
-            row["reproduced"] = reproduced
+            row["reproduced_status"] = STATUS_SUCCESS if reproduced else STATUS_LOCATION_MISMATCH
             print(
-                f"[reproduce] {'SUCCESS' if reproduced else 'FAIL'} divergence={_fmt_loc(rep_file, rep_line, rep_col)}",
+                f"[reproduce] {'SUCCESS' if reproduced else 'FAIL'} divergence={format_location(rep_file, rep_line, rep_col)}",
                 file=sys.stderr,
                 flush=True,
             )
 
-    payload: Dict[str, object] = {
-        "data": data,
-        "dtypes": {
-            "filename": "object",
-            "line": "Int64",
+    normalized_data: List[Dict[str, object]] = []
+    for row in data:
+        optional = {
+            k: v
+            for k, v in row.items()
+            if k not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
+        }
+        counterexamples = row.get("counterexamples")
+        normalized_data.append(
+            make_result_row(
+                filename=row.get("filename"),
+                line=row.get("line"),
+                non_ct_time=row.get("non_ct_time"),
+                counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
+                reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
+                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else args.library,
+                optional_fields=optional,
+            )
+        )
+    data = normalized_data
+
+    payload: Dict[str, object] = build_payload(
+        data,
+        optional_dtypes={
             "column": "Int64",
-            "non_ct_time": "float64",
             "code": "object",
-            "counterexamples": "object",
-            "reproduced": "object",
         },
-    }
+    )
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
@@ -295,4 +335,3 @@ def main(argv: List[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
-

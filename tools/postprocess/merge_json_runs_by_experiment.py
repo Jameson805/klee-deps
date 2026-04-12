@@ -11,9 +11,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 FINAL_COLUMN_ORDER = [
+    "library",
     "filename",
     "line",
     "column",
+    "reproduced_status",
     "visit_count",
     "non_ct_count",
     "visit_time",
@@ -21,18 +23,6 @@ FINAL_COLUMN_ORDER = [
     "code",
     "counterexamples",
 ]
-
-
-def _is_true(value: Any) -> bool:
-    if value is True:
-        return True
-    if value is False or value is None:
-        return False
-    if isinstance(value, (int, float)):
-        return value == 1
-    if isinstance(value, str):
-        return value.strip().lower() in {"true", "1", "yes", "y"}
-    return False
 
 
 def _to_float(value: Any) -> Optional[float]:
@@ -105,17 +95,15 @@ def _group_input_files(dst_dir: str) -> Dict[str, List[str]]:
 
 
 def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
-    by_location: Dict[Tuple[str, int, Optional[int]], Dict[str, Any]] = {}
+    by_location: Dict[Tuple[str, int, Optional[int], str], Dict[str, Any]] = {}
 
     for path in paths:
         rows = _read_rows(path)
         for row in rows:
-            if "reproduced" in row and not _is_true(row.get("reproduced")):
-                continue
-
             filename = row.get("filename")
             line = _to_int(row.get("line"))
             column = _to_int(row.get("column"))
+            library = row.get("library")
             visit_count = _to_float(row.get("visit_count"))
             non_ct_count = _to_float(row.get("non_ct_count"))
             visit_time = _to_float(row.get("visit_time"))
@@ -128,10 +116,12 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
                 continue
             if line is None:
                 continue
+            if not isinstance(library, str) or not library.strip():
+                library = "unknown"
             if non_ct_time is None:
                 continue
 
-            key = (filename, line, column)
+            key = (filename, line, column, library)
             slot = by_location.setdefault(
                 key,
                 {
@@ -141,6 +131,7 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
                     "non_ct_time_values": [],
                     "code": None,
                     "counterexamples": None,
+                    "reproduced_status_counts": {},
                 },
             )
 
@@ -156,11 +147,16 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
                 slot["code"] = row.get("code")
             if slot["counterexamples"] is None and row.get("counterexamples") is not None:
                 slot["counterexamples"] = row.get("counterexamples")
+            status = row.get("reproduced_status")
+            if isinstance(status, str) and status.strip():
+                key_status = status.strip()
+                counts = slot["reproduced_status_counts"]
+                counts[key_status] = counts.get(key_status, 0) + 1
 
     merged_rows: List[Dict[str, Any]] = []
-    for (filename, line, column), slot in sorted(
+    for (filename, line, column, library), slot in sorted(
         by_location.items(),
-        key=lambda item: (item[0][0], item[0][1], -1 if item[0][2] is None else item[0][2]),
+        key=lambda item: (item[0][3], item[0][0], item[0][1], -1 if item[0][2] is None else item[0][2]),
     ):
         visit_count = _geometric_mean(slot["visit_count_values"])
         non_ct_count = _geometric_mean(slot["non_ct_count_values"])
@@ -171,11 +167,13 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
             continue
 
         row = {
+            "library": library,
             "filename": filename,
             "line": line,
             "non_ct_time": non_ct_time,
             "code": slot["code"],
             "counterexamples": slot["counterexamples"],
+            "reproduced_status": dict(sorted(slot["reproduced_status_counts"].items())),
         }
         if column is not None:
             row["column"] = column
@@ -223,8 +221,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Merge per-run JSON results by experiment name from dst/*/*.json into dst/<experiment>.json. "
-            "Rows are keyed by (filename,line,column), filtered to non-null non_ct_time and (if present) reproduced=true, "
-            "then aggregated by geometric mean (optional metrics remain null when unavailable)."
+            "Rows are keyed by (filename,line,column), filtered to non-null non_ct_time, "
+            "then aggregated by geometric mean (optional metrics remain null when unavailable). "
+            "reproduced_status is aggregated as a status->count map."
         )
     )
     parser.add_argument("dst_dir", help="Destination root containing per-run subdirectories (e.g., dst/0, dst/1, ...)")

@@ -7,6 +7,6 @@
     "non_ct_time": "float64",
     "code": "object",
     "counterexamples": "object",
-    "reproduced": "object"
+    "reproduced_status": "object"
   }
 }

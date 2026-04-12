@@ -4,6 +4,12 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$repo_root"
 
+converter_module="tools.converters.self_comp_log_to_json"
+if ! command -v python >/dev/null 2>&1; then
+    echo "Error: python not found in PATH" >&2
+    exit 1
+fi
+
 # set virtual memory limit to 70GB to prevent excessive memory usage
 ulimit -v 70000000
 
@@ -16,13 +22,16 @@ max_memory=10000
 search_strategies="random-path,nurs:covnew"
 do_reproduce=1
 reproduce_timeout=180
+benchmarks_csv=""
+default_benchmarks=(mbedtls libgcrypt openssl)
+selected_benchmarks=("${default_benchmarks[@]}")
 
 usage() {
     cat <<EOF
 Usage: $0 --klee-root <path-to-klee-build> --max-time <duration> [options]
 
 Required:
-    --klee-root <path>     Path containing klee binary (e.g. <repo>/klee-controlflow/build/bin)
+  --klee-root <path>     Path containing klee binary (e.g. <repo>/klee-controlflow/build/bin)
   --max-time <duration>  Overall timeout for each KLEE run (e.g. 30m, 1h, 600s)
 
 Optional:
@@ -32,8 +41,11 @@ Optional:
   --max-memory <n>       Default: 10000 (MB KLEE cap)
   --search <strategies>  Default: random-path,nurs:covnew (comma-separated)
   --results-dir <name>   Default: self_comp_results
-    --no-reproduce         Disable replay-based validation (enabled by default)
-    --reproduce-timeout <s> Timeout per replay attempt in seconds (default: 180)
+  --no-reproduce         Disable replay-based validation (enabled by default)
+  --reproduce-timeout <s> Timeout per replay attempt in seconds (default: 180)
+  --benchmarks <list>    Comma-separated benchmark groups to run
+    valid: mbedtls,libgcrypt,openssl
+  default: all valid groups
   --help                 Show this help
 EOF
     exit 1
@@ -53,6 +65,7 @@ while [[ $# -gt 0 ]]; do
         --results-dir) results_dir="$2"; shift 2;;
         --no-reproduce) do_reproduce=0; shift 1;;
         --reproduce-timeout) reproduce_timeout="$2"; shift 2;;
+        --benchmarks) benchmarks_csv="$2"; shift 2;;
         --help|-h) usage;;
         --) shift; break;;
         -*)
@@ -81,6 +94,28 @@ if ! [[ "$reproduce_timeout" =~ ^[0-9]+$ ]]; then
     echo "Error: reproduce_timeout must be a non-negative integer (got '$reproduce_timeout')"; exit 1
 fi
 
+if [[ -n "$benchmarks_csv" ]]; then
+    IFS=',' read -ra requested_benchmarks <<< "$benchmarks_csv"
+    selected_benchmarks=()
+    for raw in "${requested_benchmarks[@]}"; do
+        bench="${raw//[[:space:]]/}"
+        [[ -z "$bench" ]] && continue
+        case "$bench" in
+            mbedtls|libgcrypt|openssl)
+                selected_benchmarks+=("$bench")
+                ;;
+            *)
+                echo "Error: unknown benchmark '$bench' for --benchmarks" >&2
+                exit 1
+                ;;
+        esac
+    done
+    if [[ "${#selected_benchmarks[@]}" -eq 0 ]]; then
+        echo "Error: --benchmarks provided but no valid benchmark names were parsed" >&2
+        exit 1
+    fi
+fi
+
 rm -rf "$results_dir"
 mkdir -p "$results_dir"
 exec > >(tee -a "$results_dir/output.log") 2>&1
@@ -97,6 +132,7 @@ echo "search_strategies=$search_strategies"
 echo "results_dir=$results_dir"
 echo "do_reproduce=$do_reproduce"
 echo "reproduce_timeout=$reproduce_timeout"
+echo "benchmarks=$(IFS=','; echo "${selected_benchmarks[*]}")"
 echo "##########"
 
 klee_timeout() {
@@ -121,12 +157,30 @@ klee_timeout() {
             --max-solver-time="$max_solver_time" \
             --max-memory=$max_memory \
             --emit-all-errors=true "$1" 2>&1 \
-    | python3 -u -c 'import sys,time
+    | python -u -c 'import sys,time
 for raw in sys.stdin.buffer:
     line = raw.decode("utf-8", errors="replace")
     sys.stdout.write(f"[{time.time():.3f}] {line}")
     sys.stdout.flush()' \
     || true
+}
+
+library_for_path() {
+    local path="$1"
+    case "$path" in
+        *mbedtls-3.2.1*)
+            echo "mbedtls"
+            ;;
+        *libgcrypt-and-libgpg-error*)
+            echo "libgcrypt"
+            ;;
+        *openssl-1.1.1q*)
+            echo "openssl"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
 }
 
 run_case() {
@@ -139,6 +193,12 @@ run_case() {
     local bc_dir=$(dirname "$bc")
     local case_log="$results_dir/${result_name}.log"
     local case_json="$results_dir/${json_name}"
+    local library
+    library="$(library_for_path "$bc")"
+    if [[ -z "$library" ]]; then
+        echo "Error: cannot infer library from path '$bc'" >&2
+        exit 2
+    fi
 
     echo "========="
     echo "$title"
@@ -153,11 +213,12 @@ run_case() {
         echo "Warning: missing output directory '$bc_dir/klee-out-0'"
     fi
     local cmd=(
-        python3 "$repo_root/tools/converters/self_comp_log_to_json.py"
+        python -m "$converter_module"
         --log "$case_log"
         --out "$case_json"
         --code-root "$bc_dir"
         --sym-size "$sym_size"
+        --library "$library"
     )
 
     if [[ "$do_reproduce" -eq 1 ]]; then
@@ -207,6 +268,16 @@ run_openssl() {
     done
 }
 
-run_mbedtls
-run_libgcrypt
-run_openssl
+for benchmark in "${selected_benchmarks[@]}"; do
+    case "$benchmark" in
+        mbedtls)
+            run_mbedtls
+            ;;
+        libgcrypt)
+            run_libgcrypt
+            ;;
+        openssl)
+            run_openssl
+            ;;
+    esac
+done

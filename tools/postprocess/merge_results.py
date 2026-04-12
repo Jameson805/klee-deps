@@ -12,18 +12,6 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 Location = Tuple[str, str, int, Optional[int]]  # (library, file, line, column)
 
 
-def _is_true(value) -> bool:
-	if value is True:
-		return True
-	if value is False or value is None:
-		return False
-	if isinstance(value, (int, float)):
-		return value == 1
-	if isinstance(value, str):
-		return value.strip().lower() in {"true", "1", "yes", "y"}
-	return False
-
-
 def _column_and_library_from_json_filename(name: str, run_name: str, sliced_only: bool) -> Optional[Tuple[str, str]]:
 	"""Return (column_name, library) for one top-level JSON file, or None if filtered out."""
 	lower = name.lower()
@@ -97,8 +85,6 @@ def _load_violations_from_json(path: str, library: str) -> Dict[Location, float]
 	out: Dict[Location, float] = {}
 	for row in rows:
 		if not isinstance(row, dict):
-			continue
-		if "reproduced" in row and not _is_true(row.get("reproduced")):
 			continue
 		non_ct_time = _to_float(row.get("non_ct_time"))
 		if non_ct_time is None:

@@ -137,6 +137,10 @@ def make_cactus_plot(
     else:
         non_empty_series = [times for times in group_times.values() if times.size > 0]
 
+    ordered_groups = sorted(
+        group_times.items(), key=lambda item: len(item[1]), reverse=True
+    )
+
     if non_empty_series:
         time_axis = np.unique(np.concatenate(non_empty_series))
     elif log_scale:
@@ -146,7 +150,7 @@ def make_cactus_plot(
 
     plt.figure(figsize=(9, 5.5))
 
-    for group, times in group_times.items():
+    for group, times in ordered_groups:
         if log_scale:
             times = times[times > 0]
 
@@ -275,8 +279,36 @@ def write_by_tool_outputs(df: pd.DataFrame, output_base: str, input_stem: str) -
             tool_df,
             tool_plot_path,
             title=f"{input_stem} {tool} configurations over time",
+            log_scale=True,
         )
         print(f"Wrote: {tool_plot_path}")
+
+    klee_cf_fix_pub_columns = [
+        column
+        for column in metric_columns
+        if column.startswith("klee_cf_")
+        and column.endswith("_4_fix_pub")
+        and "_sliced_" not in column
+    ]
+    if klee_cf_fix_pub_columns:
+        rename_map = {
+            column: column.removeprefix("klee_cf_").removesuffix("_fix_pub")
+            for column in klee_cf_fix_pub_columns
+        }
+        klee_cf_fix_pub_df = (
+            df.loc[:, metadata + klee_cf_fix_pub_columns]
+            .copy()
+            .rename(columns=rename_map)
+        )
+
+        klee_cf_fix_pub_plot_path = by_tool_dir / "klee_cf_4_fix_pub_cactus.png"
+        make_cactus_plot(
+            klee_cf_fix_pub_df,
+            klee_cf_fix_pub_plot_path,
+            title=f"{input_stem} klee_cf size 4 fix_pub over time",
+            log_scale=True,
+        )
+        print(f"Wrote: {klee_cf_fix_pub_plot_path}")
 
 
 def output_path(base: str, kind: str) -> Path:
@@ -343,18 +375,10 @@ def main() -> int:
     make_cactus_plot(
         aggregated,
         cactus_path,
-        title=f"{input_path.stem} insecure locations over time",
-    )
-    print(f"Wrote: {cactus_path}")
-
-    cactus_log_path = output_path(output_base, "cactus_log")
-    make_cactus_plot(
-        aggregated,
-        cactus_log_path,
         title=f"{input_path.stem} insecure locations over time (log scale)",
         log_scale=True,
     )
-    print(f"Wrote: {cactus_log_path}")
+    print(f"Wrote: {cactus_path}")
 
     write_by_tool_outputs(df, output_base, input_path.stem)
 

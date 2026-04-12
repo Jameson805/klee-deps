@@ -8,6 +8,13 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
+from tools.shared.result_schema import (
+    STATUS_NOT_REPRODUCED,
+    build_payload,
+    get_source_line,
+    make_result_row,
+)
+
 
 def main(argv: List[str]) -> int:
     p = argparse.ArgumentParser(
@@ -27,7 +34,7 @@ def main(argv: List[str]) -> int:
     p.add_argument(
         "--reproduce",
         action="store_true",
-        help="Run reproduce_positives.py --input for each row and add 'reproduced'",
+        help="Run tools.postprocess.reproduce_positives for each row and add 'reproduced_status'",
     )
     p.add_argument(
         "--replay-executable",
@@ -35,9 +42,10 @@ def main(argv: List[str]) -> int:
         help="Replay executable path (required with --reproduce)",
     )
     p.add_argument(
-        "--reproduce-script",
+        "--reproduce-module",
+        dest="reproduce_module",
         default=None,
-        help="Path to reproduce_positives.py (defaults to tools/postprocess/reproduce_positives.py)",
+        help="Python module to run for reproduction (defaults to tools.postprocess.reproduce_positives)",
     )
     p.add_argument(
         "--reproduce-timeout",
@@ -49,6 +57,12 @@ def main(argv: List[str]) -> int:
         "--reproduce-debug",
         action="store_true",
         help="Forward --debug to reproduce_positives.py and print the exact replay command on failure.",
+    )
+    p.add_argument(
+        "--library",
+        required=True,
+        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "constantine", "unknown"],
+        help="Library identifier for this dataset.",
     )
     args = p.parse_args(argv)
 
@@ -68,17 +82,15 @@ def main(argv: List[str]) -> int:
         return 2
     ref_secret = ref_secret_by_size[args.sym_size]
 
-    reproduce_script = args.reproduce_script
-    if args.reproduce and not reproduce_script:
-        here = os.path.dirname(os.path.abspath(__file__))
-        repo_root = os.path.normpath(os.path.join(here, "..", ".."))
-        reproduce_script = os.path.join(repo_root, "tools", "postprocess", "reproduce_positives.py")
+    reproduce_module = args.reproduce_module
+    if args.reproduce and not reproduce_module:
+        reproduce_module = "tools.postprocess.reproduce_positives"
     if args.reproduce:
         if not args.replay_executable:
             print("Error: --replay-executable is required with --reproduce", file=sys.stderr)
             return 2
-        if not reproduce_script or not os.path.isfile(reproduce_script):
-            print(f"Error: reproduce_positives.py not found: {reproduce_script}", file=sys.stderr)
+        if not reproduce_module:
+            print("Error: missing reproduction module", file=sys.stderr)
             return 2
 
     with open(args.log, "r", encoding="utf-8", errors="replace") as f:
@@ -89,7 +101,7 @@ def main(argv: List[str]) -> int:
     se_time: Optional[float] = None
     qif_time: Optional[float] = None
 
-    source_cache: Dict[str, List[str]] = {}
+    default_library = args.library
     i = 0
     while i < len(lines):
         s = lines[i].rstrip("\n")
@@ -158,18 +170,9 @@ def main(argv: List[str]) -> int:
                     }
 
                     if args.code_root:
-                        source_path = os.path.join(args.code_root, filename)
-                        if os.path.isfile(source_path):
-                            content = source_cache.get(source_path)
-                            if content is None:
-                                try:
-                                    with open(source_path, "r", encoding="utf-8", errors="replace") as sf:
-                                        content = sf.read().splitlines()
-                                except OSError:
-                                    content = []
-                                source_cache[source_path] = content
-                            if 1 <= line_no <= len(content):
-                                entry["code"] = content[line_no - 1]
+                        source_line = get_source_line(default_library, os.path.join(args.code_root, filename), line_no)
+                        if source_line is not None:
+                            entry["code"] = source_line
 
                     locations[addr] = entry
                     break
@@ -201,37 +204,41 @@ def main(argv: List[str]) -> int:
 
         rows.append(row)
 
-    observed_keys = set()
+    validated_rows: List[Dict[str, Any]] = []
     for row in rows:
-        observed_keys.update(row.keys())
+        optional = {
+            k: v
+            for k, v in row.items()
+            if k not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
+        }
+        counterexamples = row.get("counterexamples")
+        validated_rows.append(
+            make_result_row(
+                filename=row.get("filename"),
+                line=row.get("line"),
+                non_ct_time=row.get("non_ct_time"),
+                counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
+                reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
+                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else default_library,
+                optional_fields=optional,
+            )
+        )
+    rows = validated_rows
 
-    dtypes: Dict[str, str] = {}
-    if "filename" in observed_keys:
-        dtypes["filename"] = "object"
-    if "line" in observed_keys:
-        dtypes["line"] = "Int64"
-    if "column" in observed_keys:
-        dtypes["column"] = "Int64"
-    if "non_ct_time" in observed_keys:
-        dtypes["non_ct_time"] = "float64"
-    if "code" in observed_keys:
-        dtypes["code"] = "object"
-    if "counterexamples" in observed_keys:
-        dtypes["counterexamples"] = "object"
-    if "reproduced" in observed_keys:
-        dtypes["reproduced"] = "object"
-
-    payload = {
-        "data": rows,
-        "dtypes": dtypes,
-        "notes": {
+    payload = build_payload(
+        rows,
+        optional_dtypes={
+            "column": "Int64",
+            "code": "object",
+        },
+    )
+    payload["notes"] = {
             "abacus_reference_secret": {
                 "source": "Hard-coded from include/common.h ABACUS branch (second-closest prime constants)",
                 "sym_size": args.sym_size,
                 "exp": ref_secret,
             }
-        },
-    }
+        }
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
@@ -241,7 +248,8 @@ def main(argv: List[str]) -> int:
     if args.reproduce:
         cmd = [
             sys.executable,
-            str(reproduce_script),
+            "-m",
+            str(reproduce_module),
             "--abacus-json",
             str(args.out),
             "--output",
@@ -252,6 +260,8 @@ def main(argv: List[str]) -> int:
             str(args.sym_size),
             "--timeout",
             str(args.reproduce_timeout),
+            "--library",
+            str(args.library),
         ]
         if args.reproduce_debug:
             cmd.append("--debug")

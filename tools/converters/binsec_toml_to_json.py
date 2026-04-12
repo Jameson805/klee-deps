@@ -9,6 +9,18 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 import subprocess
 
+from tools.shared.result_schema import (
+    STATUS_IDENTICAL_TRACE,
+    STATUS_LOCATION_MISMATCH,
+    STATUS_NOT_REPRODUCED,
+    STATUS_SUCCESS,
+    STATUS_TIMEOUT,
+    build_payload,
+    format_location,
+    get_source_line,
+    make_result_row,
+)
+
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, "..", ".."))
@@ -170,19 +182,6 @@ def _build_basename_index(code_root: str) -> Dict[str, str]:
     return index
 
 
-def _read_code_line(path: str, line_no: int) -> Optional[str]:
-    if line_no <= 0:
-        return None
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            for i, line in enumerate(f, start=1):
-                if i == line_no:
-                    return line.rstrip("\n")
-    except OSError:
-        return None
-    return None
-
-
 def _normalize_filename_for_json(path: str) -> str:
     # Fallback if we can't relativize.
     return os.path.basename(path)
@@ -231,14 +230,8 @@ def _tail_lines(text: str, n: int = 12) -> str:
     return "\n".join(lines[-n:])
 
 
-def _fmt_loc(file: Optional[str], line: Optional[int], col: Optional[int]) -> str:
-    if not file or line is None or col is None:
-        return "<unknown>"
-    return f"{file}:{line}:{col}"
-
-
 def _run_reproduce(
-    reproduce_script: str,
+    reproduce_module: str,
     replay_executable: str,
     sym_size: int,
     exp: int,
@@ -256,12 +249,13 @@ def _run_reproduce(
     public_spec = ""
     if needs_publics:
         if base is None or mod is None:
-            return None
+            return None, 2, "missing public counterexamples for var_pub reproduction"
         public_spec = f"base:{sym_size}={base},mod:{sym_size}={mod}"
 
     cmd = [
         sys.executable,
-        reproduce_script,
+        "-m",
+        reproduce_module,
         "--input",
         "--executable",
         replay_executable,
@@ -273,20 +267,12 @@ def _run_reproduce(
     if needs_publics:
         cmd += ["--public", public_spec]
 
-    env = os.environ.copy()
-    py_path = env.get("PYTHONPATH", "")
-    if py_path:
-        env["PYTHONPATH"] = _REPO_ROOT + os.pathsep + py_path
-    else:
-        env["PYTHONPATH"] = _REPO_ROOT
-
     proc = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         check=False,
         cwd=_REPO_ROOT,
-        env=env,
     )
 
     out = (proc.stdout or "") + "\n" + (proc.stderr or "")
@@ -306,8 +292,9 @@ def build_rows(
     leaks: Dict[int, LeakInfo],
     addr_executable: str,
     code_root: Optional[str],
+    library: str,
     sym_size: int,
-    reproduce_script: Optional[str],
+    reproduce_module: Optional[str],
     replay_executable: Optional[str],
     needs_publics: bool,
     reproduce_timeout_s: int,
@@ -315,6 +302,7 @@ def build_rows(
     code_index: Optional[Dict[str, str]] = None
     if code_root:
         code_index = _build_basename_index(code_root)
+    source_library = library
 
     rows: List[Dict[str, Any]] = []
 
@@ -358,11 +346,11 @@ def build_rows(
             else:
                 candidate = code_index.get(filename)
             if candidate:
-                code = _read_code_line(candidate, line_no)
+                code = get_source_line(source_library, candidate, line_no)
 
-        reproduced: Optional[bool] = None
+        reproduced_status: Optional[str] = None
         if (
-            reproduce_script
+            reproduce_module
             and replay_executable
             and exp is not None
             and exp_p is not None
@@ -370,7 +358,7 @@ def build_rows(
             and line_no is not None
             and col_no is not None
         ):
-            reported_loc = _fmt_loc(filename, line_no, col_no)
+            reported_loc = format_location(filename, line_no, col_no)
             print(
                 f"[reproduce] addr=0x{addr:x} reported={reported_loc}",
                 file=sys.stderr,
@@ -378,7 +366,7 @@ def build_rows(
             )
 
             loc, rc, repro_out = _run_reproduce(
-                reproduce_script=reproduce_script,
+                reproduce_module=reproduce_module,
                 replay_executable=replay_executable,
                 sym_size=sym_size,
                 exp=exp,
@@ -389,24 +377,30 @@ def build_rows(
                 timeout_s=reproduce_timeout_s,
             )
             if loc is None:
-                if rc != 0:
+                if rc == 124:
+                    reproduced_status = STATUS_TIMEOUT
+                elif rc == 1:
+                    reproduced_status = STATUS_IDENTICAL_TRACE
+                elif rc in (0, 3):
+                    reproduced_status = STATUS_LOCATION_MISMATCH
+                else:
                     print(
                         f"[reproduce] addr=0x{addr:x} FAILED: reproduce_positives.py rc={rc}\n{_tail_lines(repro_out)}",
                         file=sys.stderr,
                         flush=True,
                     )
-                else:
-                    print(
-                        f"[reproduce] addr=0x{addr:x} FAILED: could not parse divergence location\n{_tail_lines(repro_out)}",
-                        file=sys.stderr,
-                        flush=True,
-                    )
-                reproduced = False
+                    raise RuntimeError(f"reproduce_positives.py failed with rc={rc} for addr=0x{addr:x}")
+                print(
+                    f"[reproduce] addr=0x{addr:x} {reproduced_status.upper()}",
+                    file=sys.stderr,
+                    flush=True,
+                )
             else:
                 rep_file, rep_line, rep_col = loc
-                repro_loc = _fmt_loc(rep_file, rep_line, rep_col)
-                reproduced = (os.path.basename(rep_file) == os.path.basename(filename)) and (rep_line == line_no) and (rep_col == col_no)
-                if reproduced:
+                repro_loc = format_location(rep_file, rep_line, rep_col)
+                is_success = (os.path.basename(rep_file) == os.path.basename(filename)) and (rep_line == line_no) and (rep_col == col_no)
+                reproduced_status = STATUS_SUCCESS if is_success else STATUS_LOCATION_MISMATCH
+                if is_success:
                     print(
                         f"[reproduce] addr=0x{addr:x} SUCCESS divergence={repro_loc}",
                         file=sys.stderr,
@@ -430,8 +424,8 @@ def build_rows(
             row["code"] = code
         if counterexamples is not None:
             row["counterexamples"] = counterexamples
-        if reproduced is not None:
-            row["reproduced"] = reproduced
+        if reproduced_status is not None:
+            row["reproduced_status"] = reproduced_status
         rows.append(row)
 
     return rows
@@ -493,12 +487,13 @@ def main(argv: List[str]) -> int:
     p.add_argument(
         "--reproduce",
         action="store_true",
-        help="If set, run reproduce_positives.py --input per row and add 'reproduced' field.",
+        help="If set, run reproduce_positives.py --input per row and add 'reproduced_status' field.",
     )
     p.add_argument(
-        "--reproduce-script",
+        "--reproduce-module",
+        dest="reproduce_module",
         default=None,
-        help="Path to reproduce_positives.py (defaults to tools/postprocess/reproduce_positives.py).",
+        help="Python module to run for reproduction (defaults to tools.postprocess.reproduce_positives)",
     )
     p.add_argument(
         "--reproduce-timeout",
@@ -520,6 +515,12 @@ def main(argv: List[str]) -> int:
         default=None,
         help="Optional source tree root used to fill the 'code' field by basename lookup.",
     )
+    p.add_argument(
+        "--library",
+        required=True,
+        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "constantine", "unknown"],
+        help="Library identifier for this dataset.",
+    )
 
     args = p.parse_args(argv)
 
@@ -538,13 +539,13 @@ def main(argv: List[str]) -> int:
 
     needs_publics = bool(re.search(r"_var_pub\.toml$", os.path.basename(args.toml)))
 
-    reproduce_script = args.reproduce_script
-    if args.reproduce and reproduce_script is None:
-        reproduce_script = os.path.join(_REPO_ROOT, "tools", "postprocess", "reproduce_positives.py")
+    reproduce_module = args.reproduce_module
+    if args.reproduce and reproduce_module is None:
+        reproduce_module = "tools.postprocess.reproduce_positives"
 
     if args.reproduce:
-        if not reproduce_script or not os.path.isfile(reproduce_script):
-            print(f"Error: reproduce_positives.py not found: {reproduce_script}", file=sys.stderr)
+        if not reproduce_module:
+            print("Error: missing reproduction module", file=sys.stderr)
             return 2
         if not args.replay_executable:
             print("Error: --replay-executable is required when --reproduce is set", file=sys.stderr)
@@ -553,30 +554,52 @@ def main(argv: List[str]) -> int:
     insecure_addrs, models = parse_binsec_toml(args.toml)
     leaks = parse_output_log(args.output_log, title=title)
 
-    rows = build_rows(
-        insecure_addrs=insecure_addrs,
-        models=models,
-        leaks=leaks,
-        addr_executable=args.executable,
-        code_root=args.code_path,
-        sym_size=args.sym_size,
-        reproduce_script=reproduce_script if args.reproduce else None,
-        replay_executable=args.replay_executable if args.reproduce else None,
-        needs_publics=needs_publics,
-        reproduce_timeout_s=args.reproduce_timeout,
-    )
+    try:
+        rows = build_rows(
+            insecure_addrs=insecure_addrs,
+            models=models,
+            leaks=leaks,
+            addr_executable=args.executable,
+            code_root=args.code_path,
+            library=args.library,
+            sym_size=args.sym_size,
+            reproduce_module=reproduce_module if args.reproduce else None,
+            replay_executable=args.replay_executable if args.reproduce else None,
+            needs_publics=needs_publics,
+            reproduce_timeout_s=args.reproduce_timeout,
+        )
+    except RuntimeError as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 2
 
-    out_obj = {"data": rows}
-    # Keep dtypes metadata for downstream tools that expect it.
-    out_obj["dtypes"] = {
-        "filename": "object",
-        "line": "Int64",
-        "column": "Int64",
-        "non_ct_time": "float64",
-        "code": "object",
-        "counterexamples": "object",
-        "reproduced": "object",
-    }
+    validated_rows: List[Dict[str, Any]] = []
+    for row in rows:
+        optional = {
+            k: v
+            for k, v in row.items()
+            if k not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
+        }
+        counterexamples = row.get("counterexamples")
+        validated_rows.append(
+            make_result_row(
+                filename=row.get("filename"),
+                line=row.get("line"),
+                non_ct_time=row.get("non_ct_time"),
+                counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
+                reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
+                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else args.library,
+                optional_fields=optional,
+            )
+        )
+    rows = validated_rows
+
+    out_obj = build_payload(
+        rows,
+        optional_dtypes={
+            "column": "Int64",
+            "code": "object",
+        },
+    )
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:

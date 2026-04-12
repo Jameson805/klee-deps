@@ -12,7 +12,7 @@
       "in_ctchecker": true,
       "code": "        if( Y->p[i] != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -26,7 +26,7 @@
       "in_ctchecker": true,
       "code": "        if( X->p[i] != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -43,7 +43,7 @@
         "exp": 2147483648,
         "exp__prime": 1
       },
-      "reproduced": true
+      "reproduced_status": "success"
     },
     {
       "filename": "library/bignum.c",
@@ -57,7 +57,7 @@
       "in_ctchecker": true,
       "code": "    while( n > 0 && A->p[n - 1] == 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -71,7 +71,7 @@
       "in_ctchecker": true,
       "code": "    if( b == 0 || n == 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -85,7 +85,7 @@
       "in_ctchecker": true,
       "code": "        if( X->p[i - 1] != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -99,7 +99,7 @@
       "in_ctchecker": true,
       "code": "        if( Y->p[j - 1] != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -113,7 +113,7 @@
       "in_ctchecker": true,
       "code": "        if( X->p[i - 1] > Y->p[i - 1] ) return(  1 );",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -127,7 +127,7 @@
       "in_ctchecker": true,
       "code": "        if( X->p[i - 1] < Y->p[i - 1] ) return( -1 );",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -141,7 +141,7 @@
       "in_ctchecker": true,
       "code": "        if( B->p[n - 1] != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -155,7 +155,7 @@
       "in_ctchecker": true,
       "code": "    if( carry != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -169,7 +169,7 @@
       "in_ctchecker": true,
       "code": "        for( ; n < X->n && X->p[n] == 0; n++ )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -183,7 +183,7 @@
       "in_ctchecker": true,
       "code": "        if( B->p[j - 1] != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -197,7 +197,7 @@
       "in_ctchecker": true,
       "code": "    while( c != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -214,7 +214,7 @@
         "exp": 1,
         "exp__prime": 0
       },
-      "reproduced": true
+      "reproduced_status": "success"
     },
     {
       "filename": "library/bignum.c",
@@ -228,7 +228,7 @@
       "in_ctchecker": true,
       "code": "        if( Y->p[j - 1] != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -242,7 +242,7 @@
       "in_ctchecker": true,
       "code": "        if( X->p[i - 1] > Y->p[i - 1] ) return(  X->s );",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -256,7 +256,7 @@
       "in_ctchecker": true,
       "code": "        if( X->p[i - 1] < Y->p[i - 1] ) return( -X->s );",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -270,7 +270,7 @@
       "in_ctchecker": true,
       "code": "        if( X.p[i] >= Y.p[t] )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -284,7 +284,7 @@
       "in_ctchecker": true,
       "code": "    if( 0 == d || u1 >= d )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -298,7 +298,7 @@
       "in_ctchecker": true,
       "code": "    if( 0 == d || u1 >= d )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -312,7 +312,7 @@
       "in_ctchecker": true,
       "code": "    if( quotient > ( (mbedtls_t_udbl) 1 << biL ) - 1 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -326,7 +326,7 @@
       "in_ctchecker": true,
       "code": "    if( mbedtls_mpi_cmp_int( N, 0 ) <= 0 || ( N->p[0] & 1 ) == 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -343,7 +343,7 @@
         "exp": 3221225472,
         "exp__prime": 2147483648
       },
-      "reproduced": true
+      "reproduced_status": "success"
     },
     {
       "filename": "library/bignum.c",
@@ -357,7 +357,7 @@
       "in_ctchecker": true,
       "code": "        if( ei == 0 && state == 1 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -371,7 +371,7 @@
       "in_ctchecker": true,
       "code": "        if( ( wbits & ( one << wsize ) ) != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     },
     {
       "filename": "library/bignum.c",
@@ -385,7 +385,7 @@
       "in_ctchecker": true,
       "code": "    if( neg && E->n != 0 && ( E->p[0] & 1 ) != 0 )",
       "counterexamples": null,
-      "reproduced": null
+      "reproduced_status": "location_mismatch"
     }
   ],
   "dtypes": {
@@ -400,6 +400,6 @@
     "in_ctchecker": "bool",
     "code": "object",
     "counterexamples": "object",
-    "reproduced": "object"
+    "reproduced_status": "object"
   }
 }

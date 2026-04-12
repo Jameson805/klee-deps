@@ -1,0 +1,6 @@
+library,file,line_start,line_end
+libgcrypt,mpi-pow.c,404,771
+mbedtls,bignum.c,1968,2200
+openssl_mont,bn_exp.c,297,471
+openssl_mont_word,bn_exp.c,1138,1283
+openssl_recp,bn_exp.c,161,295
