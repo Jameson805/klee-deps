@@ -1,0 +1,11 @@
+Name,Positives,Array,Time (mm:ss),Time (s)
+/Constantine/binsec/aes_big,0,0,00:01,1
+/Constantine/binsec/des_tab,18,8,00:03,3
+/Constantine/binsec/tls-rempad-luk13,0,0,00:01,1
+/Constantine/issta18/appliedCryp/3way,0,0,00:00,0
+/Constantine/issta18/appliedCryp/des,0,0,00:01,1
+/Constantine/issta18/appliedCryp/loki91,0,0,00:08,8
+/Constantine/issta18/ghostrider/findmax,0,0,00:03,3
+/Constantine/issta18/ghostrider/matmul,0,0,00:00,0
+/Constantine/issta18/libg/des,0,0,00:21,21
+/Constantine/pycrypto/ARC4,8,11,00:01,1
