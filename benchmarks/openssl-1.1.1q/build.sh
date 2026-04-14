@@ -7,20 +7,20 @@ cd "$script_dir"
 KLEE_PATH="../../klee-controlflow"
 
 usage() {
-    echo "Usage: $0 [--skip-deps] [--sliced] (--klee-cf | --binsec | --abacus | --self-comp) --sym-size N"
+    echo "Usage: $0 [--skip-deps] [--sliced] (--klee-cf | --binsec | --abacus | --self-comp) --preset NAME"
     echo "  --skip-deps    Skip building OpenSSL (Configure/make)"
     echo "  --sliced       Link crypto/bin/bn_exp.c -> crypto/bin/bn_exp_sliced.c (default: -> bn_exp_orig.c)"
     echo "  --klee-cf      Build KLEE bitcode and Replay binaries"
     echo "  --binsec       Build BINSEC binaries"
     echo "  --abacus       Build Abacus binaries"
     echo "  --self-comp    Build self-composition KLEE bitcode"
-    echo "  --sym-size N   Mandatory non-negative integer to pass as -DSYM_SIZE"
+    echo "  --preset NAME  Select the preset to materialize into generated runner artifacts"
 }
 
 SKIP_DEPS=0
 SLICED=0
 MODE=""
-SYM_SIZE=""
+PRESET=""
 
 # Flags that reduce indirect control-flow artifacts (e.g., PLT indirections / PIE thunks).
 # Note: `-no-pie` is a linker flag, so keep it in LDFLAGS for dependency builds.
@@ -51,12 +51,16 @@ while [[ $# -gt 0 ]]; do
             esac
             shift
             ;;
-        --sym-size)
+        --preset)
             if [[ $# -lt 2 ]]; then
-                echo "Missing value for --sym-size"
+                echo "Missing value for --preset"
                 exit 1
             fi
-            SYM_SIZE="$2"
+            if [[ -n "$PRESET" && "$PRESET" != "$2" ]]; then
+                echo "Multiple preset values specified: $PRESET and $2"
+                exit 1
+            fi
+            PRESET="$2"
             shift 2
             ;;
         -h|--help)
@@ -76,13 +80,13 @@ if [[ -z "$MODE" ]]; then
     usage
     exit 1
 fi
-if [[ -z "$SYM_SIZE" ]]; then
-    echo "Missing required --sym-size argument."
+if [[ -z "$PRESET" ]]; then
+    echo "Missing required preset. Use --preset NAME."
     usage
     exit 1
 fi
-if ! [[ "$SYM_SIZE" =~ ^[0-9]+$ ]]; then
-    echo "SYM_SIZE must be a non-negative integer, got: $SYM_SIZE"
+if ! [[ "$PRESET" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
+    echo "Preset name contains unsupported characters: $PRESET"
     exit 1
 fi
 
@@ -109,6 +113,23 @@ if [[ "$SLICED" -eq 1 ]]; then
 else
     ensure_bn_exp_link "bn_exp_orig.c"
 fi
+
+mkdir -p generated
+generator_args=(
+    --config "$repo_root/configs/runner/modexp_runner_config.json"
+    --header-out "$script_dir/generated/runner_config.generated.h"
+    --preset "$PRESET"
+)
+
+if [[ "$MODE" == "binsec" ]]; then
+    generator_args+=(
+        --binsec-base "$repo_root/configs/binsec/binsec_base.cfg"
+        --binsec-fix-pub-out "$script_dir/generated/binsec_fix_pub.cfg"
+        --binsec-var-pub-out "$script_dir/generated/binsec_var_pub.cfg"
+    )
+fi
+
+python "$repo_root/tools/generate_runner_artifacts.py" "${generator_args[@]}"
 
 if [ "$SKIP_DEPS" -eq 0 ]; then
     echo "Building dependencies..."
@@ -142,7 +163,7 @@ else
     echo "Skipping dependency builds."
 fi
 
-flags=( -g -O0 -I"$repo_root/include" -Iinclude )
+flags=( -g -O0 -I"$repo_root/include" -Iinclude -Igenerated )
 klee_flags=(\
     -I"$KLEE_PATH/include" \
     -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" \
@@ -164,29 +185,29 @@ for algo in "${algos[@]}"; do
 
     if [[ "$MODE" == "klee_cf" ]]; then
         # KLEE-controlflow bitcode builds
-        wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SYM_SIZE} -DKLEE_CF -D${macro} klee_main.c "${libs[@]}" -o "klee_var_pub_${algo}"
+        wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -D${macro} klee_main.c "${libs[@]}" -o "klee_var_pub_${algo}"
         extract-bc "klee_var_pub_${algo}"
-        wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SYM_SIZE} -DKLEE_CF -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_${algo}"
+        wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_${algo}"
         extract-bc "klee_fix_pub_${algo}"
 
         # Replay builds
-        clang "${flags[@]}" -static -D${macro} -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o "klee_var_pub_replay_${algo}"
-        clang "${flags[@]}" -static -D${macro} -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_replay_${algo}"
+        clang "${flags[@]}" -static -D${macro} -DREPLAY klee_main.c "${libs[@]}" -o "klee_var_pub_replay_${algo}"
+        clang "${flags[@]}" -static -D${macro} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_replay_${algo}"
     fi
 
     if [[ "$MODE" == "binsec" ]]; then
         # BINSEC builds
-        clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DSYM_SIZE=${SYM_SIZE} -DBINSEC klee_main.c "${libs[@]}" -o "binsec_var_pub_${algo}"
-        clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DSYM_SIZE=${SYM_SIZE} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_${algo}"
+        clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DBINSEC klee_main.c "${libs[@]}" -o "binsec_var_pub_${algo}"
+        clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_${algo}"
 
         # Replay binaries for BINSEC (built separately; REPLAY and BINSEC are mutually exclusive)
-        clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DSYM_SIZE=${SYM_SIZE} -DREPLAY klee_main.c "${libs[@]}" -o "binsec_var_pub_replay_${algo}"
-        clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DSYM_SIZE=${SYM_SIZE} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_replay_${algo}"
+        clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DREPLAY klee_main.c "${libs[@]}" -o "binsec_var_pub_replay_${algo}"
+        clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_replay_${algo}"
     fi
 
     if [[ "$MODE" == "abacus" ]]; then
         # Abacus builds
-        gcc "${flags[@]}" -m32 -pthread -D${macro} -DSYM_SIZE=${SYM_SIZE} -DABACUS klee_main.c "${libs[@]}" -ldl -o "abacus_fix_pub_${algo}"
+        gcc "${flags[@]}" -m32 -pthread -D${macro} -DABACUS klee_main.c "${libs[@]}" -ldl -o "abacus_fix_pub_${algo}"
     fi
 
     if [[ "$MODE" == "self_comp" ]]; then
@@ -197,11 +218,11 @@ for algo in "${algos[@]}"; do
             mont_word)      fun="BN_mod_exp_mont_word" ;;
         esac
 
-        wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SYM_SIZE} -DSELF_COMP -D${macro} klee_main.c "${libs[@]}" -o "self_comp_var_pub_${algo}"
+        wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP -D${macro} klee_main.c "${libs[@]}" -o "self_comp_var_pub_${algo}"
         extract-bc "self_comp_var_pub_${algo}"
         record_branch "self_comp_var_pub_${algo}.bc" "${fun}"
 
-        wllvm "${flags[@]}" "${klee_flags[@]}" -DSYM_SIZE=${SYM_SIZE} -DSELF_COMP -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "self_comp_fix_pub_${algo}"
+        wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "self_comp_fix_pub_${algo}"
         extract-bc "self_comp_fix_pub_${algo}"
         record_branch "self_comp_fix_pub_${algo}.bc" "${fun}"
     fi

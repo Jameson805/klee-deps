@@ -267,13 +267,16 @@ run_case() {
     local executable="$4"      # e.g. mbedtls-3.2.1/binsec_fix_pub
 
     local sse_script_to_use="$sse_script"
+    local cfg_stem
+    cfg_stem="$(basename "${sse_script%.cfg}")"
+
     if [[ "$patch_memset_ifunc" -eq 1 ]]; then
         local patcher_py="$repo_root/tools/converters/binsec_patch_memset_ifunc.py"
         if [[ -f "$patcher_py" && -n "$python_bin" ]]; then
-            local out_cfg="$results_dir/patched_${sse_script%.cfg}_$(basename "$executable").cfg"
+            local out_cfg="$results_dir/patched_memset_${cfg_stem}_$(basename "$executable").cfg"
             "$python_bin" "$patcher_py" \
                 --exe "$executable" \
-                --base-cfg "$sse_script" \
+                --base-cfg "$sse_script_to_use" \
                 --out-cfg "$out_cfg" \
                 >/dev/null
             sse_script_to_use="$out_cfg"
@@ -312,7 +315,7 @@ ensure_built_mbedtls() {
     echo "##########"
     echo "Begin experiments for Mbed TLS 3.2.1"
     echo "##########"
-    benchmarks/mbedtls-3.2.1/build.sh --binsec --sym-size "${sym_size}"
+    benchmarks/mbedtls-3.2.1/build.sh --binsec --preset "size_${sym_size}"
     _BUILT_MBEDTLS=1
 }
 
@@ -323,7 +326,7 @@ ensure_built_libgcrypt() {
     echo "##########"
     echo "Begin experiments for Libgcrypt 1.10.1"
     echo "##########"
-    benchmarks/libgcrypt-and-libgpg-error/build.sh --binsec --sym-size "${sym_size}"
+    benchmarks/libgcrypt-and-libgpg-error/build.sh --binsec --preset "size_${sym_size}"
     _BUILT_LIBGCRYPT=1
 }
 
@@ -334,7 +337,7 @@ ensure_built_openssl() {
     echo "##########"
     echo "Begin experiments for OpenSSL 1.1.1q"
     echo "##########"
-    benchmarks/openssl-1.1.1q/build.sh --binsec --sym-size "${sym_size}"
+    benchmarks/openssl-1.1.1q/build.sh --binsec --preset "size_${sym_size}"
     _BUILT_OPENSSL=1
 }
 
@@ -343,10 +346,10 @@ run_mbedtls_case() {
     ensure_built_mbedtls
     case "$kind" in
         fix_pub)
-            run_case "Mbed TLS 3.2.1 (Fix Pub)" "$repo_root/configs/binsec/binsec_fix_pub.cfg" "mbedtls_fix_pub.toml" "benchmarks/mbedtls-3.2.1/binsec_fix_pub"
+            run_case "Mbed TLS 3.2.1 (Fix Pub)" "$repo_root/benchmarks/mbedtls-3.2.1/generated/binsec_fix_pub.cfg" "mbedtls_fix_pub.toml" "benchmarks/mbedtls-3.2.1/binsec_fix_pub"
             ;;
         var_pub)
-            run_case "Mbed TLS 3.2.1 (Var Pub)" "$repo_root/configs/binsec/binsec_var_pub.cfg" "mbedtls_var_pub.toml" "benchmarks/mbedtls-3.2.1/binsec_var_pub"
+            run_case "Mbed TLS 3.2.1 (Var Pub)" "$repo_root/benchmarks/mbedtls-3.2.1/generated/binsec_var_pub.cfg" "mbedtls_var_pub.toml" "benchmarks/mbedtls-3.2.1/binsec_var_pub"
             ;;
         *)
             echo "Error: unknown mbedtls kind '$kind'" >&2
@@ -360,10 +363,10 @@ run_libgcrypt_case() {
     ensure_built_libgcrypt
     case "$kind" in
         fix_pub)
-            run_case "Libgcrypt 1.10.1 (Fix Pub)" "$repo_root/configs/binsec/binsec_fix_pub.cfg" "libgcrypt_fix_pub.toml" "benchmarks/libgcrypt-and-libgpg-error/binsec_fix_pub"
+            run_case "Libgcrypt 1.10.1 (Fix Pub)" "$repo_root/benchmarks/libgcrypt-and-libgpg-error/generated/binsec_fix_pub.cfg" "libgcrypt_fix_pub.toml" "benchmarks/libgcrypt-and-libgpg-error/binsec_fix_pub"
             ;;
         var_pub)
-            run_case "Libgcrypt 1.10.1 (Var Pub)" "$repo_root/configs/binsec/binsec_var_pub.cfg" "libgcrypt_var_pub.toml" "benchmarks/libgcrypt-and-libgpg-error/binsec_var_pub"
+            run_case "Libgcrypt 1.10.1 (Var Pub)" "$repo_root/benchmarks/libgcrypt-and-libgpg-error/generated/binsec_var_pub.cfg" "libgcrypt_var_pub.toml" "benchmarks/libgcrypt-and-libgpg-error/binsec_var_pub"
             ;;
         *)
             echo "Error: unknown libgcrypt kind '$kind'" >&2
@@ -378,10 +381,10 @@ run_openssl_case() {
     ensure_built_openssl
     case "$kind" in
         fix_pub)
-            run_case "OpenSSL 1.1.1q ${algo} (Fix Pub)" "$repo_root/configs/binsec/binsec_fix_pub.cfg" "openssl_${algo}_fix_pub.toml" "benchmarks/openssl-1.1.1q/binsec_fix_pub_${algo}"
+            run_case "OpenSSL 1.1.1q ${algo} (Fix Pub)" "$repo_root/benchmarks/openssl-1.1.1q/generated/binsec_fix_pub.cfg" "openssl_${algo}_fix_pub.toml" "benchmarks/openssl-1.1.1q/binsec_fix_pub_${algo}"
             ;;
         var_pub)
-            run_case "OpenSSL 1.1.1q ${algo} (Var Pub)" "$repo_root/configs/binsec/binsec_var_pub.cfg" "openssl_${algo}_var_pub.toml" "benchmarks/openssl-1.1.1q/binsec_var_pub_${algo}"
+            run_case "OpenSSL 1.1.1q ${algo} (Var Pub)" "$repo_root/benchmarks/openssl-1.1.1q/generated/binsec_var_pub.cfg" "openssl_${algo}_var_pub.toml" "benchmarks/openssl-1.1.1q/binsec_var_pub_${algo}"
             ;;
         *)
             echo "Error: unknown openssl kind '$kind'" >&2

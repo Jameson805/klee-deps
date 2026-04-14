@@ -1,12 +1,14 @@
-#include "common.h"
+#include "runner_config.generated.h"
 #include <gcrypt.h>
 
 #ifdef USE_SLICED
     #include "powm_sliced.h"
 #endif
 
-int driver_main(const unsigned char *exp_buf, const unsigned char *base_buf, const unsigned char *mod_buf, size_t len)
+int driver_main(void)
 {
+    size_t len = sizeof(exp_buf);
+
     if (!gcry_check_version(NULL)) {
         fprintf(stderr, "libgcrypt init failed\n");
         return 1;

@@ -1,14 +1,15 @@
-#include "common.h"
+#include "runner_config.generated.h"
 #include "mbedtls/bignum.h"
 
 #ifdef USE_SLICED
     #include "bignum_sliced.h"
 #endif
 
-int driver_main(const unsigned char *exp_buf, const unsigned char *base_buf, const unsigned char *mod_buf, size_t len)
+int driver_main(void)
 {
     mbedtls_mpi exp, base, mod, result;
     int ret = 0;
+    size_t len = sizeof(exp_buf);
 
     mbedtls_mpi_init(&exp);
     mbedtls_mpi_init(&base);

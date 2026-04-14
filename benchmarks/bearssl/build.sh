@@ -6,7 +6,7 @@ cd "$script_dir"
 
 usage() {
     cat <<EOF
-Usage: $0 (--klee-cf | --klee-eager | --self-comp | --binsec | --abacus) --sym-size N
+Usage: $0 (--klee-cf | --klee-eager | --self-comp | --binsec | --abacus) --preset NAME
 
 Builds the BearSSL aes_big/des_tab benchmark wrappers for the requested mode.
 
@@ -18,12 +18,12 @@ Modes:
   --abacus      Build Abacus executables (32-bit)
 
 Options:
-  --sym-size N  Mandatory non-negative integer (kept for interface parity)
+    --preset NAME  Mandatory preset name. Current build logic expects size_N.
 EOF
 }
 
 MODE=""
-SYM_SIZE=""
+PRESET=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -47,12 +47,12 @@ while [[ $# -gt 0 ]]; do
             MODE="abacus"
             shift
             ;;
-        --sym-size)
+        --preset)
             if [[ $# -lt 2 ]]; then
-                echo "Missing value for --sym-size" >&2
+                echo "Missing value for --preset" >&2
                 exit 1
             fi
-            SYM_SIZE="$2"
+            PRESET="$2"
             shift 2
             ;;
         -h|--help)
@@ -72,13 +72,19 @@ if [[ -z "$MODE" ]]; then
     usage
     exit 1
 fi
-if [[ -z "$SYM_SIZE" ]]; then
-    echo "Missing required --sym-size argument" >&2
+if [[ -z "$PRESET" ]]; then
+    echo "Missing required --preset argument" >&2
     usage
     exit 1
 fi
+if [[ "$PRESET" =~ ^size_([0-9]+)$ ]]; then
+    SYM_SIZE="${BASH_REMATCH[1]}"
+else
+    echo "Unsupported preset for BearSSL build: $PRESET (expected size_N)" >&2
+    exit 1
+fi
 if ! [[ "$SYM_SIZE" =~ ^[0-9]+$ ]]; then
-    echo "SYM_SIZE must be a non-negative integer, got: $SYM_SIZE" >&2
+    echo "Derived SYM_SIZE must be a non-negative integer, got: $SYM_SIZE" >&2
     exit 1
 fi
 

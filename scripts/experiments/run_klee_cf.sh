@@ -260,12 +260,12 @@ run_case() {
     rm -f "$bc_dir/klee-last"
     rm -rf "$bc_dir/klee-out-"*
 
-    python -m tools.postprocess.compare_with_ctchecker branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" --library "$library" "$@" $replay_opts
+    python -m tools.converters.compare_with_ctchecker branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" --library "$library" "$@" $replay_opts
     python -m tools.postprocess.reproduce_positives --json "$results_dir/${result_name}_branch.json" --klee-output "$results_dir/$result_name" --executable "$replay_script" --library "$library" $replay_opts --output "$results_dir/${result_name}_branch.json"
     # make_report.py "$results_dir/${result_name}_branch.json" "$results_dir/${result_name}_branch_report.html"
 
     if [[ "$memory_flag" == "true" ]]; then
-        python -m tools.postprocess.compare_with_ctchecker memory "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_memory.json" --code-path "$code_path" --library "$library" "$@"
+        python -m tools.converters.compare_with_ctchecker memory "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_memory.json" --code-path "$code_path" --library "$library" "$@"
         # make_report.py "$results_dir/${result_name}_memory.json" "$results_dir/${result_name}_memory_report.html"
     fi
 }
@@ -275,7 +275,7 @@ run_mbedtls() {
     echo "Begin experiments for Mbed TLS 3.2.1"
     echo "##########"
 
-    benchmarks/mbedtls-3.2.1/build.sh --klee-cf --sym-size ${sym_size}
+    benchmarks/mbedtls-3.2.1/build.sh --klee-cf --preset size_${sym_size}
     limit_loop \
         -blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz \
         -o benchmarks/mbedtls-3.2.1/klee_fix_pub_lim_loop.bc \
@@ -313,7 +313,7 @@ run_mbedtls_sliced() {
     echo "Begin experiments for Mbed TLS 3.2.1 (Sliced)"
     echo "##########"
 
-    benchmarks/mbedtls-3.2.1/build.sh --klee-cf --sym-size ${sym_size}
+    benchmarks/mbedtls-3.2.1/build.sh --klee-cf --preset size_${sym_size}
     limit_loop \
         -blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz \
         -o benchmarks/mbedtls-3.2.1/klee_fix_pub_sliced_lim_loop.bc \
@@ -348,7 +348,7 @@ run_libgcrypt() {
     echo "Begin experiments for Libgcrypt 1.10.1"
     echo "##########"
 
-    benchmarks/libgcrypt-and-libgpg-error/build.sh --klee-cf --sym-size ${sym_size}
+    benchmarks/libgcrypt-and-libgpg-error/build.sh --klee-cf --preset size_${sym_size}
     limit_loop \
         -blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift \
         -o benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc \
@@ -387,7 +387,7 @@ run_libgcrypt_sliced() {
     echo "Begin experiments for Libgcrypt 1.10.1 (Sliced)"
     echo "##########"
 
-    benchmarks/libgcrypt-and-libgpg-error/build.sh --klee-cf --sym-size ${sym_size} --sliced
+    benchmarks/libgcrypt-and-libgpg-error/build.sh --klee-cf --preset size_${sym_size} --sliced
     limit_loop \
         -blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift \
         -o benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc \
@@ -425,7 +425,7 @@ run_openssl() {
     echo "Begin experiments for OpenSSL 1.1.1q"
     echo "##########"
 
-    benchmarks/openssl-1.1.1q/build.sh --klee-cf --sym-size ${sym_size}
+    benchmarks/openssl-1.1.1q/build.sh --klee-cf --preset size_${sym_size}
 
     for algo in recp mont mont_consttime mont_word; do
         limit_loop \
@@ -484,7 +484,7 @@ run_openssl_sliced() {
     echo "Begin experiments for OpenSSL 1.1.1q (Sliced)"
     echo "##########"
 
-    benchmarks/openssl-1.1.1q/build.sh --klee-cf --sym-size ${sym_size} --sliced
+    benchmarks/openssl-1.1.1q/build.sh --klee-cf --preset size_${sym_size} --sliced
 
     for algo in recp mont mont_word; do
     # for algo in recp mont mont_consttime mont_word; do

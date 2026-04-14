@@ -1,4 +1,4 @@
-#include "common.h"
+#include "runner_config.generated.h"
 #include <openssl/bn.h>
 
 #if RECP + MONT + MONT_CONSTTIME + MONT_WORD != 1
@@ -17,8 +17,10 @@ static BN_ULONG be_tail_to_bn_ulong(const unsigned char *buf, size_t len) {
     return v;
 }
 
-int driver_main(const unsigned char *exp_buf, const unsigned char *base_buf, const unsigned char *mod_buf, size_t len)
+int driver_main(void)
 {
+    size_t len = sizeof(exp_buf);
+
     BIGNUM *base = BN_new();
     BIGNUM *exp = BN_new();
     BIGNUM *mod = BN_new();

@@ -22,9 +22,8 @@ klee_var_pub*
 klee_fix_pub_replay*
 klee_var_pub_replay*
 binsec_fix_pub*
-!configs/binsec/binsec_fix_pub.cfg
 binsec_var_pub*
-!configs/binsec/binsec_var_pub.cfg
+runner_config.generated.h
 abacus_fix_pub*
 self_comp_fix_pub*
 self_comp_var_pub*

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import ast
 import argparse
 import json
 import os
@@ -70,17 +71,47 @@ def main(argv: List[str]) -> int:
         print(f"Error: log not found: {args.log}", file=sys.stderr)
         return 2
 
-    ref_secret_by_size = {
-        1: 241,
-        2: 65519,
-        4: 4294967279,
-        8: 18446744073709551533,
-        16: ((1 << 64) - 1) << 64 | 18446744073709551443,
-    }
-    if args.sym_size not in ref_secret_by_size:
-        print("Error: --sym-size must be one of 1,2,4,8,16", file=sys.stderr)
+    runner_config_path = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "configs",
+            "runner",
+            "modexp_runner_config.json",
+        )
+    )
+    preset_name = f"size_{args.sym_size}"
+    try:
+        with open(runner_config_path, "r", encoding="utf-8") as f:
+            runner_config = ast.literal_eval(f.read())
+        ref_secret_value = runner_config["presets"][preset_name]["abacus_secrets"]["exp_buf"]
+    except (OSError, SyntaxError, ValueError, KeyError, TypeError) as exc:
+        print(
+            "Error: failed to load ABACUS reference secret from "
+            f"{runner_config_path} preset {preset_name}: {exc}",
+            file=sys.stderr,
+        )
         return 2
-    ref_secret = ref_secret_by_size[args.sym_size]
+
+    if isinstance(ref_secret_value, int):
+        ref_secret = ref_secret_value
+    elif isinstance(ref_secret_value, list) and ref_secret_value:
+        ref_secret = 0
+        for byte_value in ref_secret_value:
+            if not isinstance(byte_value, int) or byte_value < 0 or byte_value > 0xFF:
+                print(
+                    "Error: ABACUS reference secret bytes must be integers in [0, 255]",
+                    file=sys.stderr,
+                )
+                return 2
+            ref_secret = (ref_secret << 8) | byte_value
+    else:
+        print(
+            f"Error: unsupported ABACUS reference secret format for preset {preset_name}",
+            file=sys.stderr,
+        )
+        return 2
 
     reproduce_module = args.reproduce_module
     if args.reproduce and not reproduce_module:
@@ -234,7 +265,8 @@ def main(argv: List[str]) -> int:
     )
     payload["notes"] = {
             "abacus_reference_secret": {
-                "source": "Hard-coded from include/common.h ABACUS branch (second-closest prime constants)",
+                "source": "Loaded from configs/runner/modexp_runner_config.json preset abacus_secrets.exp_buf",
+                "preset": preset_name,
                 "sym_size": args.sym_size,
                 "exp": ref_secret,
             }

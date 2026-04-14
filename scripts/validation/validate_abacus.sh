@@ -242,8 +242,8 @@ for json_file in "${json_files[@]}"; do
         fi
 
         echo "Replay executable not found: $replay_exe"
-        echo "Building with $build_script --klee-cf --sym-size $sym_size"
-        "$build_script" --klee-cf --sym-size "$sym_size"
+        echo "Building with $build_script --klee-cf --preset size_$sym_size"
+        "$build_script" --klee-cf --preset "size_$sym_size"
     fi
 
     if [[ ! -x "$replay_exe" ]]; then

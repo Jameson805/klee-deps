@@ -122,7 +122,7 @@ run_mbedtls() {
     echo "Begin experiments for Mbed TLS 3.2.1"
     echo "##########"
 
-    benchmarks/mbedtls-3.2.1/build.sh --abacus --sym-size ${sym_size}
+    benchmarks/mbedtls-3.2.1/build.sh --abacus --preset size_${sym_size}
     run_case "benchmarks/mbedtls-3.2.1/abacus_fix_pub" "mbedtls.txt"
 }
 
@@ -131,7 +131,7 @@ run_libgcrypt() {
     echo "Begin experiments for Libgcrypt 1.10.1"
     echo "##########"
 
-    benchmarks/libgcrypt-and-libgpg-error/build.sh --abacus --sym-size ${sym_size}
+    benchmarks/libgcrypt-and-libgpg-error/build.sh --abacus --preset size_${sym_size}
     run_case "benchmarks/libgcrypt-and-libgpg-error/abacus_fix_pub" "libgcrypt.txt"
 }
 
@@ -140,7 +140,7 @@ run_openssl() {
     echo "Begin experiments for OpenSSL 1.1.1q"
     echo "##########"
 
-    benchmarks/openssl-1.1.1q/build.sh --abacus --sym-size ${sym_size}
+    benchmarks/openssl-1.1.1q/build.sh --abacus --preset size_${sym_size}
     for algo in recp mont mont_consttime mont_word; do
         run_case "benchmarks/openssl-1.1.1q/abacus_fix_pub_${algo}" "openssl_${algo}.txt"
     done

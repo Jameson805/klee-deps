@@ -243,7 +243,7 @@ run_mbedtls() {
     echo "##########"
     echo "Begin experiments for Mbed TLS 3.2.1"
     echo "##########"
-    benchmarks/mbedtls-3.2.1/build.sh --self-comp --sym-size "$sym_size"
+    benchmarks/mbedtls-3.2.1/build.sh --self-comp --preset "size_${sym_size}"
     run_case "Mbed TLS 3.2.1 (Fix Pub Self-Comp)" "benchmarks/mbedtls-3.2.1/self_comp_fix_pub.bc" "mbedtls_self_comp_fix_pub" "mbedtls_fix_pub.json" "klee_fix_pub_replay"
     run_case "Mbed TLS 3.2.1 (Var Pub Self-Comp)" "benchmarks/mbedtls-3.2.1/self_comp_var_pub.bc" "mbedtls_self_comp_var_pub" "mbedtls_var_pub.json" "klee_var_pub_replay"
 }
@@ -252,7 +252,7 @@ run_libgcrypt() {
     echo "##########"
     echo "Begin experiments for Libgcrypt 1.10.1"
     echo "##########"
-    benchmarks/libgcrypt-and-libgpg-error/build.sh --self-comp --sym-size "$sym_size"
+    benchmarks/libgcrypt-and-libgpg-error/build.sh --self-comp --preset "size_${sym_size}"
     run_case "Libgcrypt 1.10.1 (Fix Pub Self-Comp)" "benchmarks/libgcrypt-and-libgpg-error/self_comp_fix_pub.bc" "libgcrypt_self_comp_fix_pub" "libgcrypt_fix_pub.json" "klee_fix_pub_replay"
     run_case "Libgcrypt 1.10.1 (Var Pub Self-Comp)" "benchmarks/libgcrypt-and-libgpg-error/self_comp_var_pub.bc" "libgcrypt_self_comp_var_pub" "libgcrypt_var_pub.json" "klee_var_pub_replay"
 }
@@ -261,7 +261,7 @@ run_openssl() {
     echo "##########"
     echo "Begin experiments for OpenSSL 1.1.1q"
     echo "##########"
-    benchmarks/openssl-1.1.1q/build.sh --self-comp --sym-size "$sym_size"
+    benchmarks/openssl-1.1.1q/build.sh --self-comp --preset "size_${sym_size}"
     for algo in recp mont mont_consttime mont_word; do
         run_case "OpenSSL 1.1.1q ${algo} (Fix Pub Self-Comp)" "benchmarks/openssl-1.1.1q/self_comp_fix_pub_${algo}.bc" "openssl_${algo}_self_comp_fix_pub" "openssl_${algo}_fix_pub.json" "klee_fix_pub_replay_${algo}"
         run_case "OpenSSL 1.1.1q ${algo} (Var Pub Self-Comp)" "benchmarks/openssl-1.1.1q/self_comp_var_pub_${algo}.bc" "openssl_${algo}_self_comp_var_pub" "openssl_${algo}_var_pub.json" "klee_var_pub_replay_${algo}"
