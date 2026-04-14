@@ -2,7 +2,7 @@ import json
 import pandas as pd
 
 def load_combined_json(input_json: str) -> pd.DataFrame:
-    """Load the JSON produced by compare_with_ctchecker.py into a DataFrame.
+    """Load the combined comparison JSON produced by the tool converters.
 
     Support two forms:
       - A dict with keys {"data": [...], "dtypes": {...}}

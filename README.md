@@ -19,12 +19,14 @@ This repository contains experimental infrastructure for evaluating constant-tim
   - run_experiments_abacus.sh
   - parallel_klee_copies.sh
 - scripts/validation: validation helpers for generated experiment outputs
-- tools/postprocess: aggregation/reporting/comparison utilities
-- tools/converters: log/toml to json converters
+- tools/postprocess: merge/filter/report utilities for collected results
+- tools/converters: raw-output-to-schema converters used before postprocessing
 - tools/utilities: reusable helper scripts
 - tools/shared: shared Python modules
-- configs/binsec: BINSEC config files and related mapping data
-- include/common.h: shared harness header
+- configs/binsec: shared BINSEC execution config inputs
+- configs/postprocess: checked-in CSV inputs for result relabeling and filtering
+- configs/runner: shared runner config inputs reused by multiple benchmarks
+- include/runner.h: shared generated-runner harness used by benchmark entrypoints
 - results: generated outputs (ignored by git)
 - tests: fixture assets and expected outputs for repository tooling
 
