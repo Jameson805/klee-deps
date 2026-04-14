@@ -202,7 +202,7 @@ def main(argv: List[str]) -> int:
         default=None,
         help="Python module to run for reproduction (defaults to tools.postprocess.reproduce_positives)",
     )
-    p.add_argument("--reproduce-timeout", type=int, default=180, help="Timeout in seconds per reproduction (default: 180)")
+    p.add_argument("--reproduce-timeout", type=int, default=1200, help="Timeout in seconds per reproduction (default: 1200)")
     p.add_argument(
         "--code-root",
         default=None,

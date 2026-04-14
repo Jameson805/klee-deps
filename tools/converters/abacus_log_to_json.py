@@ -51,8 +51,8 @@ def main(argv: List[str]) -> int:
     p.add_argument(
         "--reproduce-timeout",
         type=int,
-        default=180,
-        help="Timeout seconds for each reproduction attempt (default: 180)",
+        default=1200,
+        help="Timeout seconds for each reproduction attempt (default: 1200)",
     )
     p.add_argument(
         "--reproduce-debug",
