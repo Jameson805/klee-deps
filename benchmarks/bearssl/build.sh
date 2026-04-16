@@ -2,11 +2,14 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
+repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$script_dir"
+
+KLEE_PATH="../../klee-controlflow"
 
 usage() {
     cat <<EOF
-Usage: $0 (--klee-cf | --klee-eager | --self-comp | --binsec | --abacus) --preset NAME
+Usage: $0 (--klee-cf | --klee-eager | --self-comp | --binsec | --abacus) [--preset NAME]
 
 Builds the BearSSL aes_big/des_tab benchmark wrappers for the requested mode.
 
@@ -18,7 +21,7 @@ Modes:
   --abacus      Build Abacus executables (32-bit)
 
 Options:
-    --preset NAME  Mandatory preset name. Current build logic expects size_N.
+    --preset NAME  Optional preset name. If omitted, the sole preset in each config is used.
 EOF
 }
 
@@ -72,19 +75,8 @@ if [[ -z "$MODE" ]]; then
     usage
     exit 1
 fi
-if [[ -z "$PRESET" ]]; then
-    echo "Missing required --preset argument" >&2
-    usage
-    exit 1
-fi
-if [[ "$PRESET" =~ ^size_([0-9]+)$ ]]; then
-    SYM_SIZE="${BASH_REMATCH[1]}"
-else
-    echo "Unsupported preset for BearSSL build: $PRESET (expected size_N)" >&2
-    exit 1
-fi
-if ! [[ "$SYM_SIZE" =~ ^[0-9]+$ ]]; then
-    echo "Derived SYM_SIZE must be a non-negative integer, got: $SYM_SIZE" >&2
+if [[ -n "$PRESET" ]] && ! [[ "$PRESET" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
+    echo "Preset name contains unsupported characters: $PRESET" >&2
     exit 1
 fi
 
@@ -100,9 +92,15 @@ bench_ids=(
 common_flags=(
     -g
     -O0
-    -DSYM_SIZE="${SYM_SIZE}"
+    -I "$repo_root/include"
     -I bearssl-0.6/inc
     -I bearssl-0.6/src
+)
+
+klee_flags=(
+    -I "$KLEE_PATH/include"
+    -L "$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib"
+    -lkleeRuntest
 )
 
 bench_sources_for_id() {
@@ -128,54 +126,146 @@ bench_sources_for_id() {
     esac
 }
 
+bench_config_for_id() {
+    local id="$1"
+    case "$id" in
+        binsec_aes_big)
+            printf '%s\n' "$repo_root/configs/runner/bearssl_aes_big_runner_config.json"
+            ;;
+        appliedcryp_des)
+            printf '%s\n' "$repo_root/configs/runner/bearssl_des_tab_runner_config.json"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+bench_generated_dir_for_id() {
+    local id="$1"
+    printf '%s\n' "$script_dir/generated/$id"
+}
+
+generate_runner_artifacts_for_id() {
+    local id="$1"
+    local generated_dir
+    local generator_args
+
+    generated_dir="$(bench_generated_dir_for_id "$id")"
+    mkdir -p "$generated_dir"
+
+    generator_args=(
+        --config "$(bench_config_for_id "$id")"
+        --header-out "$generated_dir/runner_config.generated.h"
+    )
+
+    if [[ -n "$PRESET" ]]; then
+        generator_args+=(--preset "$PRESET")
+    fi
+
+    if [[ "$MODE" == "binsec" ]]; then
+        generator_args+=(
+            --binsec-base "$repo_root/configs/binsec/binsec_base.cfg"
+            --binsec-fix-pub-out "$generated_dir/binsec_fix_pub.cfg"
+            --binsec-var-pub-out "$generated_dir/binsec_var_pub.cfg"
+        )
+    fi
+
+    python "$repo_root/tools/generate_runner_artifacts.py" "${generator_args[@]}"
+}
+
+record_branch() {
+    local pass_path="../../branch-recorder/build/libBranchRecorder.so"
+    opt -load "$pass_path" \
+        -load-pass-plugin="$pass_path" \
+        -passes=branch-recorder \
+        "$1" -o "$1"
+}
+
 build_klee_mode() {
     local id="$1"
+    local generated_dir
+    local flags
+
+    generate_runner_artifacts_for_id "$id"
     mapfile -t sources < <(bench_sources_for_id "$id")
+    generated_dir="$(bench_generated_dir_for_id "$id")"
+    flags=("${common_flags[@]}" -I "$generated_dir")
 
     local var_exe="klee_var_pub_${id}"
     local fix_exe="klee_fix_pub_${id}"
+    local var_replay="klee_var_pub_replay_${id}"
+    local fix_replay="klee_fix_pub_replay_${id}"
 
-    wllvm "${common_flags[@]}" "${sources[@]}" -o "$var_exe"
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF "${sources[@]}" -o "$var_exe"
     extract-bc "$var_exe"
 
-    wllvm "${common_flags[@]}" -DCONCRETE_PUBS "${sources[@]}" -o "$fix_exe"
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -DCONCRETE_PUBS "${sources[@]}" -o "$fix_exe"
     extract-bc "$fix_exe"
+
+    clang "${flags[@]}" -DREPLAY "${sources[@]}" -o "$var_replay"
+    clang "${flags[@]}" -DREPLAY -DCONCRETE_PUBS "${sources[@]}" -o "$fix_replay"
 }
 
 build_self_comp_mode() {
     local id="$1"
+    local generated_dir
+    local flags
+
+    generate_runner_artifacts_for_id "$id"
     mapfile -t sources < <(bench_sources_for_id "$id")
+    generated_dir="$(bench_generated_dir_for_id "$id")"
+    flags=("${common_flags[@]}" -I "$generated_dir")
 
     local var_exe="self_comp_var_pub_${id}"
     local fix_exe="self_comp_fix_pub_${id}"
+    local var_replay="klee_var_pub_replay_${id}"
+    local fix_replay="klee_fix_pub_replay_${id}"
 
-    wllvm "${common_flags[@]}" -DSELF_COMP "${sources[@]}" -o "$var_exe"
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP "${sources[@]}" -o "$var_exe"
     extract-bc "$var_exe"
+    record_branch "$var_exe.bc"
 
-    wllvm "${common_flags[@]}" -DSELF_COMP -DCONCRETE_PUBS "${sources[@]}" -o "$fix_exe"
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP -DCONCRETE_PUBS "${sources[@]}" -o "$fix_exe"
     extract-bc "$fix_exe"
+    record_branch "$fix_exe.bc"
+
+    clang "${flags[@]}" -DREPLAY "${sources[@]}" -o "$var_replay"
+    clang "${flags[@]}" -DREPLAY -DCONCRETE_PUBS "${sources[@]}" -o "$fix_replay"
 }
 
 build_binsec_mode() {
     local id="$1"
+    local generated_dir
+    local flags
+
+    generate_runner_artifacts_for_id "$id"
     mapfile -t sources < <(bench_sources_for_id "$id")
+    generated_dir="$(bench_generated_dir_for_id "$id")"
+    flags=("${common_flags[@]}" -I "$generated_dir")
 
     clang -g -O0 -m32 -static -fno-pie -fno-plt -Wl,-no-pie \
-        -DBINSEC "${common_flags[@]}" "${sources[@]}" -o "binsec_var_pub_${id}"
+        -DBINSEC "${flags[@]}" "${sources[@]}" -o "binsec_var_pub_${id}"
     clang -g -O0 -m32 -static -fno-pie -fno-plt -Wl,-no-pie \
-        -DBINSEC -DCONCRETE_PUBS "${common_flags[@]}" "${sources[@]}" -o "binsec_fix_pub_${id}"
+        -DBINSEC -DCONCRETE_PUBS "${flags[@]}" "${sources[@]}" -o "binsec_fix_pub_${id}"
 
     clang -g -O0 -m32 -static -fno-pie -fno-plt -Wl,-no-pie \
-        -DREPLAY "${common_flags[@]}" "${sources[@]}" -o "binsec_var_pub_replay_${id}"
+        -DREPLAY "${flags[@]}" "${sources[@]}" -o "binsec_var_pub_replay_${id}"
     clang -g -O0 -m32 -static -fno-pie -fno-plt -Wl,-no-pie \
-        -DREPLAY -DCONCRETE_PUBS "${common_flags[@]}" "${sources[@]}" -o "binsec_fix_pub_replay_${id}"
+        -DREPLAY -DCONCRETE_PUBS "${flags[@]}" "${sources[@]}" -o "binsec_fix_pub_replay_${id}"
 }
 
 build_abacus_mode() {
     local id="$1"
-    mapfile -t sources < <(bench_sources_for_id "$id")
+    local generated_dir
+    local flags
 
-    gcc -g -O0 -m32 -DABACUS "${common_flags[@]}" "${sources[@]}" -o "abacus_fix_pub_${id}"
+    generate_runner_artifacts_for_id "$id"
+    mapfile -t sources < <(bench_sources_for_id "$id")
+    generated_dir="$(bench_generated_dir_for_id "$id")"
+    flags=("${common_flags[@]}" -I "$generated_dir")
+
+    gcc -g -O0 -m32 -DABACUS "${flags[@]}" "${sources[@]}" -o "abacus_fix_pub_${id}"
 }
 
 for id in "${bench_ids[@]}"; do
@@ -200,4 +290,4 @@ for id in "${bench_ids[@]}"; do
     esac
 done
 
-printf 'Done. mode=%s sym_size=%s targets=%s\n' "$MODE" "$SYM_SIZE" "${#bench_ids[@]}"
+printf 'Done. mode=%s preset=%s targets=%s\n' "$MODE" "${PRESET:-<default>}" "${#bench_ids[@]}"

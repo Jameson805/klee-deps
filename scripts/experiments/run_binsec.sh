@@ -24,7 +24,7 @@ patch_memset_ifunc=0
 
 do_reproduce=1
 benchmarks_csv=""
-default_benchmarks=(mbedtls libgcrypt openssl)
+default_benchmarks=(mbedtls libgcrypt openssl bearssl)
 selected_benchmarks=("${default_benchmarks[@]}")
 
 usage() {
@@ -39,7 +39,7 @@ Usage: $0 [--sym-size <n>] [--jump-enum <n>] [--sse-depth <n>] <max_time_seconds
   --smt-solver <name>  Optional SMT solver command for BINSEC, default: z3
   --patch-memset-ifunc Optional, pin `memset_func`'s PLT/GOT slot to a concrete memset impl
   --benchmarks <list>  Optional comma-separated benchmark groups to run
-    valid: mbedtls,libgcrypt,openssl
+        valid: mbedtls,libgcrypt,openssl,bearssl
   default: all valid groups
 EOF
     exit 1
@@ -105,7 +105,7 @@ if [[ -n "$benchmarks_csv" ]]; then
         bench="${raw//[[:space:]]/}"
         [[ -z "$bench" ]] && continue
         case "$bench" in
-            mbedtls|libgcrypt|openssl)
+            mbedtls|libgcrypt|openssl|bearssl)
                 selected_benchmarks+=("$bench")
                 ;;
             *)
@@ -149,6 +149,9 @@ code_path_for_executable() {
         benchmarks/openssl-1.1.1q/*)
             echo "benchmarks/openssl-1.1.1q"
             ;;
+        benchmarks/bearssl/*)
+            echo "benchmarks/bearssl"
+            ;;
         *)
             echo ""
             ;;
@@ -166,6 +169,9 @@ library_for_executable() {
             ;;
         benchmarks/openssl-1.1.1q/*)
             echo "openssl"
+            ;;
+        benchmarks/bearssl/*)
+            echo "bearssl"
             ;;
         *)
             echo ""
@@ -198,6 +204,8 @@ replay_executable_for_executable() {
 convert_case_to_json() {
     local stats_file="$1"     # e.g. mbedtls_fix_pub.toml (filename only)
     local executable="$2"     # e.g. mbedtls-3.2.1/binsec_fix_pub
+    shift 2
+    local converter_args=("$@")
 
     if [[ ! -f "$results_dir/$stats_file" ]]; then
         echo "Warning: missing stats file $results_dir/$stats_file; skipping JSON conversion" >&2
@@ -242,6 +250,9 @@ convert_case_to_json() {
     if [[ -n "$code_path" ]]; then
         cmd+=(--code-path "$code_path")
     fi
+    if [[ "${#converter_args[@]}" -gt 0 ]]; then
+        cmd+=("${converter_args[@]}")
+    fi
 
     if [[ "$do_reproduce" -eq 1 ]]; then
         local replay_exe
@@ -265,6 +276,8 @@ run_case() {
     local sse_script="$2"      # e.g. binsec_fix_pub.cfg
     local stats_file="$3"      # e.g. mbedtls_fix_pub.toml (filename only)
     local executable="$4"      # e.g. mbedtls-3.2.1/binsec_fix_pub
+    shift 4
+    local converter_args=("$@")
 
     local sse_script_to_use="$sse_script"
     local cfg_stem
@@ -301,12 +314,13 @@ run_case() {
         -checkct-stats-file "$results_dir/$stats_file" \
         "$executable"
 
-    convert_case_to_json "$stats_file" "$executable"
+    convert_case_to_json "$stats_file" "$executable" "${converter_args[@]}"
 }
 
 _BUILT_MBEDTLS=0
 _BUILT_LIBGCRYPT=0
 _BUILT_OPENSSL=0
+_BUILT_BEARSSL=0
 
 ensure_built_mbedtls() {
     if [[ "$_BUILT_MBEDTLS" -eq 1 ]]; then
@@ -339,6 +353,17 @@ ensure_built_openssl() {
     echo "##########"
     benchmarks/openssl-1.1.1q/build.sh --binsec --preset "size_${sym_size}"
     _BUILT_OPENSSL=1
+}
+
+ensure_built_bearssl() {
+    if [[ "$_BUILT_BEARSSL" -eq 1 ]]; then
+        return 0
+    fi
+    echo "##########"
+    echo "Begin experiments for BearSSL 0.6"
+    echo "##########"
+    benchmarks/bearssl/build.sh --binsec --preset default
+    _BUILT_BEARSSL=1
 }
 
 run_mbedtls_case() {
@@ -393,6 +418,23 @@ run_openssl_case() {
     esac
 }
 
+run_bearssl_case() {
+    local target="$1"  # aes_big | des_tab
+    ensure_built_bearssl
+    case "$target" in
+        aes_big)
+            run_case "BearSSL 0.6 aes_big" "$repo_root/benchmarks/bearssl/generated/binsec_aes_big/binsec_fix_pub.cfg" "bearssl_aes_big.toml" "benchmarks/bearssl/binsec_fix_pub_binsec_aes_big" --secret-input "skey:48:skey_buf" --secret-input "data:32:data_buf"
+            ;;
+        des_tab)
+            run_case "BearSSL 0.6 des_tab" "$repo_root/benchmarks/bearssl/generated/appliedcryp_des/binsec_fix_pub.cfg" "bearssl_des_tab.toml" "benchmarks/bearssl/binsec_fix_pub_appliedcryp_des" --secret-input "skey:256:skey_buf" --secret-input "data:16:data_buf"
+            ;;
+        *)
+            echo "Error: unknown bearssl target '$target'" >&2
+            return 2
+            ;;
+    esac
+}
+
 ########################
 # Cases (comment out any single line to skip)
 ########################
@@ -416,6 +458,10 @@ for benchmark in "${selected_benchmarks[@]}"; do
             run_openssl_case mont_consttime var_pub
             run_openssl_case mont_word fix_pub
             run_openssl_case mont_word var_pub
+            ;;
+        bearssl)
+            run_bearssl_case aes_big
+            run_bearssl_case des_tab
             ;;
     esac
 done

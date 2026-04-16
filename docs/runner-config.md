@@ -1,23 +1,27 @@
 # Runner Config
 
-The shared runner config describes the benchmark buffers and preset values that are materialized into generated runner artifacts at build time.
+A runner config describes the benchmark buffers and preset values that are materialized into generated runner artifacts at build time.
 
 The current shared modular-exponentiation config lives at `configs/runner/modexp_runner_config.json`. Mbed TLS, Libgcrypt, and OpenSSL 1.1.1q all consume this same config and emit benchmark-local artifacts under their own `generated/` directories.
+
+Not every benchmark needs to share one config source. BearSSL `aes_big` and `des_tab` use benchmark-local configs in `configs/runner/bearssl_aes_big_runner_config.json` and `configs/runner/bearssl_des_tab_runner_config.json` because they keep different effective schedule sizes while still using the same generator and `runner.h` contract. See `benchmarks/bearssl/README.md` for the rationale behind those choices.
 
 The file is parsed as a Python literal instead of strict JSON. This is intentional: it keeps byte arrays and large integers readable with `0x...` literals and plain `True`/`False` values.
 
 ## Build Model
 
-Each build picks exactly one preset with `--preset NAME`.
+Each build materializes exactly one preset.
 
-Benchmark build scripts require `--preset NAME`. Higher-level experiment runners may still keep an internal `sym_size` setting and translate it to `--preset size_N` at the build-script boundary.
+Most benchmark build scripts still pass `--preset NAME` explicitly. If a config defines exactly one preset, the generator can select it implicitly and the build script may omit `--preset`.
+
+Higher-level experiment runners may still keep an internal `sym_size` setting and translate it to `--preset size_N` at the build-script boundary when a benchmark family exposes size-based presets.
 
 The generator then:
 
-- emits `generated/runner_config.generated.h` inside the benchmark being built
-- optionally emits generated BINSEC cfgs such as `generated/binsec_fix_pub.cfg` and `generated/binsec_var_pub.cfg`
+- emits `generated/runner_config.generated.h` inside the benchmark being built, or a target-local variant such as `generated/<target>/runner_config.generated.h` when one build script owns multiple wrappers with different materializations
+- optionally emits generated BINSEC cfgs such as `generated/binsec_fix_pub.cfg` and `generated/binsec_var_pub.cfg`, again optionally under a target-local generated subdirectory
 - defines the preset macros such as `SYM_SIZE` directly in the generated header
-- emits exactly one set of public default values
+- emits zero or one set of public default values per public input
 - emits exactly one set of ABACUS secret seeds
 - includes `runner.h`, which provides the generic runner logic
 
@@ -75,6 +79,7 @@ This means the compiler command line should not redefine preset-owned macros suc
 
 - Concrete defaults for public inputs.
 - Every public input must be present.
+- If a benchmark has no public inputs, `vars` may be an empty dictionary.
 - Each value may be either:
   - one non-negative integer, expanded big-endian to the buffer width
   - a full byte list
@@ -111,6 +116,16 @@ For benchmarks that opt into this flow, the generator can also emit BINSEC cfg f
 - The generated var-pub cfg declares secret inputs and public inputs.
 - Public default bytes are still owned by the generated header and executable, not by the BINSEC cfg.
 - Even when the config source is shared, the emitted BINSEC cfgs stay benchmark-local so build products remain isolated and easy to inspect.
+
+## Benchmark-Specific Notes
+
+Some benchmark integrations intentionally use benchmark-local macros and sizes instead of one shared `SYM_SIZE` abstraction.
+
+- BearSSL `aes_big` and `des_tab` keep the original wrappers' fixed zero IV and original `DATA_LEN` values.
+- Those BearSSL wrappers now make only the effective prefix of `ctx.skey` symbolic, not the full backing array, because the wrappers hardcode `N_ROUND=2` and never read the unused tail.
+- For BearSSL, mod-exp-style `size_4` or `size_16` presets would be misleading: unlike `SYM_SIZE` in the modular-exponentiation benchmarks, `ctx.skey` is an expanded internal schedule, not a raw semantic key buffer. Smaller widths there would produce partially symbolic schedules with the remaining consumed words fixed to zero.
+- They therefore use a single `default` preset per target instead of exposing a family of `size_N` presets.
+- They also currently model only secret inputs, so `vars` is empty and the generated fix-pub and var-pub artifacts differ only by mode plumbing, not by any extra public buffers.
 
 ## Example
 

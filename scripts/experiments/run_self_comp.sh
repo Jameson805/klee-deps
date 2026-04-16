@@ -23,7 +23,7 @@ search_strategies="random-path,nurs:covnew"
 do_reproduce=1
 reproduce_timeout=180
 benchmarks_csv=""
-default_benchmarks=(mbedtls libgcrypt openssl)
+default_benchmarks=(mbedtls libgcrypt openssl bearssl)
 selected_benchmarks=("${default_benchmarks[@]}")
 
 usage() {
@@ -44,7 +44,7 @@ Optional:
   --no-reproduce         Disable replay-based validation (enabled by default)
   --reproduce-timeout <s> Timeout per replay attempt in seconds (default: 180)
   --benchmarks <list>    Comma-separated benchmark groups to run
-    valid: mbedtls,libgcrypt,openssl
+        valid: mbedtls,libgcrypt,openssl,bearssl
   default: all valid groups
   --help                 Show this help
 EOF
@@ -101,7 +101,7 @@ if [[ -n "$benchmarks_csv" ]]; then
         bench="${raw//[[:space:]]/}"
         [[ -z "$bench" ]] && continue
         case "$bench" in
-            mbedtls|libgcrypt|openssl)
+            mbedtls|libgcrypt|openssl|bearssl)
                 selected_benchmarks+=("$bench")
                 ;;
             *)
@@ -177,6 +177,9 @@ library_for_path() {
         *openssl-1.1.1q*)
             echo "openssl"
             ;;
+        *bearssl*)
+            echo "bearssl"
+            ;;
         *)
             echo ""
             ;;
@@ -189,6 +192,8 @@ run_case() {
     local result_name="$3"
     local json_name="$4"
     local replay_exe="$5"
+    shift 5
+    local converter_args=("$@")
 
     local bc_dir=$(dirname "$bc")
     local case_log="$results_dir/${result_name}.log"
@@ -220,6 +225,10 @@ run_case() {
         --sym-size "$sym_size"
         --library "$library"
     )
+
+    if [[ "${#converter_args[@]}" -gt 0 ]]; then
+        cmd+=("${converter_args[@]}")
+    fi
 
     if [[ "$do_reproduce" -eq 1 ]]; then
         local replay_path="$bc_dir/$replay_exe"
@@ -268,6 +277,15 @@ run_openssl() {
     done
 }
 
+run_bearssl() {
+    echo "##########"
+    echo "Begin experiments for BearSSL 0.6"
+    echo "##########"
+    benchmarks/bearssl/build.sh --self-comp --preset default
+    run_case "BearSSL 0.6 aes_big (Self-Comp)" "benchmarks/bearssl/self_comp_fix_pub_binsec_aes_big.bc" "bearssl_aes_big_self_comp" "bearssl_aes_big.json" "klee_fix_pub_replay_binsec_aes_big" --secret-layout "skey:48,data:32"
+    run_case "BearSSL 0.6 des_tab (Self-Comp)" "benchmarks/bearssl/self_comp_fix_pub_appliedcryp_des.bc" "bearssl_des_tab_self_comp" "bearssl_des_tab.json" "klee_fix_pub_replay_appliedcryp_des" --secret-layout "skey:256,data:16"
+}
+
 for benchmark in "${selected_benchmarks[@]}"; do
     case "$benchmark" in
         mbedtls)
@@ -278,6 +296,9 @@ for benchmark in "${selected_benchmarks[@]}"; do
             ;;
         openssl)
             run_openssl
+            ;;
+        bearssl)
+            run_bearssl
             ;;
     esac
 done

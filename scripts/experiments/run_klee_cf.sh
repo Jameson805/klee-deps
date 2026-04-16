@@ -26,7 +26,7 @@ concretize_on_solver_timeout="true"
 solver_backend="stp"
 optimize_array="false"
 benchmarks_csv=""
-default_benchmarks=(mbedtls mbedtls_sliced libgcrypt libgcrypt_sliced openssl openssl_sliced)
+default_benchmarks=(mbedtls mbedtls_sliced libgcrypt libgcrypt_sliced openssl openssl_sliced bearssl)
 selected_benchmarks=("${default_benchmarks[@]}")
 
 usage() {
@@ -45,7 +45,7 @@ Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <durat
   --solver-backend <name>  - optional, default: stp (stp|metasmt|dummy|z3)
   --optimize-array <value> - optional, default: false (false|all|index|value)
   --benchmarks <list>      - optional, comma-separated benchmark groups to run
-    valid: mbedtls,mbedtls_sliced,libgcrypt,libgcrypt_sliced,openssl,openssl_sliced
+        valid: mbedtls,mbedtls_sliced,libgcrypt,libgcrypt_sliced,openssl,openssl_sliced,bearssl
   default: all valid groups
 EOF
     exit 1
@@ -115,7 +115,7 @@ if [[ -n "$benchmarks_csv" ]]; then
         bench="${raw//[[:space:]]/}"
         [[ -z "$bench" ]] && continue
         case "$bench" in
-            mbedtls|mbedtls_sliced|libgcrypt|libgcrypt_sliced|openssl|openssl_sliced)
+            mbedtls|mbedtls_sliced|libgcrypt|libgcrypt_sliced|openssl|openssl_sliced|bearssl)
                 selected_benchmarks+=("$bench")
                 ;;
             *)
@@ -218,6 +218,9 @@ library_for_path() {
             ;;
         *openssl-1.1.1q*)
             echo "openssl"
+            ;;
+        *bearssl*)
+            echo "bearssl"
             ;;
         *)
             echo ""
@@ -536,6 +539,16 @@ run_openssl_sliced() {
     run_openssl_algo_sliced mont_word false 1138:1283
 }
 
+run_bearssl() {
+    echo "##########"
+    echo "Begin experiments for BearSSL 0.6"
+    echo "##########"
+
+    benchmarks/bearssl/build.sh --klee-cf --preset default
+    run_case "BearSSL 0.6 aes_big" "benchmarks/bearssl/klee_fix_pub_binsec_aes_big.bc" "bearssl_aes_big" "benchmarks/bearssl/klee_fix_pub_replay_binsec_aes_big" "--secret skey,data" "ctchecker_results/BearSSL0.6/empty.json" "benchmarks/bearssl" true
+    run_case "BearSSL 0.6 des_tab" "benchmarks/bearssl/klee_fix_pub_appliedcryp_des.bc" "bearssl_des_tab" "benchmarks/bearssl/klee_fix_pub_replay_appliedcryp_des" "--secret skey,data" "ctchecker_results/BearSSL0.6/empty.json" "benchmarks/bearssl" true
+}
+
 for benchmark in "${selected_benchmarks[@]}"; do
     case "$benchmark" in
         mbedtls)
@@ -555,6 +568,9 @@ for benchmark in "${selected_benchmarks[@]}"; do
             ;;
         openssl_sliced)
             run_openssl_sliced
+            ;;
+        bearssl)
+            run_bearssl
             ;;
     esac
 done

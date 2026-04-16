@@ -47,6 +47,13 @@ class LeakInfo:
     seconds: float
 
 
+@dataclass
+class InputLayout:
+    name: str
+    size: int
+    model_key: str
+
+
 _CHECKCT_RE = re.compile(
     r"^\[checkct:result\] Instruction (?P<addr>0x[0-9a-fA-F]+) has (?P<kind>control flow|memory access) leak \((?P<secs>[0-9.]+)s\)\s*$"
 )
@@ -202,22 +209,60 @@ def _relativize_to_code_root(debug_path: str, code_root: Optional[str]) -> str:
     return _normalize_filename_for_json(debug_path)
 
 
-def _pick_model_values(models: Dict[int, Dict[str, Dict[str, int]]], addr: int) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[int]]:
-    """Return (exp, exp_prime, base, mod) if present for this addr."""
+def _parse_input_layouts(raw_specs: List[str], defaults: List[Tuple[str, int, str]], kind: str) -> List[InputLayout]:
+    if not raw_specs:
+        return [InputLayout(name=name, size=size, model_key=model_key) for name, size, model_key in defaults]
+
+    layouts: List[InputLayout] = []
+    for spec in raw_specs:
+        parts = spec.split(":")
+        if len(parts) != 3:
+            raise ValueError(f"Invalid {kind} input specification '{spec}', expected name:bytes:model_key")
+        name, size_str, model_key = (part.strip() for part in parts)
+        if not name or not model_key:
+            raise ValueError(f"Invalid {kind} input specification '{spec}', missing name or model key")
+        try:
+            size = int(size_str, 0)
+        except ValueError as exc:
+            raise ValueError(f"Invalid byte size in {kind} input specification '{spec}'") from exc
+        if size <= 0:
+            raise ValueError(f"Byte size must be positive in {kind} input specification '{spec}'")
+        layouts.append(InputLayout(name=name, size=size, model_key=model_key))
+
+    return layouts
+
+
+def _pick_model_counterexamples(
+    models: Dict[int, Dict[str, Dict[str, int]]],
+    addr: int,
+    secret_inputs: List[InputLayout],
+    public_inputs: List[InputLayout],
+) -> Optional[Dict[str, int]]:
     model = models.get(addr)
     if not model:
-        return None, None, None, None
+        return None
 
     s1 = model.get("secret1", {})
     s2 = model.get("secret2", {})
     pub = model.get("public", {})
 
-    # BINSEC stats use *_buf keys; interpret them as the big-endian integer value of the buffer.
-    exp = s1.get("exp_buf") if isinstance(s1, dict) else None
-    exp_p = s2.get("exp_buf") if isinstance(s2, dict) else None
-    base = pub.get("base_buf") if isinstance(pub, dict) else None
-    mod = pub.get("mod_buf") if isinstance(pub, dict) else None
-    return exp, exp_p, base, mod
+    counterexamples: Dict[str, int] = {}
+
+    for inp in secret_inputs:
+        value = s1.get(inp.model_key) if isinstance(s1, dict) else None
+        prime_value = s2.get(inp.model_key) if isinstance(s2, dict) else None
+        if value is None or prime_value is None:
+            continue
+        counterexamples[inp.name] = value
+        counterexamples[f"{inp.name}__prime"] = prime_value
+
+    for inp in public_inputs:
+        value = pub.get(inp.model_key) if isinstance(pub, dict) else None
+        if value is None:
+            continue
+        counterexamples[inp.name] = value
+
+    return counterexamples or None
 
 
 _REPRO_LINE_RE = re.compile(r"0x[0-9a-fA-F]+:\s+(?P<file>.+?):(?P<line>[0-9]+):(?P<col>[0-9]+)\s*$")
@@ -233,24 +278,32 @@ def _tail_lines(text: str, n: int = 12) -> str:
 def _run_reproduce(
     reproduce_module: str,
     replay_executable: str,
-    sym_size: int,
-    exp: int,
-    exp_prime: int,
-    base: Optional[int],
-    mod: Optional[int],
-    needs_publics: bool,
+    counterexamples: Dict[str, int],
+    secret_inputs: List[InputLayout],
+    public_inputs: List[InputLayout],
     timeout_s: int,
 ) -> Tuple[Optional[Tuple[str, int, int]], int, str]:
     """Run reproduce_positives.py --input and parse the reported divergence location.
 
     Returns: (location|None, returncode, combined_output)
     """
-    secret_spec = f"exp:{sym_size}={exp}/{exp_prime}"
-    public_spec = ""
-    if needs_publics:
-        if base is None or mod is None:
-            return None, 2, "missing public counterexamples for var_pub reproduction"
-        public_spec = f"base:{sym_size}={base},mod:{sym_size}={mod}"
+    secret_parts: List[str] = []
+    for inp in secret_inputs:
+        value = counterexamples.get(inp.name)
+        prime_value = counterexamples.get(f"{inp.name}__prime")
+        if value is None or prime_value is None:
+            return None, 2, f"missing secret counterexamples for {inp.name}"
+        secret_parts.append(f"{inp.name}:{inp.size}={value}/{prime_value}")
+
+    public_parts: List[str] = []
+    for inp in public_inputs:
+        value = counterexamples.get(inp.name)
+        if value is None:
+            return None, 2, f"missing public counterexamples for {inp.name}"
+        public_parts.append(f"{inp.name}:{inp.size}={value}")
+
+    secret_spec = ",".join(secret_parts)
+    public_spec = ",".join(public_parts)
 
     cmd = [
         sys.executable,
@@ -264,7 +317,7 @@ def _run_reproduce(
         "--timeout",
         str(timeout_s),
     ]
-    if needs_publics:
+    if public_spec:
         cmd += ["--public", public_spec]
 
     proc = subprocess.run(
@@ -293,10 +346,10 @@ def build_rows(
     addr_executable: str,
     code_root: Optional[str],
     library: str,
-    sym_size: int,
+    secret_inputs: List[InputLayout],
+    public_inputs: List[InputLayout],
     reproduce_module: Optional[str],
     replay_executable: Optional[str],
-    needs_publics: bool,
     reproduce_timeout_s: int,
 ) -> List[Dict[str, Any]]:
     code_index: Optional[Dict[str, str]] = None
@@ -328,15 +381,7 @@ def build_rows(
         leak = leaks.get(addr)
         non_ct_time = leak.seconds if leak is not None else None
 
-        exp, exp_p, base, mod = _pick_model_values(models, addr)
-        counterexamples: Optional[Dict[str, int]] = None
-        if exp is not None and exp_p is not None:
-            counterexamples = {"exp": exp, "exp__prime": exp_p}
-            # Include publics if available; useful for var_pub reproduction.
-            if base is not None:
-                counterexamples["base"] = base
-            if mod is not None:
-                counterexamples["mod"] = mod
+        counterexamples = _pick_model_counterexamples(models, addr, secret_inputs, public_inputs)
 
         code: Optional[str] = None
         if filename and line_no and code_root and code_index is not None:
@@ -352,8 +397,7 @@ def build_rows(
         if (
             reproduce_module
             and replay_executable
-            and exp is not None
-            and exp_p is not None
+            and counterexamples is not None
             and filename is not None
             and line_no is not None
             and col_no is not None
@@ -368,12 +412,9 @@ def build_rows(
             loc, rc, repro_out = _run_reproduce(
                 reproduce_module=reproduce_module,
                 replay_executable=replay_executable,
-                sym_size=sym_size,
-                exp=exp,
-                exp_prime=exp_p,
-                base=base,
-                mod=mod,
-                needs_publics=needs_publics,
+                counterexamples=counterexamples,
+                secret_inputs=secret_inputs,
+                public_inputs=public_inputs,
                 timeout_s=reproduce_timeout_s,
             )
             if loc is None:
@@ -438,6 +479,8 @@ def default_title_for_toml_name(toml_path: str) -> Optional[str]:
         "mbedtls_var_pub.toml": "Mbed TLS 3.2.1 (Var Pub)",
         "libgcrypt_fix_pub.toml": "Libgcrypt 1.10.1 (Fix Pub)",
         "libgcrypt_var_pub.toml": "Libgcrypt 1.10.1 (Var Pub)",
+        "bearssl_aes_big.toml": "BearSSL 0.6 aes_big",
+        "bearssl_des_tab.toml": "BearSSL 0.6 des_tab",
     }
     if name in mapping:
         return mapping[name]
@@ -478,6 +521,18 @@ def main(argv: List[str]) -> int:
         type=int,
         default=4,
         help="Symbol size in bytes (SYM_SIZE), used for reproduction input encoding (default: 4).",
+    )
+    p.add_argument(
+        "--secret-input",
+        action="append",
+        default=[],
+        help="Replay/model mapping name:bytes:model_key (repeatable). Defaults to exp:<sym-size>:exp_buf.",
+    )
+    p.add_argument(
+        "--public-input",
+        action="append",
+        default=[],
+        help="Replay/model mapping name:bytes:model_key (repeatable). Defaults to base/mod for var_pub TOMLs.",
     )
     p.add_argument(
         "--replay-executable",
@@ -539,6 +594,21 @@ def main(argv: List[str]) -> int:
 
     needs_publics = bool(re.search(r"_var_pub\.toml$", os.path.basename(args.toml)))
 
+    try:
+        secret_inputs = _parse_input_layouts(
+            args.secret_input,
+            [("exp", args.sym_size, "exp_buf")],
+            "secret",
+        )
+        public_inputs = _parse_input_layouts(
+            args.public_input,
+            [("base", args.sym_size, "base_buf"), ("mod", args.sym_size, "mod_buf")] if needs_publics else [],
+            "public",
+        )
+    except ValueError as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 2
+
     reproduce_module = args.reproduce_module
     if args.reproduce and reproduce_module is None:
         reproduce_module = "tools.postprocess.reproduce_positives"
@@ -562,10 +632,10 @@ def main(argv: List[str]) -> int:
             addr_executable=args.executable,
             code_root=args.code_path,
             library=args.library,
-            sym_size=args.sym_size,
+            secret_inputs=secret_inputs,
+            public_inputs=public_inputs,
             reproduce_module=reproduce_module if args.reproduce else None,
             replay_executable=args.replay_executable if args.reproduce else None,
-            needs_publics=needs_publics,
             reproduce_timeout_s=args.reproduce_timeout,
         )
     except RuntimeError as err:

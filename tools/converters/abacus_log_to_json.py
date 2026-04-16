@@ -7,7 +7,7 @@ import os
 import re
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from tools.shared.result_schema import (
     STATUS_NOT_REPRODUCED,
@@ -15,6 +15,124 @@ from tools.shared.result_schema import (
     get_source_line,
     make_result_row,
 )
+
+
+def _resolve_input_size(size_spec: Any, macros: Dict[str, Any]) -> int:
+    if isinstance(size_spec, int):
+        if size_spec <= 0:
+            raise ValueError(f"input size must be positive (got {size_spec})")
+        return size_spec
+
+    if isinstance(size_spec, str):
+        value = macros.get(size_spec)
+        if not isinstance(value, int) or value <= 0:
+            raise ValueError(f"macro {size_spec!r} is missing or not a positive integer")
+        return value
+
+    raise ValueError(f"unsupported input size specification: {size_spec!r}")
+
+
+def _value_to_bytes(value: Any, size: int) -> List[int]:
+    if isinstance(value, int):
+        try:
+            return list(int(value).to_bytes(size, byteorder="big", signed=False))
+        except OverflowError as exc:
+            raise ValueError(f"integer seed does not fit in {size} bytes") from exc
+
+    if isinstance(value, list):
+        if len(value) != size:
+            raise ValueError(f"byte-seed length {len(value)} does not match expected size {size}")
+        out: List[int] = []
+        for byte_value in value:
+            if not isinstance(byte_value, int) or byte_value < 0 or byte_value > 0xFF:
+                raise ValueError("ABACUS reference secret bytes must be integers in [0, 255]")
+            out.append(byte_value)
+        return out
+
+    raise ValueError(f"unsupported ABACUS seed format: {value!r}")
+
+
+def _bytes_to_int(values: List[int]) -> int:
+    result = 0
+    for value in values:
+        result = (result << 8) | value
+    return result
+
+
+def _load_abacus_secret_layout(runner_config_path: str, preset_name: str) -> List[Dict[str, Any]]:
+    try:
+        with open(runner_config_path, "r", encoding="utf-8") as f:
+            runner_config = ast.literal_eval(f.read())
+    except (OSError, SyntaxError, ValueError) as exc:
+        raise ValueError(f"failed to load runner config {runner_config_path}: {exc}") from exc
+
+    inputs = runner_config.get("inputs")
+    mode_policy = runner_config.get("mode_policy")
+    presets = runner_config.get("presets")
+    if not isinstance(inputs, list) or not isinstance(mode_policy, dict) or not isinstance(presets, dict):
+        raise ValueError("runner config is missing inputs/mode_policy/presets")
+
+    preset = presets.get(preset_name)
+    if not isinstance(preset, dict):
+        raise ValueError(f"unknown preset {preset_name!r}")
+
+    macros = preset.get("macros", {})
+    abacus_secrets = preset.get("abacus_secrets", {})
+    abacus_policy = mode_policy.get("abacus", {})
+    secret_ids = abacus_policy.get("secret_inputs")
+    if not isinstance(macros, dict) or not isinstance(abacus_secrets, dict) or not isinstance(secret_ids, list):
+        raise ValueError("runner config abacus policy is incomplete")
+
+    input_by_id = {}
+    for entry in inputs:
+        if not isinstance(entry, dict):
+            continue
+        input_id = entry.get("id")
+        if isinstance(input_id, str):
+            input_by_id[input_id] = entry
+
+    layout: List[Dict[str, Any]] = []
+    for input_id in secret_ids:
+        if input_id not in input_by_id:
+            raise ValueError(f"abacus secret input {input_id!r} is missing from inputs")
+        entry = input_by_id[input_id]
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"abacus secret input {input_id!r} is missing a replay name")
+        if input_id not in abacus_secrets:
+            raise ValueError(f"preset {preset_name!r} is missing abacus seed for {input_id!r}")
+        size = _resolve_input_size(entry.get("size"), macros)
+        seed_bytes = _value_to_bytes(abacus_secrets[input_id], size)
+        layout.append(
+            {
+                "id": input_id,
+                "name": name,
+                "size": size,
+                "seed_bytes": seed_bytes,
+                "seed_value": _bytes_to_int(seed_bytes),
+            }
+        )
+
+    return layout
+
+
+def _build_counterexamples(secret_layout: List[Dict[str, Any]], divergent_bytes: List[int]) -> Dict[str, int]:
+    total_size = sum(int(entry["size"]) for entry in secret_layout)
+    if len(divergent_bytes) != total_size:
+        raise ValueError(
+            f"divergent input length {len(divergent_bytes)} does not match configured secret length {total_size}"
+        )
+
+    counterexamples: Dict[str, int] = {}
+    offset = 0
+    for entry in secret_layout:
+        size = int(entry["size"])
+        name = str(entry["name"])
+        counterexamples[name] = int(entry["seed_value"])
+        counterexamples[f"{name}__prime"] = _bytes_to_int(divergent_bytes[offset:offset + size])
+        offset += size
+
+    return counterexamples
 
 
 def main(argv: List[str]) -> int:
@@ -27,6 +145,16 @@ def main(argv: List[str]) -> int:
     p.add_argument("--log", required=True, help="Path to Abacus per-case log")
     p.add_argument("--out", required=True, help="Output JSON path")
     p.add_argument("--sym-size", type=int, default=4, help="SYM_SIZE bytes (default: 4)")
+    p.add_argument(
+        "--runner-config",
+        default=None,
+        help="Optional runner config path used to recover ABACUS secret layouts and reference seeds",
+    )
+    p.add_argument(
+        "--preset-name",
+        default=None,
+        help="Optional preset name inside --runner-config (defaults to size_<sym-size> for legacy modexp)",
+    )
     p.add_argument(
         "--code-root",
         default=None,
@@ -71,44 +199,28 @@ def main(argv: List[str]) -> int:
         print(f"Error: log not found: {args.log}", file=sys.stderr)
         return 2
 
-    runner_config_path = os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "configs",
-            "runner",
-            "modexp_runner_config.json",
+    runner_config_path = args.runner_config
+    if runner_config_path is None:
+        runner_config_path = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "configs",
+                "runner",
+                "modexp_runner_config.json",
+            )
         )
-    )
-    preset_name = f"size_{args.sym_size}"
-    try:
-        with open(runner_config_path, "r", encoding="utf-8") as f:
-            runner_config = ast.literal_eval(f.read())
-        ref_secret_value = runner_config["presets"][preset_name]["abacus_secrets"]["exp_buf"]
-    except (OSError, SyntaxError, ValueError, KeyError, TypeError) as exc:
-        print(
-            "Error: failed to load ABACUS reference secret from "
-            f"{runner_config_path} preset {preset_name}: {exc}",
-            file=sys.stderr,
-        )
-        return 2
-
-    if isinstance(ref_secret_value, int):
-        ref_secret = ref_secret_value
-    elif isinstance(ref_secret_value, list) and ref_secret_value:
-        ref_secret = 0
-        for byte_value in ref_secret_value:
-            if not isinstance(byte_value, int) or byte_value < 0 or byte_value > 0xFF:
-                print(
-                    "Error: ABACUS reference secret bytes must be integers in [0, 255]",
-                    file=sys.stderr,
-                )
-                return 2
-            ref_secret = (ref_secret << 8) | byte_value
     else:
+        runner_config_path = os.path.abspath(runner_config_path)
+
+    preset_name = args.preset_name or f"size_{args.sym_size}"
+    try:
+        secret_layout = _load_abacus_secret_layout(runner_config_path, preset_name)
+    except ValueError as exc:
         print(
-            f"Error: unsupported ABACUS reference secret format for preset {preset_name}",
+            "Error: failed to load ABACUS secret layout from "
+            f"{runner_config_path} preset {preset_name}: {exc}",
             file=sys.stderr,
         )
         return 2
@@ -127,7 +239,7 @@ def main(argv: List[str]) -> int:
     with open(args.log, "r", encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
 
-    divergent: Dict[int, int] = {}
+    divergent: Dict[int, List[int]] = {}
     locations: Dict[int, Dict[str, Any]] = {}
     se_time: Optional[float] = None
     qif_time: Optional[float] = None
@@ -162,14 +274,8 @@ def main(argv: List[str]) -> int:
                 bvals.append(int(km.group(2)))
                 i += 1
             if bvals:
-                b_int = 0
-                for b in bvals:
-                    if b < 0 or b > 255:
-                        b_int = -1
-                        break
-                    b_int = (b_int << 8) | b
-                if b_int >= 0:
-                    divergent[addr] = b_int
+                if all(0 <= value <= 255 for value in bvals):
+                    divergent[addr] = bvals
             continue
 
         m_addr = re.match(r"^Address:\s*([0-9a-fA-F]+)\b", s)
@@ -228,10 +334,11 @@ def main(argv: List[str]) -> int:
         if addr in locations:
             row.update(locations[addr])
         if addr in divergent:
-            row["counterexamples"] = {
-                "exp": ref_secret,
-                "exp__prime": divergent[addr],
-            }
+            try:
+                row["counterexamples"] = _build_counterexamples(secret_layout, divergent[addr])
+            except ValueError as exc:
+                print(f"Error: failed to decode divergent input for 0x{addr:x}: {exc}", file=sys.stderr)
+                return 2
 
         rows.append(row)
 
@@ -264,12 +371,27 @@ def main(argv: List[str]) -> int:
         },
     )
     payload["notes"] = {
-            "abacus_reference_secret": {
-                "source": "Loaded from configs/runner/modexp_runner_config.json preset abacus_secrets.exp_buf",
-                "preset": preset_name,
-                "sym_size": args.sym_size,
-                "exp": ref_secret,
+        "runner_config": runner_config_path,
+        "preset": preset_name,
+        "secret_layout": [
+            {
+                "name": entry["name"],
+                "size": entry["size"],
             }
+            for entry in secret_layout
+        ],
+        "public_layout": [],
+        "abacus_reference_secrets": {
+            entry["name"]: entry["seed_value"]
+            for entry in secret_layout
+        },
+    }
+    if len(secret_layout) == 1 and secret_layout[0]["name"] == "exp":
+        payload["notes"]["abacus_reference_secret"] = {
+            "source": f"Loaded from {runner_config_path} preset {preset_name}",
+            "preset": preset_name,
+            "sym_size": args.sym_size,
+            "exp": secret_layout[0]["seed_value"],
         }
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)

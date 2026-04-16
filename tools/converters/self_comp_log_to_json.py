@@ -49,6 +49,91 @@ def _parse_counterexample_tokens(raw: str) -> Dict[str, int]:
     return out
 
 
+def _parse_named_layout(spec: str) -> List[Tuple[str, int]]:
+    layouts: List[Tuple[str, int]] = []
+    if not spec:
+        return layouts
+
+    for item in spec.split(","):
+        entry = item.strip()
+        if not entry:
+            continue
+        if ":" not in entry:
+            raise ValueError(f"Invalid layout specification '{entry}', expected name:bytes")
+        name, size_str = entry.split(":", 1)
+        name = name.strip()
+        if not name:
+            raise ValueError(f"Invalid layout specification '{entry}', missing input name")
+        try:
+            size = int(size_str, 0)
+        except ValueError as exc:
+            raise ValueError(f"Invalid byte size in layout specification '{entry}'") from exc
+        if size <= 0:
+            raise ValueError(f"Byte size must be positive in layout specification '{entry}'")
+        layouts.append((name, size))
+
+    return layouts
+
+
+def _build_replay_specs(
+    cex: Dict[str, int],
+    sym_size: int,
+    secret_layout_spec: str,
+    public_layout_spec: str,
+) -> Optional[Tuple[str, str]]:
+    secret_layout = _parse_named_layout(secret_layout_spec)
+    public_layout = _parse_named_layout(public_layout_spec)
+
+    secret_parts: List[str] = []
+    used_public_keys = set()
+
+    if secret_layout:
+        for name, size in secret_layout:
+            orig_value = cex.get(f"{name}_1")
+            prime_value = cex.get(f"{name}_2")
+            if orig_value is None:
+                orig_value = cex.get(name)
+            if prime_value is None:
+                prime_value = cex.get(f"{name}__prime")
+            if prime_value is None:
+                prime_value = cex.get(f"{name}_prime")
+            if orig_value is None or prime_value is None:
+                return None
+            secret_parts.append(f"{name}:{size}={orig_value}/{prime_value}")
+    else:
+        for key in cex:
+            if not key.endswith("_1"):
+                continue
+            base_name = key[:-2]
+            if f"{base_name}_2" not in cex:
+                continue
+            secret_parts.append(f"{base_name}:{sym_size}={cex[key]}/{cex[f'{base_name}_2']}")
+
+        if not secret_parts and cex.get("exp") is not None and cex.get("exp__prime") is not None:
+            secret_parts.append(f"exp:{sym_size}={cex['exp']}/{cex['exp__prime']}")
+
+    if not secret_parts:
+        return None
+
+    public_parts: List[str] = []
+    if public_layout:
+        for name, size in public_layout:
+            value = cex.get(name)
+            if value is None:
+                return None
+            used_public_keys.add(name)
+            public_parts.append(f"{name}:{size}={value}")
+    else:
+        for key, value in cex.items():
+            if key.endswith("_1") or key.endswith("_2") or key.endswith("__prime") or key.endswith("_prime"):
+                continue
+            if key in used_public_keys:
+                continue
+            public_parts.append(f"{key}:{sym_size}={value}")
+
+    return ",".join(secret_parts), ",".join(public_parts)
+
+
 def _read_text_auto(path: str) -> str:
     """Read text file with automatic UTF-8-first decoding.
 
@@ -142,14 +227,15 @@ def _run_reproduce(
     replay_executable: str,
     sym_size: int,
     cex: Dict[str, int],
+    secret_layout_spec: str,
+    public_layout_spec: str,
     timeout_s: int,
 ) -> Tuple[Optional[Tuple[str, int, int]], int, str]:
-    exp = cex.get("exp")
-    exp_prime = cex.get("exp__prime")
-    if exp is None or exp_prime is None:
-        return None, 2, "missing exp/exp__prime"
+    specs = _build_replay_specs(cex, sym_size, secret_layout_spec, public_layout_spec)
+    if specs is None:
+        return None, 2, "missing secret counterexamples"
 
-    secret_spec = f"exp:{sym_size}={exp}/{exp_prime}"
+    secret_spec, public_spec = specs
     cmd = [
         sys.executable,
         "-m",
@@ -163,8 +249,7 @@ def _run_reproduce(
         str(timeout_s),
     ]
 
-    if "base" in cex and "mod" in cex:
-        public_spec = f"base:{sym_size}={cex['base']},mod:{sym_size}={cex['mod']}"
+    if public_spec:
         cmd += ["--public", public_spec]
 
     proc = subprocess.run(
@@ -196,6 +281,16 @@ def main(argv: List[str]) -> int:
     p.add_argument("--sym-size", type=int, default=4, help="Symbol size in bytes (SYM_SIZE), default: 4")
     p.add_argument("--reproduce", action="store_true", help="Run replay reproduction for each row with counterexamples")
     p.add_argument("--replay-executable", default=None, help="Path to replay executable (required with --reproduce)")
+    p.add_argument(
+        "--secret-layout",
+        default="",
+        help="Optional comma-separated secret replay layout name:bytes (for example: skey:48,data:32)",
+    )
+    p.add_argument(
+        "--public-layout",
+        default="",
+        help="Optional comma-separated public replay layout name:bytes",
+    )
     p.add_argument(
         "--reproduce-module",
         dest="reproduce_module",
@@ -236,6 +331,13 @@ def main(argv: List[str]) -> int:
             return 2
 
     code_root = os.path.abspath(args.code_root) if args.code_root else None
+    try:
+        _parse_named_layout(args.secret_layout)
+        _parse_named_layout(args.public_layout)
+    except ValueError as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 2
+
     data = parse_log_rows(args.log, code_root, args.library)
 
     if args.reproduce:
@@ -259,6 +361,8 @@ def main(argv: List[str]) -> int:
                 replay_executable=str(args.replay_executable),
                 sym_size=int(args.sym_size),
                 cex=cex,
+                secret_layout_spec=str(args.secret_layout),
+                public_layout_spec=str(args.public_layout),
                 timeout_s=int(args.reproduce_timeout),
             )
 

@@ -12,7 +12,7 @@ fi
 sym_size=4
 abacus_root=""
 benchmarks_csv=""
-default_benchmarks=(mbedtls libgcrypt openssl)
+default_benchmarks=(mbedtls libgcrypt openssl bearssl)
 selected_benchmarks=("${default_benchmarks[@]}")
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -62,7 +62,7 @@ if [[ -n "$benchmarks_csv" ]]; then
         bench="${raw//[[:space:]]/}"
         [[ -z "$bench" ]] && continue
         case "$bench" in
-            mbedtls|libgcrypt|openssl)
+            mbedtls|libgcrypt|openssl|bearssl)
                 selected_benchmarks+=("$bench")
                 ;;
             *)
@@ -86,6 +86,8 @@ exec > >(tee -a "$results_dir/output.log") 2>&1
 run_case() {
     local exe="$1"
     local outfile="$2"
+    local runner_config="${3:-}"
+    local preset_name="${4:-}"
     local library=""
     case "$exe" in
         *mbedtls-3.2.1*)
@@ -96,6 +98,9 @@ run_case() {
             ;;
         *openssl-1.1.1q*)
             library="openssl"
+            ;;
+        *bearssl*)
+            library="bearssl"
             ;;
     esac
     if [[ -z "$library" ]]; then
@@ -108,12 +113,18 @@ run_case() {
         "${abacus_root}/Intel-Pin-Archive/pin" -t "${abacus_root}/Pintools/obj-ia32/MyPinToolLinux.so" -- "$exe"
         "${abacus_root}/build/App/QIF/QIF" ./Inst_data.txt -f Function.txt -d "$exe" -o "${results_dir}/$outfile"
     } 2>&1 | tee "$case_log"
-    python -m "$converter_module" \
-        --log "$case_log" \
-        --out "$case_json" \
-        --sym-size "$sym_size" \
-        --code-root "$repo_root" \
+    local cmd=(
+        python -m "$converter_module"
+        --log "$case_log"
+        --out "$case_json"
+        --sym-size "$sym_size"
+        --code-root "$repo_root"
         --library "$library"
+    )
+    if [[ -n "$runner_config" ]]; then
+        cmd+=(--runner-config "$runner_config" --preset-name "$preset_name")
+    fi
+    "${cmd[@]}"
     rm -f Inst_data.txt Function.txt
 }
 
@@ -146,6 +157,16 @@ run_openssl() {
     done
 }
 
+run_bearssl() {
+    echo "##########"
+    echo "Begin experiments for BearSSL 0.6"
+    echo "##########"
+
+    benchmarks/bearssl/build.sh --abacus --preset default
+    run_case "benchmarks/bearssl/abacus_fix_pub_binsec_aes_big" "bearssl_aes_big.txt" "$repo_root/configs/runner/bearssl_aes_big_runner_config.json" default
+    run_case "benchmarks/bearssl/abacus_fix_pub_appliedcryp_des" "bearssl_des_tab.txt" "$repo_root/configs/runner/bearssl_des_tab_runner_config.json" default
+}
+
 for benchmark in "${selected_benchmarks[@]}"; do
     case "$benchmark" in
         mbedtls)
@@ -156,6 +177,9 @@ for benchmark in "${selected_benchmarks[@]}"; do
             ;;
         openssl)
             run_openssl
+            ;;
+        bearssl)
+            run_bearssl
             ;;
     esac
 done

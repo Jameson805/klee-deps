@@ -54,6 +54,8 @@ def load_ctchecker(ct_type, path, prefix=""):
         data = json.load(f)
     key = "branches" if ct_type == "branch" else "indices"
     df = pd.DataFrame(data.get(key, []))
+    if "filename" not in df.columns:
+        df = pd.DataFrame(columns=["filename", "line", "column"])
     df["filename"] = df["filename"].apply(lambda x: os.path.join(prefix, x))
     return df
 

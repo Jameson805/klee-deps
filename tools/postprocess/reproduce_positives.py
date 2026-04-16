@@ -4,9 +4,10 @@ import os
 import sys
 
 import argparse
+import json
 from importlib.resources import files
 import subprocess
-from typing import List, Optional, Tuple, Dict
+from typing import Any, Dict, List, Optional, Tuple
 import shutil
 import tempfile  # new
 from tools.utilities.addrinfo import get_addr_info
@@ -195,6 +196,8 @@ def mode_dataframe(
         df["counterexamples"] = [dict() for _ in range(len(df.index))]
     else:
         df["counterexamples"] = df["counterexamples"].apply(lambda v: v if isinstance(v, dict) else {})
+    if "non_ct_count" not in df.columns:
+        df["non_ct_count"] = 0
 
     if "library" not in df.columns:
         df["library"] = library
@@ -346,6 +349,73 @@ def parse_public_input_spec(spec: str) -> Dict[str, Tuple[int, int]]:
     return result
 
 
+def _load_json_notes(path: str) -> Dict[str, Any]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+    if isinstance(raw, dict):
+        notes = raw.get("notes")
+        if isinstance(notes, dict):
+            return notes
+    return {}
+
+
+def _build_abacus_specs(
+    counterexamples: Dict[str, int],
+    notes: Dict[str, Any],
+    sym_size: int,
+) -> Optional[Tuple[str, str]]:
+    secret_layout = notes.get("secret_layout")
+    public_layout = notes.get("public_layout")
+
+    secret_parts: List[str] = []
+    if isinstance(secret_layout, list) and secret_layout:
+        for entry in secret_layout:
+            if not isinstance(entry, dict):
+                raise ValueError("notes.secret_layout entries must be dictionaries")
+            name = entry.get("name")
+            size = entry.get("size")
+            if not isinstance(name, str) or not name:
+                raise ValueError("notes.secret_layout entries must define a non-empty name")
+            if not isinstance(size, int) or size <= 0:
+                raise ValueError(f"notes.secret_layout entry for {name!r} has invalid size")
+            value = counterexamples.get(name)
+            prime_value = counterexamples.get(f"{name}__prime")
+            if value is None or prime_value is None:
+                return None
+            secret_parts.append(f"{name}:{size}={int(value)}/{int(prime_value)}")
+    else:
+        exp = counterexamples.get("exp")
+        exp_prime = counterexamples.get("exp__prime")
+        if exp is None or exp_prime is None:
+            return None
+        secret_parts.append(f"exp:{sym_size}={int(exp)}/{int(exp_prime)}")
+
+    public_parts: List[str] = []
+    if isinstance(public_layout, list) and public_layout:
+        for entry in public_layout:
+            if not isinstance(entry, dict):
+                raise ValueError("notes.public_layout entries must be dictionaries")
+            name = entry.get("name")
+            size = entry.get("size")
+            if not isinstance(name, str) or not name:
+                raise ValueError("notes.public_layout entries must define a non-empty name")
+            if not isinstance(size, int) or size <= 0:
+                raise ValueError(f"notes.public_layout entry for {name!r} has invalid size")
+            value = counterexamples.get(name)
+            if value is None:
+                return None
+            public_parts.append(f"{name}:{size}={int(value)}")
+    elif counterexamples.get("base") is not None and counterexamples.get("mod") is not None:
+        public_parts.append(f"base:{sym_size}={int(counterexamples['base'])}")
+        public_parts.append(f"mod:{sym_size}={int(counterexamples['mod'])}")
+
+    return ",".join(secret_parts), ",".join(public_parts)
+
+
 def write_int_file(path: str, value: int, size: int) -> None:
     """Write an integer with given byte size (big-endian, unsigned) to path."""
     with open(path, "wb") as f:
@@ -451,6 +521,7 @@ def mode_abacus_json(
     import pandas as pd  # type: ignore
     from tools.shared.common import load_combined_json, save_combined_json  # type: ignore
 
+    notes = _load_json_notes(input_json)
     df = load_combined_json(input_json)
     if "counterexamples" not in df.columns:
         if len(df.index) == 0:
@@ -480,9 +551,12 @@ def mode_abacus_json(
             df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
             continue
 
-        exp = cex.get("exp")
-        exp_prime = cex.get("exp__prime")
-        if exp is None or exp_prime is None:
+        try:
+            specs = _build_abacus_specs(cex, notes, sym_size)
+        except ValueError as err:
+            print(f"Error: {err}", file=sys.stderr)
+            return 2
+        if specs is None:
             df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
             continue
 
@@ -490,10 +564,7 @@ def mode_abacus_json(
         line = row.get("line")
         print(f"Reproducing {filename}:{line} ... ", end="", flush=True)
 
-        secret_spec = f"exp:{sym_size}={int(exp)}/{int(exp_prime)}"
-        public_spec = ""
-        if cex.get("base") is not None and cex.get("mod") is not None:
-            public_spec = f"base:{sym_size}={int(cex['base'])},mod:{sym_size}={int(cex['mod'])}"
+        secret_spec, public_spec = specs
 
         expected_filename = filename if isinstance(filename, str) else None
         expected_line = None
