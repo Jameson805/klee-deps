@@ -1,0 +1,7 @@
+comparison_tool,source_column,display_label,plot_groups
+binsec,binsec_16_var_pub,BINSEC,external
+klee_cf,klee_cf_rand_path_dfs_4_fix_pub,KLEE-CF,internal|external
+klee_cf_sliced,klee_cf_rand_path_dfs_4_sliced_fix_pub,KLEE-CF sliced,internal
+klee_eager,klee_eager_rand_path_dfs_4_fix_pub,KLEE-Eager,internal
+self_comp,self_comp_dfs_4_fix_pub,Self-Comp,internal
+abacus,abacus_4_all,Abacus,external

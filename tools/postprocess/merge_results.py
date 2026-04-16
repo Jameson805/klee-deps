@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 Location = Tuple[str, str, int, Optional[int]]  # (library, file, line, column)
 
 
-def _column_and_library_from_json_filename(name: str, run_name: str, sliced_only: bool) -> Optional[Tuple[str, str]]:
+def column_and_library_from_json_filename(name: str, run_name: str, sliced_only: bool) -> Optional[Tuple[str, str]]:
 	"""Return (column_name, library) for one top-level JSON file, or None if filtered out."""
 	lower = name.lower()
 	if not lower.endswith(".json"):
@@ -52,6 +52,9 @@ def _column_and_library_from_json_filename(name: str, run_name: str, sliced_only
 
 	prefix = f"{run_name}_sliced" if sliced_only else run_name
 	return f"{prefix}_{option}", library
+
+
+_column_and_library_from_json_filename = column_and_library_from_json_filename
 
 
 def _to_float(value) -> Optional[float]:
@@ -143,7 +146,7 @@ def merge_runs(root_dir: str, *, sliced_only: bool = False) -> Tuple[List[str], 
 			if not os.path.isfile(path):
 				continue
 
-			resolved = _column_and_library_from_json_filename(file, run_name, sliced_only)
+			resolved = column_and_library_from_json_filename(file, run_name, sliced_only)
 			if resolved is None:
 				continue
 			col_name, library = resolved

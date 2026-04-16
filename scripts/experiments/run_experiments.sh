@@ -16,11 +16,13 @@ merge_results_module="tools.postprocess.merge_results"
 apply_sliced_map_module="tools.postprocess.apply_sliced_map"
 merge_csv_by_location_module="tools.postprocess.merge_csv_by_location"
 filter_merged_results_module="tools.postprocess.filter_merged_results"
+summarize_reproduction_status_module="tools.postprocess.summarize_reproduction_status"
 num_copies=10
 temp_dir="/datapool/theta-lin-experiments/tmp"
 output="/datapool/theta-lin-experiments/20260404"
 sliced_map_csv="$repo_root/configs/postprocess/sliced_map.csv"
 filtered_locations_csv="$repo_root/configs/postprocess/filtered_locations.csv"
+ideal_config_selection_csv="$repo_root/configs/postprocess/ideal_config_selection.csv"
 run_time="4h"
 run_time_seconds="14400"
 # output="/datapool/theta-lin-experiments/test_run"
@@ -200,6 +202,11 @@ run_postprocess() {
 		return 1
 	fi
 
+	if ! python -c "import ${summarize_reproduction_status_module}" >/dev/null 2>&1; then
+		echo "missing helper module: $summarize_reproduction_status_module" >&2
+		return 1
+	fi
+
 	if [[ ! -f "$sliced_map_csv" ]]; then
 		echo "missing sliced map CSV: $sliced_map_csv" >&2
 		return 1
@@ -207,6 +214,11 @@ run_postprocess() {
 
 	if [[ ! -f "$filtered_locations_csv" ]]; then
 		echo "missing filtered locations CSV: $filtered_locations_csv" >&2
+		return 1
+	fi
+
+	if [[ ! -f "$ideal_config_selection_csv" ]]; then
+		echo "missing ideal config selection CSV: $ideal_config_selection_csv" >&2
 		return 1
 	fi
 
@@ -241,6 +253,14 @@ run_postprocess() {
 		"$output/all_merged_results.csv" \
 		--filter "$filtered_locations_csv" \
 		--output "$output/filtered_merged_results.csv" || return 1
+
+	run_tagged "SUMMARY REPRO STATUS" \
+		python -m "$summarize_reproduction_status_module" \
+		"$output" \
+		--filter "$filtered_locations_csv" \
+		--sliced-map "$sliced_map_csv" \
+		--selection-csv "$ideal_config_selection_csv" \
+		--output "$output/filtered_reproduction_status_summary.csv" || return 1
 }
 
 launch_run "KLEE CF Default 4" "results/klee_cf_results" "$output/klee_cf_default_4" -- scripts/experiments/run_klee_cf.sh "$run_time" --sym-size 4 "${cf_bench_args[@]}"

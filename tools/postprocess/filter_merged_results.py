@@ -63,14 +63,29 @@ def load_filters(filter_path: Path) -> dict[tuple[str, str], list[tuple[int, int
     return filters
 
 
-def row_matches(filters: dict[tuple[str, str], list[tuple[int, int]]], row: dict[str, str]) -> bool:
-    key = (_normalize_text(row["library"]), _normalize_file(row["file"]))
+def location_matches(
+    filters: dict[tuple[str, str], list[tuple[int, int]]],
+    *,
+    library: object,
+    file: object,
+    line: object,
+) -> bool:
+    key = (_normalize_text(library), _normalize_file(file))
     ranges = filters.get(key)
     if not ranges:
         return False
 
-    line = _normalize_int(row["line"], "line")
-    return any(line_start <= line <= line_end for line_start, line_end in ranges)
+    normalized_line = _normalize_int(line, "line")
+    return any(line_start <= normalized_line <= line_end for line_start, line_end in ranges)
+
+
+def row_matches(filters: dict[tuple[str, str], list[tuple[int, int]]], row: dict[str, str]) -> bool:
+    return location_matches(
+        filters,
+        library=row["library"],
+        file=row["file"],
+        line=row["line"],
+    )
 
 
 def filter_csv(input_path: Path, filter_path: Path, output_path: Path) -> tuple[int, int]:
