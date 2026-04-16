@@ -164,6 +164,24 @@ resolve_build_script() {
     esac
 }
 
+resolve_library() {
+    local json_name="$1"
+    case "$json_name" in
+        mbedtls.json)
+            printf '%s\n' 'mbedtls'
+            ;;
+        libgcrypt.json)
+            printf '%s\n' 'libgcrypt'
+            ;;
+        openssl_recp.json|openssl_mont.json|openssl_mont_consttime.json|openssl_mont_word.json)
+            printf '%s\n' 'openssl'
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 read_sym_size() {
     local json_file="$1"
     python - "$json_file" <<'PY'
@@ -219,6 +237,10 @@ for json_file in "${json_files[@]}"; do
         echo "Skipping unsupported JSON file: $json_name" >&2
         continue
     }
+    library="$(resolve_library "$json_name")" || {
+        echo "Skipping JSON with unknown library mapping: $json_name" >&2
+        continue
+    }
 
     sym_size="$sym_size_override"
     if [[ -z "$sym_size" ]]; then
@@ -268,6 +290,7 @@ for json_file in "${json_files[@]}"; do
         --abacus-json "$json_file" \
         --output "$output_json" \
         --executable "$replay_exe" \
+        --library "$library" \
         --sym-size "$sym_size" \
         --timeout "$timeout"
 done
