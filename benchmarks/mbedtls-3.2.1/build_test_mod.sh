@@ -9,6 +9,7 @@ KLEE_PATH="../../klee-controlflow"
 export LLVM_COMPILER=clang
 
 flags=( -g -O0 -I"$repo_root/include" -Iinclude )
+noind_exe_flags=( -fno-pie -fno-plt -Wl,-no-pie )
 klee_flags=(\
     -I"$KLEE_PATH/include" \
     -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" \
@@ -16,5 +17,5 @@ klee_flags=(\
 )
 libs=( build/library/libmbedtls.a build/library/libmbedx509.a build/library/libmbedcrypto.a )
 
-wllvm "${flags[@]}" "${klee_flags[@]}" test_mod.c "${libs[@]}" -o test_mod
+wllvm "${flags[@]}" "${klee_flags[@]}" "${noind_exe_flags[@]}" test_mod.c "${libs[@]}" -o test_mod
 extract-bc test_mod

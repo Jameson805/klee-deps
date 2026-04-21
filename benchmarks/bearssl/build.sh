@@ -28,6 +28,15 @@ EOF
 MODE=""
 PRESET=""
 
+NOIND_CFLAGS=(
+    -fno-pie
+    -fno-plt
+)
+NOIND_LDFLAGS=(
+    -Wl,-no-pie
+)
+NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --klee-cf)
@@ -203,8 +212,8 @@ build_klee_mode() {
     wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -DCONCRETE_PUBS "${sources[@]}" -o "$fix_exe"
     extract-bc "$fix_exe"
 
-    clang "${flags[@]}" -DREPLAY "${sources[@]}" -o "$var_replay"
-    clang "${flags[@]}" -DREPLAY -DCONCRETE_PUBS "${sources[@]}" -o "$fix_replay"
+    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY "${sources[@]}" -o "$var_replay"
+    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS "${sources[@]}" -o "$fix_replay"
 }
 
 build_self_comp_mode() {
@@ -230,8 +239,8 @@ build_self_comp_mode() {
     extract-bc "$fix_exe"
     record_branch "$fix_exe.bc"
 
-    clang "${flags[@]}" -DREPLAY "${sources[@]}" -o "$var_replay"
-    clang "${flags[@]}" -DREPLAY -DCONCRETE_PUBS "${sources[@]}" -o "$fix_replay"
+    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY "${sources[@]}" -o "$var_replay"
+    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS "${sources[@]}" -o "$fix_replay"
 }
 
 build_binsec_mode() {
@@ -244,14 +253,14 @@ build_binsec_mode() {
     generated_dir="$(bench_generated_dir_for_id "$id")"
     flags=("${common_flags[@]}" -I "$generated_dir")
 
-    clang -g -O0 -m32 -static -fno-pie -fno-plt -Wl,-no-pie \
+    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
         -DBINSEC "${flags[@]}" "${sources[@]}" -o "binsec_var_pub_${id}"
-    clang -g -O0 -m32 -static -fno-pie -fno-plt -Wl,-no-pie \
+    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
         -DBINSEC -DCONCRETE_PUBS "${flags[@]}" "${sources[@]}" -o "binsec_fix_pub_${id}"
 
-    clang -g -O0 -m32 -static -fno-pie -fno-plt -Wl,-no-pie \
+    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
         -DREPLAY "${flags[@]}" "${sources[@]}" -o "binsec_var_pub_replay_${id}"
-    clang -g -O0 -m32 -static -fno-pie -fno-plt -Wl,-no-pie \
+    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
         -DREPLAY -DCONCRETE_PUBS "${flags[@]}" "${sources[@]}" -o "binsec_fix_pub_replay_${id}"
 }
 

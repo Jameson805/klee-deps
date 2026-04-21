@@ -150,10 +150,8 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
         LDFLAGS+=( -m32 )
         ARCH_FLAGS=( linux-generic32 )
     fi
-    if [[ "$MODE" == "binsec" ]]; then
-        CFLAGS+=( "${NOIND_CFLAGS[@]}" )
-        LDFLAGS+=( "${NOIND_LDFLAGS[@]}" )
-    fi
+    CFLAGS+=( "${NOIND_CFLAGS[@]}" )
+    LDFLAGS+=( "${NOIND_LDFLAGS[@]}" )
 
     # The no-asm part of the code will be constant time
     ./Configure no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME "${ARCH_FLAGS[@]}"
@@ -185,14 +183,14 @@ for algo in "${algos[@]}"; do
 
     if [[ "$MODE" == "klee_cf" ]]; then
         # KLEE-controlflow bitcode builds
-        wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -D${macro} klee_main.c "${libs[@]}" -o "klee_var_pub_${algo}"
+        wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF -D${macro} klee_main.c "${libs[@]}" -o "klee_var_pub_${algo}"
         extract-bc "klee_var_pub_${algo}"
-        wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_${algo}"
+        wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_${algo}"
         extract-bc "klee_fix_pub_${algo}"
 
         # Replay builds
-        clang "${flags[@]}" -static -D${macro} -DREPLAY klee_main.c "${libs[@]}" -o "klee_var_pub_replay_${algo}"
-        clang "${flags[@]}" -static -D${macro} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_replay_${algo}"
+        clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DREPLAY klee_main.c "${libs[@]}" -o "klee_var_pub_replay_${algo}"
+        clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_replay_${algo}"
     fi
 
     if [[ "$MODE" == "binsec" ]]; then
@@ -207,7 +205,7 @@ for algo in "${algos[@]}"; do
 
     if [[ "$MODE" == "abacus" ]]; then
         # Abacus builds
-        gcc "${flags[@]}" -m32 -pthread -D${macro} -DABACUS klee_main.c "${libs[@]}" -ldl -o "abacus_fix_pub_${algo}"
+        gcc "${flags[@]}" -m32 -pthread "${NOIND_EXE_FLAGS[@]}" -D${macro} -DABACUS klee_main.c "${libs[@]}" -ldl -o "abacus_fix_pub_${algo}"
     fi
 
     if [[ "$MODE" == "self_comp" ]]; then
@@ -218,11 +216,11 @@ for algo in "${algos[@]}"; do
             mont_word)      fun="BN_mod_exp_mont_word" ;;
         esac
 
-        wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP -D${macro} klee_main.c "${libs[@]}" -o "self_comp_var_pub_${algo}"
+        wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP -D${macro} klee_main.c "${libs[@]}" -o "self_comp_var_pub_${algo}"
         extract-bc "self_comp_var_pub_${algo}"
         record_branch "self_comp_var_pub_${algo}.bc" "${fun}"
 
-        wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "self_comp_fix_pub_${algo}"
+        wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "self_comp_fix_pub_${algo}"
         extract-bc "self_comp_fix_pub_${algo}"
         record_branch "self_comp_fix_pub_${algo}.bc" "${fun}"
     fi

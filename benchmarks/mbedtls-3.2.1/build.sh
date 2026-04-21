@@ -122,10 +122,8 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
         CFLAGS+=( -m32 )
         LDFLAGS+=( -m32 )
     fi
-    if [[ "$MODE" == "binsec" ]]; then
-        CFLAGS+=( "${NOIND_CFLAGS[@]}" )
-        LDFLAGS+=( "${NOIND_LDFLAGS[@]}" )
-    fi
+    CFLAGS+=( "${NOIND_CFLAGS[@]}" )
+    LDFLAGS+=( "${NOIND_LDFLAGS[@]}" )
 
     rm -rf build
     mkdir build
@@ -152,22 +150,22 @@ libs=( build/library/libmbedtls.a build/library/libmbedx509.a build/library/libm
 
 if [[ "$MODE" == "klee_cf" ]]; then
     # KLEE-controlflow bitcode builds
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF klee_main.c "${libs[@]}" -o klee_var_pub
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF klee_main.c "${libs[@]}" -o klee_var_pub
     extract-bc klee_var_pub
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
     extract-bc klee_fix_pub
 
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DKLEE_CF klee_main.c bignum_sliced.c "${libs[@]}" -o klee_var_pub_sliced
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DKLEE_CF klee_main.c bignum_sliced.c "${libs[@]}" -o klee_var_pub_sliced
     extract-bc klee_var_pub_sliced
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DUSE_SLICED -DKLEE_CF -DCONCRETE_PUBS klee_main.c bignum_sliced.c "${libs[@]}" -o klee_fix_pub_sliced
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DKLEE_CF -DCONCRETE_PUBS klee_main.c bignum_sliced.c "${libs[@]}" -o klee_fix_pub_sliced
     extract-bc klee_fix_pub_sliced
 
     # Replay builds
-    clang "${flags[@]}" -static -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
-    clang "${flags[@]}" -static -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
 
-    clang "${flags[@]}" -static -DUSE_SLICED -DREPLAY klee_main.c bignum_sliced.c "${libs[@]}" -o klee_var_pub_sliced_replay
-    clang "${flags[@]}" -static -DUSE_SLICED -DREPLAY -DCONCRETE_PUBS klee_main.c bignum_sliced.c "${libs[@]}" -o klee_fix_pub_sliced_replay
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DREPLAY klee_main.c bignum_sliced.c "${libs[@]}" -o klee_var_pub_sliced_replay
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DREPLAY -DCONCRETE_PUBS klee_main.c bignum_sliced.c "${libs[@]}" -o klee_fix_pub_sliced_replay
 fi
 
 if [[ "$MODE" == "binsec" ]]; then
@@ -182,7 +180,7 @@ fi
 
 if [[ "$MODE" == "abacus" ]]; then
     # Abacus builds
-    gcc "${flags[@]}" -m32 -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
+    gcc "${flags[@]}" -m32 "${NOIND_EXE_FLAGS[@]}" -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
 fi
 
 record_branch() {
@@ -194,10 +192,10 @@ record_branch() {
 }
 
 if [[ "$MODE" == "self_comp" ]]; then
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP klee_main.c "${libs[@]}" -o self_comp_var_pub
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP klee_main.c "${libs[@]}" -o self_comp_var_pub
     extract-bc self_comp_var_pub
     record_branch self_comp_var_pub.bc
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o self_comp_fix_pub
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o self_comp_fix_pub
     extract-bc self_comp_fix_pub
     record_branch self_comp_fix_pub.bc
 fi
