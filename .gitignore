@@ -15,6 +15,7 @@ klee-out-*/
 .libs/
 .deps/
 build/
+obj-*/
 
 klee_main
 klee_fix_pub*

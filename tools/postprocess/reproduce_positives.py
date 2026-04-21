@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 
-import os
-import sys
+from __future__ import annotations
 
 import argparse
 import json
-from importlib.resources import files
-import subprocess
-from typing import Any, Dict, List, Optional, Tuple
+import os
+import shlex
 import shutil
-import tempfile  # new
-from tools.utilities.addrinfo import get_addr_info
+import struct
+import subprocess
+import sys
+import tempfile
+from collections import deque
+from dataclasses import dataclass
+from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
 from tools.shared.result_schema import (
     STATUS_IDENTICAL_TRACE,
     STATUS_LOCATION_MISMATCH,
@@ -19,21 +26,78 @@ from tools.shared.result_schema import (
     STATUS_TIMEOUT,
 )
 
-def resolve_trace_script() -> str:
-    """Resolve the packaged gdb trace script."""
-    path = files("tools.postprocess").joinpath("trace.gdb")
-    if path.is_file():
-        return str(path)
-    raise FileNotFoundError("trace.gdb not found in tools.postprocess package resources")
+try:
+    from tools.utilities.addrinfo import get_addr_info, get_addr_info_context  # type: ignore
+except Exception as exc:  # pragma: no cover
+    get_addr_info = None  # type: ignore
+    get_addr_info_context = None  # type: ignore
+    _ADDRINFO_IMPORT_ERROR = str(exc)
+else:
+    _ADDRINFO_IMPORT_ERROR = None
 
 
-def parse_list(s: str) -> List[str]:
-    """Split a comma-separated list and ignore empty entries/spaces."""
-    return [p.strip() for p in s.split(",") if p and p.strip()]
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PIN_TOOL_DIR = os.path.join(REPO_ROOT, "pin-tracer")
+PIN_TOOL_NAME = "replay_trace"
+PRIME_SUFFIXES = ("__prime", "_prime")
+TRACE_LOOKBACK = 64
+
+_ADDRINFO_WARNING_EMITTED = False
+_PIN_RUNTIME_CACHE: Dict[Tuple[str, str], "PinRuntime"] = {}
 
 
-def require_tools(tools: List[str]) -> None:
-    missing = [t for t in tools if shutil.which(t) is None]
+@dataclass(frozen=True)
+class ExecutableArch:
+    target: str
+    pin_binary_name: str
+    personality: str
+
+
+@dataclass(frozen=True)
+class PinRuntime:
+    pin_root: str
+    target: str
+    pin_binary: str
+    personality: str
+    tool_path: str
+
+
+@dataclass(frozen=True)
+class TraceEvent:
+    kind: str
+    ip: int
+    address: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class Divergence:
+    index: int
+    event_a: Optional[TraceEvent]
+    event_b: Optional[TraceEvent]
+    culprit_ip: Optional[int]
+    recent_ips: Tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class ReplayResult:
+    culprit_ip: Optional[int]
+    resolved_ip: Optional[int]
+    location: Optional[Tuple[str, int, int]]
+    column_bounds: Optional[Tuple[Optional[int], Optional[int]]] = None
+
+
+@dataclass(frozen=True)
+class LocationMatchResult:
+    matches: bool
+    snapped: bool = False
+
+
+def parse_list(spec: str) -> List[str]:
+    return [part.strip() for part in spec.split(",") if part and part.strip()]
+
+
+def require_tools(tools: Sequence[str]) -> None:
+    missing = [tool for tool in tools if shutil.which(tool) is None]
     if missing:
         print(
             f"Error: required tools not found on PATH: {', '.join(missing)}",
@@ -42,317 +106,560 @@ def require_tools(tools: List[str]) -> None:
         sys.exit(2)
 
 
-def run_gdb_trace(executable: str, arg_files: List[str], timeout: int) -> str:
-    """Run gdb batch trace script and return stdout (trace of PCs).
+def coerce_int(value: Any) -> Optional[int]:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        if value != value:
+            return None
+    except Exception:
+        pass
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
-    On non-zero exit, print stdout/stderr so the user can inspect the failure.
-    """
-    script = resolve_trace_script()
-    cmd = ["gdb", "-batch", "-x", script, "--args", executable] + arg_files
-    proc = subprocess.run(
-        cmd,
-        # check=False so we can inspect stdout/stderr on failure
-        check=False,
-        capture_output=True,
-        text=True,
-        bufsize=-1,
-        timeout=timeout,
+
+def shell_join(argv: Sequence[str]) -> str:
+    return shlex.join(list(argv))
+
+
+def tail_text(text: str, n: int = 30) -> str:
+    lines = text.splitlines()
+    if len(lines) <= n:
+        return text
+    return "\n".join(lines[-n:])
+
+
+def warn_addrinfo_unavailable() -> None:
+    global _ADDRINFO_WARNING_EMITTED
+    if get_addr_info is not None or _ADDRINFO_WARNING_EMITTED:
+        return
+    message = "Warning: DWARF address lookup is unavailable."
+    if _ADDRINFO_IMPORT_ERROR:
+        message += f" Import error: {_ADDRINFO_IMPORT_ERROR}"
+    print(message, file=sys.stderr)
+    _ADDRINFO_WARNING_EMITTED = True
+
+
+def resolve_pin_root(pin_root: Optional[str]) -> str:
+    candidate = pin_root or os.environ.get("PIN_ROOT")
+    if not candidate:
+        raise RuntimeError("Intel Pin root not configured. Pass --pin-root or set PIN_ROOT.")
+    resolved = os.path.abspath(candidate)
+    if not os.path.isdir(resolved):
+        raise RuntimeError(f"Intel Pin root does not exist: {resolved}")
+    return resolved
+
+
+def inspect_executable_arch(executable: str) -> ExecutableArch:
+    with open(executable, "rb") as stream:
+        header = stream.read(20)
+
+    if len(header) < 20 or header[:4] != b"\x7fELF":
+        raise RuntimeError(f"Replay executable is not an ELF file: {executable}")
+
+    elf_class = header[4]
+    data_encoding = header[5]
+    if data_encoding == 1:
+        machine = struct.unpack("<H", header[18:20])[0]
+    elif data_encoding == 2:
+        machine = struct.unpack(">H", header[18:20])[0]
+    else:
+        raise RuntimeError(f"Unsupported ELF data encoding in: {executable}")
+
+    if elf_class == 1:
+        if machine != 3:
+            raise RuntimeError(f"Unsupported 32-bit replay executable machine {machine} in: {executable}")
+        return ExecutableArch(target="ia32", pin_binary_name="pin32", personality="linux32")
+
+    if elf_class == 2:
+        if machine != 62:
+            raise RuntimeError(f"Unsupported 64-bit replay executable machine {machine} in: {executable}")
+        return ExecutableArch(target="intel64", pin_binary_name="pin", personality="linux64")
+
+    raise RuntimeError(f"Unsupported ELF class {elf_class} in: {executable}")
+
+
+def ensure_pin_runtime(executable: str, pin_root: str) -> PinRuntime:
+    arch = inspect_executable_arch(executable)
+    cache_key = (pin_root, arch.target)
+    cached = _PIN_RUNTIME_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    if not os.path.isdir(PIN_TOOL_DIR):
+        raise RuntimeError(f"Pin tracer directory is missing: {PIN_TOOL_DIR}")
+
+    pin_binary = os.path.join(pin_root, arch.pin_binary_name)
+    if not os.path.isfile(pin_binary):
+        raise RuntimeError(f"Required Pin launcher not found: {pin_binary}")
+
+    tool_path = os.path.join(PIN_TOOL_DIR, f"obj-{arch.target}", f"{PIN_TOOL_NAME}.so")
+    if not os.path.isfile(tool_path):
+        require_tools(["make"])
+        cmd = [
+            "make",
+            "-C",
+            PIN_TOOL_DIR,
+            f"PIN_ROOT={pin_root}",
+            f"TARGET={arch.target}",
+            "tools",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if proc.returncode != 0 or not os.path.isfile(tool_path):
+            details = [
+                f"Failed to build the Pin tracer for target {arch.target}.",
+                f"Command: {shell_join(cmd)}",
+            ]
+            if proc.stdout:
+                details.append(f"stdout:\n{tail_text(proc.stdout)}")
+            if proc.stderr:
+                details.append(f"stderr:\n{tail_text(proc.stderr)}")
+            raise RuntimeError("\n".join(details))
+
+    runtime = PinRuntime(
+        pin_root=pin_root,
+        target=arch.target,
+        pin_binary=pin_binary,
+        personality=arch.personality,
+        tool_path=tool_path,
     )
-    if proc.returncode != 0:
-        print(
-            f"gdb exited with status {proc.returncode} running: {' '.join(cmd)}",
-            file=sys.stderr,
-        )
-        if proc.stdout:
-            print("=== gdb stdout ===", file=sys.stderr)
-            print(proc.stdout, file=sys.stderr, end="")
-        if proc.stderr:
-            print("=== gdb stderr ===", file=sys.stderr)
-            print(proc.stderr, file=sys.stderr, end="")
-        # Re-raise as CalledProcessError to keep existing error handling semantics
-        raise subprocess.CalledProcessError(
-            proc.returncode, cmd, output=proc.stdout, stderr=proc.stderr
-        )
-
-    # Missing/invalid gdb script can otherwise produce empty traces that look identical.
-    if not proc.stdout.strip():
-        raise RuntimeError(
-            "gdb produced an empty trace; check trace.gdb location and executable debug info"
-        )
-
-    return proc.stdout
+    _PIN_RUNTIME_CACHE[cache_key] = runtime
+    return runtime
 
 
-def analyze_traces(trace_a: str, trace_b: str) -> Dict[str, Optional[int]]:
-    """Return dict with first_diff_index, addr_a, addr_b, prev_addr."""
-    lines_a = trace_a.splitlines()
-    lines_b = trace_b.splitlines()
-    max_len = max(len(lines_a), len(lines_b))
-    for i in range(max_len):
-        a = lines_a[i] if i < len(lines_a) else None
-        b = lines_b[i] if i < len(lines_b) else None
-        if a != b:
-            addr_a = int(a, 16) if a is not None else None
-            addr_b = int(b, 16) if b is not None else None
-            prev_addr = None
-            if i - 1 >= 0 and i - 1 < len(lines_a):
-                try:
-                    prev_addr = int(lines_a[i - 1], 16)
-                except Exception:
-                    prev_addr = None
-            return {
-                "first_diff_index": i,
-                "addr_a": addr_a,
-                "addr_b": addr_b,
-                "prev_addr": prev_addr,
-            }
-    return {
-        "first_diff_index": None,
-        "addr_a": None,
-        "addr_b": None,
-        "prev_addr": None,
-    }
-
-
-def print_nearest_debug_info(
+def run_pin_trace(
     executable: str,
-    trace_text: str,
-    start_index: int,
-) -> bool:
-    """Walk backward from start_index (bounded) to find the nearest addr with debug info and print it.
-
-    print:
-      nearest debug info at 0x<failed_addr> -> file:line:col
-
-    Returns True if something was printed (found), else prints a 'no debug info' message and returns False.
-    """
-    lines = trace_text.splitlines()
-    if not lines:
-        print("no debug info found for previous addresses")
-        return False
-
-    start = min(max(start_index, 0), len(lines) - 1)
-    j = start
-    while j >= 0:
-        try:
-            addr = int(lines[j], 16)
-        except Exception:
-            j -= 1
-            continue
-        info = get_addr_info(executable, addr)
-        if info is not None:
-            f, l, c = info
-            print(f"nearest debug info at 0x{addr:x} -> {f}:{l}:{c}")
-            return True
-        j -= 1
-
-    print("no debug info found for previous addresses")
-    return False
-
-
-def extract_inputs(ktest_file: str, secrets: List[str], publics: List[str]) -> None:
-    """Extract variables (including secret primes) using ktest-tool."""
-    def extract_var(var: str) -> None:
-        cmd = ["ktest-tool", "--extract", var, ktest_file]
-        subprocess.run(cmd, check=True)
-    for v in publics:
-        extract_var(v)
-    for s in secrets:
-        extract_var(s)
-        extract_var(f"{s}__prime")
-
-
-def run_traces(executable: str, ktest_file: str, secrets: List[str], publics: List[str], timeout: int) -> Tuple[str, str]:
-    """Run original (secrets) and prime (secret__prime) traces."""
-    trace_a = run_gdb_trace(executable, [ktest_file + f".{v}" for v in secrets + publics], timeout)
-    trace_b = run_gdb_trace(executable, [ktest_file + f".{v}__prime" for v in secrets] + [ktest_file + f".{v}" for v in publics], timeout)
-    return trace_a, trace_b
-
-
-def mode_dataframe(
-    input_json: str,
-    klee_output: str,
-    executable: str,
-    secret: str,
-    public: str,
+    arg_files: Sequence[str],
     timeout: int,
-    output: Optional[str],
-    library: str,
+    pin_root: str,
+    trace_path: str,
+    debug: bool,
 ) -> None:
-    """Original mode: iterate rows from a combined JSON and attempt reproduction."""
-    # Lazy imports so --input mode does not require pandas.
-    import pandas as pd  # type: ignore
-    from tools.shared.common import load_combined_json, save_combined_json  # type: ignore
+    runtime = ensure_pin_runtime(executable, pin_root)
+    require_tools(["setarch"])
 
-    require_tools(["ktest-tool", "gdb"])
-
-    secrets = parse_list(secret)
-    publics = parse_list(public)
-
-    df = load_combined_json(input_json)
-    if "reproduced" in df.columns:
-        df = df.drop(columns=["reproduced"])
-    if "counterexamples" not in df.columns:
-        df["counterexamples"] = [dict() for _ in range(len(df.index))]
-    else:
-        df["counterexamples"] = df["counterexamples"].apply(lambda v: v if isinstance(v, dict) else {})
-    if "non_ct_count" not in df.columns:
-        df["non_ct_count"] = 0
-
-    if "library" not in df.columns:
-        df["library"] = library
-    else:
-        df["library"] = df["library"].apply(lambda v: v if isinstance(v, str) and v.strip() else library)
-
-    df["reproduced_status"] = STATUS_NOT_REPRODUCED
-
-    for idx, row in df[df["non_ct_count"] > 0].iterrows():
-        filename = f"branch_counterexample_{row['inst_id']}.ktest"
-        print(
-            f"Reproducing {row['filename']}:{row['line']}:{row['column']} with {filename} ... ",
-            end="",
-            flush=True,
-        )
-        ktest_file = os.path.join(klee_output, filename)
-
-        try:
-            extract_inputs(ktest_file, secrets, publics)
-            trace_a, trace_b = run_traces(executable, ktest_file, secrets, publics, timeout)
-        except subprocess.TimeoutExpired:
-            print("Timeout")
-            df.at[idx, "reproduced_status"] = STATUS_TIMEOUT
-            continue
-
-        analysis = analyze_traces(trace_a, trace_b)
-        prev_addr = analysis["prev_addr"]
-        pos = analysis["first_diff_index"]
-        if prev_addr is None:
-            print("Failed with identical traces")
-            df.at[idx, "reproduced_status"] = STATUS_IDENTICAL_TRACE
-            continue
-
-        info = get_addr_info(executable, prev_addr)
-        if info is None:
-            print(f"Failed at 0x{prev_addr:x}, ", end="")
-            start_idx = (pos - 1) if (pos is not None and pos > 0) else 0
-            print_nearest_debug_info(executable, trace_a, start_idx)
-            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
-        else:
-            f, l, c = info
-            # NOTE: only compare basenames to avoid issues with different paths
-            if os.path.basename(row["filename"]) == os.path.basename(f) and row["line"] == l and row["column"] == c:
-                print("Success")
-                df.at[idx, "reproduced_status"] = STATUS_SUCCESS
-            else:
-                print(f"Failed at 0x{prev_addr:x} -> {f}:{l}:{c}")
-                df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
-
-    if output:
-        save_combined_json(df, output)
-
-
-def mode_ktest_file(executable: str, ktest_file: str, secret: str, public: str, timeout: int) -> int:
-    """Run two traces for a single .ktest by extracting inputs like in dataframe mode."""
-    require_tools(["ktest-tool", "gdb"])
-
-    secrets = parse_list(secret)
-    publics = parse_list(public)
+    setarch_path = shutil.which("setarch")
+    assert setarch_path is not None
+    cmd = [
+        setarch_path,
+        runtime.personality,
+        "-R",
+        runtime.pin_binary,
+        "-t",
+        runtime.tool_path,
+        "-o",
+        trace_path,
+        "--",
+        executable,
+    ] + list(arg_files)
 
     try:
-        extract_inputs(ktest_file, secrets, publics)
-        trace_a, trace_b = run_traces(executable, ktest_file, secrets, publics, timeout)
+        proc = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
     except subprocess.TimeoutExpired:
-        print("Timeout while running gdb traces", file=sys.stderr)
-        return 124
+        if debug:
+            print(f"[debug] timed out running: {shell_join(cmd)}", file=sys.stderr)
+        raise
 
-    analysis = analyze_traces(trace_a, trace_b)
-    prev_addr = analysis["prev_addr"]
-    pos = analysis["first_diff_index"]
-    if prev_addr is None:
-        print("Identical traces")
-        return 1
+    if proc.returncode != 0:
+        print(f"Pin exited with status {proc.returncode} running: {shell_join(cmd)}", file=sys.stderr)
+        if debug:
+            print(f"[debug] Pin command: {shell_join(cmd)}", file=sys.stderr)
+        if proc.stdout:
+            print("=== pin stdout ===", file=sys.stderr)
+            print(proc.stdout, file=sys.stderr, end="")
+        if proc.stderr:
+            print("=== pin stderr ===", file=sys.stderr)
+            print(proc.stderr, file=sys.stderr, end="")
+        raise subprocess.CalledProcessError(proc.returncode, cmd, output=proc.stdout, stderr=proc.stderr)
 
-    info = get_addr_info(executable, prev_addr)
-    if info is None:
-        print(f"Divergence after 0x{prev_addr:x}, ", end="")
-        start_idx = (pos - 1) if (pos is not None and pos > 0) else 0
-        print_nearest_debug_info(executable, trace_a, start_idx)
+    if not os.path.isfile(trace_path) or os.path.getsize(trace_path) == 0:
+        if debug:
+            print(f"[debug] Pin command: {shell_join(cmd)}", file=sys.stderr)
+        raise RuntimeError("Pin produced an empty trace; check PIN_ROOT, the replay executable, and the tracer build")
+
+
+def parse_trace_line(raw_line: str) -> TraceEvent:
+    parts = raw_line.strip().split()
+    if len(parts) == 2 and parts[0] == "I":
+        return TraceEvent(kind="I", ip=int(parts[1], 0))
+    if len(parts) == 3 and parts[0] in {"R", "W"}:
+        return TraceEvent(kind=parts[0], ip=int(parts[1], 0), address=int(parts[2], 0))
+    raise RuntimeError(f"Unrecognized Pin trace line: {raw_line.rstrip()}")
+
+
+def compare_trace_files(trace_a_path: str, trace_b_path: str) -> Optional[Divergence]:
+    recent_ips: Deque[int] = deque(maxlen=TRACE_LOOKBACK)
+
+    with open(trace_a_path, "r", encoding="utf-8", errors="replace", buffering=1024 * 1024) as trace_a:
+        with open(trace_b_path, "r", encoding="utf-8", errors="replace", buffering=1024 * 1024) as trace_b:
+            index = 0
+            while True:
+                raw_a = trace_a.readline()
+                raw_b = trace_b.readline()
+
+                if not raw_a and not raw_b:
+                    return None
+
+                if raw_a == raw_b:
+                    if raw_a:
+                        event = parse_trace_line(raw_a)
+                        recent_ips.append(event.ip)
+                    index += 1
+                    continue
+
+                event_a = parse_trace_line(raw_a) if raw_a else None
+                event_b = parse_trace_line(raw_b) if raw_b else None
+                last_common_ip = recent_ips[-1] if recent_ips else None
+                culprit_ip = last_common_ip
+                if event_a is not None and event_b is not None:
+                    # For control-flow divergence, report the last shared instruction,
+                    # not the first instruction already inside the two different paths.
+                    if not (event_a.kind == "I" and event_b.kind == "I" and event_a.ip != event_b.ip):
+                        culprit_ip = event_a.ip
+                elif event_a is not None:
+                    culprit_ip = event_a.ip if event_a.kind != "I" or last_common_ip is None else last_common_ip
+                elif event_b is not None:
+                    culprit_ip = event_b.ip if event_b.kind != "I" or last_common_ip is None else last_common_ip
+
+                return Divergence(
+                    index=index,
+                    event_a=event_a,
+                    event_b=event_b,
+                    culprit_ip=culprit_ip,
+                    recent_ips=tuple(recent_ips),
+                )
+
+
+def resolve_divergence_location(
+    executable: str,
+    divergence: Divergence,
+) -> Tuple[Optional[int], Optional[Tuple[str, int, int]], Optional[Tuple[Optional[int], Optional[int]]]]:
+    if get_addr_info_context is None:
+        return divergence.culprit_ip, None, None
+
+    candidates: List[int] = []
+    if divergence.culprit_ip is not None:
+        candidates.append(divergence.culprit_ip)
+    for ip in reversed(divergence.recent_ips):
+        if ip not in candidates:
+            candidates.append(ip)
+
+    for ip in candidates:
+        info = get_addr_info_context(executable, ip)
+        if info is not None:
+            file_name, line_no, col_no, previous_column, next_column = info
+            return ip, (file_name, line_no, col_no), (previous_column, next_column)
+
+    return divergence.culprit_ip, None, None
+
+
+def read_bytes(path: str) -> bytes:
+    with open(path, "rb") as stream:
+        return stream.read()
+
+
+def write_bytes(path: str, data: bytes) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as stream:
+        stream.write(data)
+
+
+def write_int_file(path: str, value: int, size: int) -> None:
+    with open(path, "wb") as stream:
+        stream.write(int(value).to_bytes(size, byteorder="big", signed=False))
+
+
+def analyze_input_bytes(
+    executable: str,
+    secret_names: Sequence[str],
+    public_names: Sequence[str],
+    secret_orig: Dict[str, bytes],
+    secret_prime: Dict[str, bytes],
+    public_values: Dict[str, bytes],
+    timeout: int,
+    pin_root: str,
+    debug: bool,
+) -> Optional[ReplayResult]:
+    executable_path = os.path.abspath(executable)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        run_a_dir = os.path.join(tmpdir, "run0")
+        run_b_dir = os.path.join(tmpdir, "run1")
+        os.makedirs(run_a_dir, exist_ok=True)
+        os.makedirs(run_b_dir, exist_ok=True)
+
+        files_run_a: List[str] = []
+        files_run_b: List[str] = []
+
+        # Keep identical directory layouts between the two runs so argv stack addresses stay aligned.
+        for name in secret_names:
+            path_a = os.path.join(run_a_dir, name)
+            path_b = os.path.join(run_b_dir, name)
+            write_bytes(path_a, secret_orig[name])
+            write_bytes(path_b, secret_prime[name])
+            files_run_a.append(path_a)
+            files_run_b.append(path_b)
+
+        for name in public_names:
+            path_a = os.path.join(run_a_dir, name)
+            path_b = os.path.join(run_b_dir, name)
+            write_bytes(path_a, public_values[name])
+            write_bytes(path_b, public_values[name])
+            files_run_a.append(path_a)
+            files_run_b.append(path_b)
+
+        trace_a_path = os.path.join(tmpdir, "trace0.log")
+        trace_b_path = os.path.join(tmpdir, "trace1.log")
+        run_pin_trace(executable_path, files_run_a, timeout, pin_root, trace_a_path, debug)
+        run_pin_trace(executable_path, files_run_b, timeout, pin_root, trace_b_path, debug)
+
+        divergence = compare_trace_files(trace_a_path, trace_b_path)
+        if divergence is None:
+            return None
+
+        resolved_ip, location, column_bounds = resolve_divergence_location(executable_path, divergence)
+        return ReplayResult(
+            culprit_ip=divergence.culprit_ip,
+            resolved_ip=resolved_ip,
+            location=location,
+            column_bounds=column_bounds,
+        )
+
+
+def extract_var_bytes(ktest_file: str, variable_name: str) -> bytes:
+    output_path = f"{ktest_file}.{variable_name}"
+    try:
+        os.remove(output_path)
+    except FileNotFoundError:
+        pass
+
+    subprocess.run(
+        ["ktest-tool", "--extract", variable_name, ktest_file],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if not os.path.isfile(output_path):
+        raise RuntimeError(f"ktest-tool did not produce {output_path}")
+    return read_bytes(output_path)
+
+
+def extract_ktest_inputs(
+    ktest_file: str,
+    secrets: Sequence[str],
+    publics: Sequence[str],
+) -> Tuple[Dict[str, bytes], Dict[str, bytes], Dict[str, bytes]]:
+    secret_orig: Dict[str, bytes] = {}
+    secret_prime: Dict[str, bytes] = {}
+    public_values: Dict[str, bytes] = {}
+
+    for public_name in publics:
+        public_values[public_name] = extract_var_bytes(ktest_file, public_name)
+
+    for secret_name in secrets:
+        secret_orig[secret_name] = extract_var_bytes(ktest_file, secret_name)
+        for suffix in PRIME_SUFFIXES:
+            prime_name = f"{secret_name}{suffix}"
+            try:
+                secret_prime[secret_name] = extract_var_bytes(ktest_file, prime_name)
+                break
+            except subprocess.CalledProcessError:
+                continue
+        if secret_name not in secret_prime:
+            raise RuntimeError(f"Could not extract a prime variant for secret '{secret_name}' from {ktest_file}")
+
+    return secret_orig, secret_prime, public_values
+
+
+def resolve_ktest_file(klee_output: str, inst_id: int, preferred_kind: Optional[str]) -> str:
+    search_order: List[str] = []
+    if preferred_kind in {"branch", "memory"}:
+        search_order.append(preferred_kind)
+    for kind in ("branch", "memory"):
+        if kind not in search_order:
+            search_order.append(kind)
+
+    klee_output_dir = os.path.abspath(klee_output)
+    for kind in search_order:
+        candidate = os.path.join(klee_output_dir, f"{kind}_counterexample_{inst_id}.ktest")
+        if os.path.isfile(candidate):
+            return candidate
+
+    raise FileNotFoundError(f"Missing KTest file for inst_id={inst_id} under {klee_output_dir}")
+
+
+def guess_json_ct_kind(input_json: str) -> Optional[str]:
+    basename = os.path.basename(input_json)
+    if "_memory" in basename:
+        return "memory"
+    if "_branch" in basename:
+        return "branch"
+    return None
+
+
+def print_replay_location(result: ReplayResult) -> None:
+    if result.location is None:
+        if result.culprit_ip is not None:
+            print(f"Divergence after 0x{result.culprit_ip:x}")
+        else:
+            print("Divergence observed but no instruction address was resolved")
+        return
+
+    file_name, line_no, col_no = result.location
+    address = result.resolved_ip if result.resolved_ip is not None else result.culprit_ip
+    if address is None:
+        print(f"{file_name}:{line_no}:{col_no}")
+        return
+    print(f"0x{address:x}: {file_name}:{line_no}:{col_no}")
+
+
+def location_matches(
+    expected_filename: Optional[str],
+    expected_line: Optional[int],
+    expected_column: Optional[int],
+    actual_file: str,
+    actual_line: int,
+    actual_column: int,
+    actual_previous_column: Optional[int] = None,
+    actual_next_column: Optional[int] = None,
+) -> LocationMatchResult:
+    if expected_filename is not None and os.path.basename(expected_filename) != os.path.basename(actual_file):
+        return LocationMatchResult(matches=False)
+    if expected_line is not None and expected_line != actual_line:
+        return LocationMatchResult(matches=False)
+    if expected_column is None:
+        return LocationMatchResult(matches=True)
+    if expected_column == actual_column:
+        return LocationMatchResult(matches=True)
+
+    lower_bound = actual_previous_column
+    upper_bound = actual_next_column
+    if lower_bound is not None and lower_bound >= actual_column:
+        lower_bound = None
+    if upper_bound is not None and upper_bound <= actual_column:
+        upper_bound = None
+    if lower_bound is None and upper_bound is None:
+        return LocationMatchResult(matches=False)
+    if lower_bound is not None and not (lower_bound <= expected_column):
+        return LocationMatchResult(matches=False)
+    if upper_bound is not None and not (expected_column <= upper_bound):
+        return LocationMatchResult(matches=False)
+    return LocationMatchResult(matches=True, snapped=True)
+
+
+def format_snapped_success(
+    actual_column: int,
+    expected_column: int,
+    previous_column: Optional[int],
+    next_column: Optional[int],
+) -> str:
+    if previous_column is not None and next_column is not None:
+        window = f"{previous_column} <= y <= {next_column}"
+    elif previous_column is not None:
+        window = f"{previous_column} <= y"
+    elif next_column is not None:
+        window = f"y <= {next_column}"
     else:
-        f, l, c = info
-        print(f"0x{prev_addr:x}: {f}:{l}:{c}")
-    return 0
+        window = "no DWARF column window"
+    return (
+        f"Success (reported column {actual_column} vs expected {expected_column}, "
+        f"considered close enough within {window})"
+    )
 
 
 def parse_secret_input_spec(spec: str) -> Dict[str, Tuple[int, int, int]]:
-    """
-    Parse secret input spec of the form: v1:8=100/200,v2:4=300/400
-    Returns mapping: name -> (size_bytes, orig_value, prime_value)
-    """
     result: Dict[str, Tuple[int, int, int]] = {}
     if not spec:
         return result
+
     for item in spec.split(","):
-        item = item.strip()
-        if not item:
+        entry = item.strip()
+        if not entry:
             continue
-        if "=" not in item:
-            raise ValueError(f"Invalid secret specification '{item}', expected name:bytes=val/val")
-        name_part, vals = item.split("=", 1)
-        name_part = name_part.strip()
+        if "=" not in entry:
+            raise ValueError(f"Invalid secret specification '{entry}', expected name:bytes=orig/prime")
+        name_part, values_part = entry.split("=", 1)
         if ":" not in name_part:
-            raise ValueError(f"Invalid secret specification '{item}', expected name:bytes=val/val")
+            raise ValueError(f"Invalid secret specification '{entry}', expected name:bytes=orig/prime")
         name, size_str = name_part.split(":", 1)
         name = name.strip()
         try:
             size = int(size_str, 0)
-        except ValueError:
-            raise ValueError(f"Invalid byte size in secret specification '{item}'")
+        except ValueError as exc:
+            raise ValueError(f"Invalid byte size in secret specification '{entry}'") from exc
         if size <= 0:
-            raise ValueError(f"Byte size must be positive in secret specification '{item}'")
-        if "/" not in vals:
-            raise ValueError(f"Invalid secret specification '{item}', expected name:bytes=val/val")
-        v1_str, v2_str = vals.split("/", 1)
-        v1 = int(v1_str, 0)
-        v2 = int(v2_str, 0)
-        result[name] = (size, v1, v2)
+            raise ValueError(f"Byte size must be positive in secret specification '{entry}'")
+        if "/" not in values_part:
+            raise ValueError(f"Invalid secret specification '{entry}', expected name:bytes=orig/prime")
+        orig_str, prime_str = values_part.split("/", 1)
+        result[name] = (size, int(orig_str, 0), int(prime_str, 0))
+
     return result
 
 
 def parse_public_input_spec(spec: str) -> Dict[str, Tuple[int, int]]:
-    """
-    Parse public input spec of the form: v3:8=500,v4:4=0x10
-    Returns mapping: name -> (size_bytes, value)
-    """
     result: Dict[str, Tuple[int, int]] = {}
     if not spec:
         return result
+
     for item in spec.split(","):
-        item = item.strip()
-        if not item:
+        entry = item.strip()
+        if not entry:
             continue
-        if "=" not in item:
-            raise ValueError(f"Invalid public specification '{item}', expected name:bytes=val")
-        name_part, v_str = item.split("=", 1)
-        name_part = name_part.strip()
+        if "=" not in entry:
+            raise ValueError(f"Invalid public specification '{entry}', expected name:bytes=value")
+        name_part, value_str = entry.split("=", 1)
         if ":" not in name_part:
-            raise ValueError(f"Invalid public specification '{item}', expected name:bytes=val")
+            raise ValueError(f"Invalid public specification '{entry}', expected name:bytes=value")
         name, size_str = name_part.split(":", 1)
         name = name.strip()
         try:
             size = int(size_str, 0)
-        except ValueError:
-            raise ValueError(f"Invalid byte size in public specification '{item}'")
+        except ValueError as exc:
+            raise ValueError(f"Invalid byte size in public specification '{entry}'") from exc
         if size <= 0:
-            raise ValueError(f"Byte size must be positive in public specification '{item}'")
-        val = int(v_str, 0)
-        result[name] = (size, val)
+            raise ValueError(f"Byte size must be positive in public specification '{entry}'")
+        result[name] = (size, int(value_str, 0))
+
     return result
+
+
+def build_value_input_bytes(
+    secrets: Dict[str, Tuple[int, int, int]],
+    publics: Dict[str, Tuple[int, int]],
+) -> Tuple[Dict[str, bytes], Dict[str, bytes], Dict[str, bytes]]:
+    secret_orig: Dict[str, bytes] = {}
+    secret_prime: Dict[str, bytes] = {}
+    public_values: Dict[str, bytes] = {}
+
+    for name, (size, value_orig, value_prime) in secrets.items():
+        try:
+            secret_orig[name] = int(value_orig).to_bytes(size, byteorder="big", signed=False)
+            secret_prime[name] = int(value_prime).to_bytes(size, byteorder="big", signed=False)
+        except OverflowError as exc:
+            raise ValueError(f"Secret value for '{name}' does not fit in {size} bytes") from exc
+
+    for name, (size, value) in publics.items():
+        try:
+            public_values[name] = int(value).to_bytes(size, byteorder="big", signed=False)
+        except OverflowError as exc:
+            raise ValueError(f"Public value for '{name}' does not fit in {size} bytes") from exc
+
+    return secret_orig, secret_prime, public_values
 
 
 def _load_json_notes(path: str) -> Dict[str, Any]:
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            raw = json.load(f)
+        with open(path, "r", encoding="utf-8") as stream:
+            raw = json.load(stream)
     except (OSError, ValueError):
         return {}
 
@@ -416,10 +723,180 @@ def _build_abacus_specs(
     return ",".join(secret_parts), ",".join(public_parts)
 
 
-def write_int_file(path: str, value: int, size: int) -> None:
-    """Write an integer with given byte size (big-endian, unsigned) to path."""
-    with open(path, "wb") as f:
-        f.write(int(value).to_bytes(size, byteorder="big", signed=False))
+def mode_dataframe(
+    input_json: str,
+    klee_output: str,
+    executable: str,
+    secret: str,
+    public: str,
+    timeout: int,
+    output: Optional[str],
+    library: str,
+    pin_root: Optional[str],
+    debug: bool,
+) -> int:
+    from tools.shared.common import load_combined_json, save_combined_json  # type: ignore
+
+    require_tools(["ktest-tool"])
+    warn_addrinfo_unavailable()
+
+    resolved_pin_root = resolve_pin_root(pin_root)
+    executable_path = os.path.abspath(executable)
+    secrets = parse_list(secret)
+    publics = parse_list(public)
+
+    df = load_combined_json(input_json)
+    if "reproduced" in df.columns:
+        df = df.drop(columns=["reproduced"])
+    if "counterexamples" not in df.columns:
+        df["counterexamples"] = [dict() for _ in range(len(df.index))]
+    else:
+        df["counterexamples"] = df["counterexamples"].apply(lambda value: value if isinstance(value, dict) else {})
+    if "non_ct_count" not in df.columns:
+        df["non_ct_count"] = 0
+    if "library" not in df.columns:
+        df["library"] = library
+    else:
+        df["library"] = df["library"].apply(lambda value: value if isinstance(value, str) and value.strip() else library)
+
+    df["reproduced_status"] = STATUS_NOT_REPRODUCED
+    preferred_kind = guess_json_ct_kind(input_json)
+
+    for idx, row in df[df["non_ct_count"] > 0].iterrows():
+        inst_id = coerce_int(row.get("inst_id"))
+        if inst_id is None:
+            print(f"Reproducing {row.get('filename')}:{row.get('line')}:{row.get('column')} ... missing inst_id")
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+            continue
+
+        try:
+            ktest_file = resolve_ktest_file(klee_output, inst_id, preferred_kind)
+        except FileNotFoundError as err:
+            print(f"Reproducing {row.get('filename')}:{row.get('line')}:{row.get('column')} ... {err}")
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+            continue
+
+        print(
+            f"Reproducing {row.get('filename')}:{row.get('line')}:{row.get('column')} with {os.path.basename(ktest_file)} ... ",
+            end="",
+            flush=True,
+        )
+
+        try:
+            secret_orig, secret_prime, public_values = extract_ktest_inputs(ktest_file, secrets, publics)
+        except (subprocess.CalledProcessError, RuntimeError, OSError) as err:
+            print(f"Failed ({err})")
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+            continue
+
+        try:
+            replay = analyze_input_bytes(
+                executable=executable_path,
+                secret_names=secrets,
+                public_names=publics,
+                secret_orig=secret_orig,
+                secret_prime=secret_prime,
+                public_values=public_values,
+                timeout=timeout,
+                pin_root=resolved_pin_root,
+                debug=debug,
+            )
+        except subprocess.TimeoutExpired:
+            print("Timeout")
+            df.at[idx, "reproduced_status"] = STATUS_TIMEOUT
+            continue
+        except (RuntimeError, subprocess.CalledProcessError) as err:
+            print(f"Operational failure: {err}", file=sys.stderr)
+            return 2
+
+        if replay is None:
+            print("Failed with identical traces")
+            df.at[idx, "reproduced_status"] = STATUS_IDENTICAL_TRACE
+            continue
+
+        if replay.location is None:
+            if replay.culprit_ip is not None:
+                print(f"Failed at 0x{replay.culprit_ip:x} (no debug info)")
+            else:
+                print("Failed (no debug info)")
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+            continue
+
+        actual_file, actual_line, actual_col = replay.location
+        expected_line = coerce_int(row.get("line"))
+        expected_col = coerce_int(row.get("column"))
+        previous_column = None
+        next_column = None
+        if replay.column_bounds is not None:
+            previous_column, next_column = replay.column_bounds
+        match_result = location_matches(
+            expected_filename=row.get("filename") if isinstance(row.get("filename"), str) else None,
+            expected_line=expected_line,
+            expected_column=expected_col,
+            actual_file=actual_file,
+            actual_line=actual_line,
+            actual_column=actual_col,
+            actual_previous_column=previous_column,
+            actual_next_column=next_column,
+        )
+        if match_result.matches:
+            if match_result.snapped and expected_col is not None:
+                print(format_snapped_success(actual_col, expected_col, previous_column, next_column))
+            else:
+                print("Success")
+            df.at[idx, "reproduced_status"] = STATUS_SUCCESS
+        else:
+            print(f"Failed at {actual_file}:{actual_line}:{actual_col}")
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+
+    if output:
+        save_combined_json(df, output)
+    return 0
+
+
+def mode_ktest_file(
+    executable: str,
+    ktest_file: str,
+    secret: str,
+    public: str,
+    timeout: int,
+    pin_root: Optional[str],
+    debug: bool,
+) -> int:
+    require_tools(["ktest-tool"])
+    warn_addrinfo_unavailable()
+
+    resolved_pin_root = resolve_pin_root(pin_root)
+    executable_path = os.path.abspath(executable)
+    secrets = parse_list(secret)
+    publics = parse_list(public)
+
+    try:
+        secret_orig, secret_prime, public_values = extract_ktest_inputs(ktest_file, secrets, publics)
+        replay = analyze_input_bytes(
+            executable=executable_path,
+            secret_names=secrets,
+            public_names=publics,
+            secret_orig=secret_orig,
+            secret_prime=secret_prime,
+            public_values=public_values,
+            timeout=timeout,
+            pin_root=resolved_pin_root,
+            debug=debug,
+        )
+    except subprocess.TimeoutExpired:
+        print("Timeout while running Pin traces", file=sys.stderr)
+        return 124
+    except (subprocess.CalledProcessError, RuntimeError, OSError) as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 2
+
+    if replay is None:
+        print("Identical traces")
+        return 1
+
+    print_replay_location(replay)
+    return 0
 
 
 def mode_input_values(
@@ -427,86 +904,79 @@ def mode_input_values(
     secret_spec: str,
     public_spec: str,
     timeout: int,
+    pin_root: Optional[str],
+    debug: bool,
     expected_filename: Optional[str] = None,
     expected_line: Optional[int] = None,
+    expected_column: Optional[int] = None,
 ) -> int:
-    """
-    Mode --input:
-      --secret v1:8=100/200,v2:4=300/400
-      --public v3:8=500
-    Creates temporary files for each variable and runs two traces:
-      A: secrets(orig) + publics
-      B: secrets(prime) + publics
-    """
-    require_tools(["gdb"])
+    warn_addrinfo_unavailable()
 
     try:
         secrets = parse_secret_input_spec(secret_spec)
         publics = parse_public_input_spec(public_spec)
-    except ValueError as e:
-        print(f"Error parsing inputs: {e}", file=sys.stderr)
+        secret_orig, secret_prime, public_values = build_value_input_bytes(secrets, publics)
+    except ValueError as err:
+        print(f"Error parsing inputs: {err}", file=sys.stderr)
         return 2
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        files_run_a: List[str] = []
-        files_run_b: List[str] = []
+    resolved_pin_root = resolve_pin_root(pin_root)
+    executable_path = os.path.abspath(executable)
 
-        # Secret variables: create orig and prime files; run A uses name, run B uses name__prime
-        for name, (size, v_orig, v_prime) in secrets.items():
-            path_orig = os.path.join(tmpdir, name)
-            path_prime = os.path.join(tmpdir, f"{name}__prime")
-            write_int_file(path_orig, v_orig, size)
-            write_int_file(path_prime, v_prime, size)
-            files_run_a.append(path_orig)
-            files_run_b.append(path_prime)
+    try:
+        replay = analyze_input_bytes(
+            executable=executable_path,
+            secret_names=list(secrets.keys()),
+            public_names=list(publics.keys()),
+            secret_orig=secret_orig,
+            secret_prime=secret_prime,
+            public_values=public_values,
+            timeout=timeout,
+            pin_root=resolved_pin_root,
+            debug=debug,
+        )
+    except subprocess.TimeoutExpired:
+        print("Timeout while running Pin traces", file=sys.stderr)
+        return 124
+    except (RuntimeError, subprocess.CalledProcessError) as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 2
 
-        # Public variables: same file for both runs
-        for name, (size, val) in publics.items():
-            path_pub = os.path.join(tmpdir, name)
-            write_int_file(path_pub, val, size)
-            files_run_a.append(path_pub)
-            files_run_b.append(path_pub)
+    if replay is None:
+        print("Identical traces")
+        return 1
 
-        try:
-            trace_a = run_gdb_trace(executable, files_run_a, timeout)
-            trace_b = run_gdb_trace(executable, files_run_b, timeout)
-        except subprocess.TimeoutExpired:
-            print("Timeout while running gdb traces", file=sys.stderr)
-            return 124
-
-        analysis = analyze_traces(trace_a, trace_b)
-        prev_addr = analysis["prev_addr"]
-        pos = analysis["first_diff_index"]
-
-        if prev_addr is None:
-            print("Identical traces")
-            return 1
-
-        info = get_addr_info(executable, prev_addr)
-        if info is None:
-            print(f"Divergence after 0x{prev_addr:x}, ", end="")
-            start_idx = (pos - 1) if (pos is not None and pos > 0) else 0
-            print_nearest_debug_info(executable, trace_a, start_idx)
-
-            # In plain --input mode, any divergence is considered success.
-            # In checked mode (abacus-json), missing debug info means mismatch.
-            if expected_filename is not None and expected_line is not None:
-                return 3
-            return 0
-
-        f, l, c = info
-        print(f"0x{prev_addr:x}: {f}:{l}:{c}")
-
-        if expected_filename is not None and expected_line is not None:
-            same_file = os.path.basename(expected_filename) == os.path.basename(f)
-            same_line = (l == expected_line)
-            if not (same_file and same_line):
-                print(
-                    f"Location mismatch: expected {expected_filename}:{expected_line}, got {f}:{l}:{c}"
-                )
-                return 3
-
+    print_replay_location(replay)
+    if replay.location is None:
+        if expected_filename is not None or expected_line is not None or expected_column is not None:
+            return 3
         return 0
+
+    actual_file, actual_line, actual_column = replay.location
+    previous_column = None
+    next_column = None
+    if replay.column_bounds is not None:
+        previous_column, next_column = replay.column_bounds
+    match_result = location_matches(
+        expected_filename,
+        expected_line,
+        expected_column,
+        actual_file,
+        actual_line,
+        actual_column,
+        actual_previous_column=previous_column,
+        actual_next_column=next_column,
+    )
+    if match_result.matches:
+        if match_result.snapped and expected_column is not None:
+            print(format_snapped_success(actual_column, expected_column, previous_column, next_column))
+        return 0
+
+    print(
+        f"Location mismatch: expected {expected_filename}:{expected_line}:{expected_column}, "
+        f"got {actual_file}:{actual_line}:{actual_column}"
+    )
+    return 3
 
 
 def mode_abacus_json(
@@ -516,11 +986,12 @@ def mode_abacus_json(
     timeout: int,
     output: Optional[str],
     library: str,
+    pin_root: Optional[str],
+    debug: bool,
 ) -> int:
-    """Batch reproduction for Abacus-style JSON rows containing counterexamples dicts."""
-    import pandas as pd  # type: ignore
     from tools.shared.common import load_combined_json, save_combined_json  # type: ignore
 
+    resolved_pin_root = resolve_pin_root(pin_root)
     notes = _load_json_notes(input_json)
     df = load_combined_json(input_json)
     if "counterexamples" not in df.columns:
@@ -532,27 +1003,24 @@ def mode_abacus_json(
 
     if "reproduced" in df.columns:
         df = df.drop(columns=["reproduced"])
-
     if "counterexamples" not in df.columns:
         df["counterexamples"] = [dict() for _ in range(len(df.index))]
     else:
-        df["counterexamples"] = df["counterexamples"].apply(lambda v: v if isinstance(v, dict) else {})
-
+        df["counterexamples"] = df["counterexamples"].apply(lambda value: value if isinstance(value, dict) else {})
     if "library" not in df.columns:
         df["library"] = library
     else:
-        df["library"] = df["library"].apply(lambda v: v if isinstance(v, str) and v.strip() else library)
+        df["library"] = df["library"].apply(lambda value: value if isinstance(value, str) and value.strip() else library)
 
     df["reproduced_status"] = STATUS_NOT_REPRODUCED
-
     for idx, row in df.iterrows():
-        cex = row.get("counterexamples")
-        if not isinstance(cex, dict):
+        counterexamples = row.get("counterexamples")
+        if not isinstance(counterexamples, dict):
             df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
             continue
 
         try:
-            specs = _build_abacus_specs(cex, notes, sym_size)
+            specs = _build_abacus_specs(counterexamples, notes, sym_size)
         except ValueError as err:
             print(f"Error: {err}", file=sys.stderr)
             return 2
@@ -561,26 +1029,19 @@ def mode_abacus_json(
             continue
 
         filename = row.get("filename")
-        line = row.get("line")
-        print(f"Reproducing {filename}:{line} ... ", end="", flush=True)
+        line_no = coerce_int(row.get("line"))
+        print(f"Reproducing {filename}:{line_no} ... ", end="", flush=True)
 
         secret_spec, public_spec = specs
-
-        expected_filename = filename if isinstance(filename, str) else None
-        expected_line = None
-        try:
-            if line is not None:
-                expected_line = int(line)
-        except Exception:
-            expected_line = None
-
         rc = mode_input_values(
             executable=executable,
             secret_spec=secret_spec,
             public_spec=public_spec,
             timeout=timeout,
-            expected_filename=expected_filename,
-            expected_line=expected_line,
+            pin_root=resolved_pin_root,
+            debug=debug,
+            expected_filename=filename if isinstance(filename, str) else None,
+            expected_line=line_no,
         )
         if rc == 0:
             print("Success")
@@ -598,11 +1059,11 @@ def mode_abacus_json(
             print(f"Failed (unexpected rc={rc})", file=sys.stderr)
             return rc
 
-    for col in ["visit_count", "non_ct_count", "visit_time"]:
-        if col in df.columns:
+    for column_name in ["visit_count", "non_ct_count", "visit_time"]:
+        if column_name in df.columns:
             try:
-                if df[col].isna().all():
-                    df = df.drop(columns=[col])
+                if df[column_name].isna().all():
+                    df = df.drop(columns=[column_name])
             except Exception:
                 pass
 
@@ -611,102 +1072,64 @@ def mode_abacus_json(
 
 
 def build_parsers_and_dispatch(argv: List[str]) -> int:
-    """CLI with mutually-exclusive modes: --json (batch), --file (.ktest), or --input (manual values)."""
     parser = argparse.ArgumentParser(
         description=(
-            "Reproduce divergence either from a dataframe (--json), "
-            "a single .ktest (--file), or explicit values (--input)."
+            "Reproduce divergence either from a dataframe (--json), a single .ktest (--file), "
+            "explicit input values (--input), or an Abacus JSON batch (--abacus-json)."
         )
     )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        "--json",
-        dest="json_path",
-        help="Path to combined dataframe JSON (batch mode).",
-    )
-    group.add_argument(
-        "--file",
-        dest="ktest_file",
-        help="Path to a single KLEE .ktest file (e.g., branch_counterexample_<id>.ktest).",
-    )
+    group.add_argument("--json", help="Path to the combined JSON produced by compare_with_ctchecker.py.")
+    group.add_argument("--file", help="Path to a single KLEE .ktest file.")
     group.add_argument(
         "--input",
-        dest="input_mode",
         action="store_true",
         help=(
-            "Manually supply inputs on the command line: "
-            "--secret v1:8=100/200,v2:4=300/400 --public v3:8=500"
+            "Use explicit values instead of a ktest file. "
+            "Example: --input --executable ./prog --secret v1:8=100/200 --public v2:8=5"
         ),
     )
-    group.add_argument(
-        "--abacus-json",
-        dest="abacus_json",
-        help="Path to Abacus-style JSON containing per-row counterexamples for batch input-value reproduction.",
-    )
-    parser.add_argument(
-        "--klee-output",
-        dest="klee_output",
-        help="Path to KLEE output directory (required with --json).",
-    )
-    parser.add_argument(
-        "--executable",
-        required=True,
-        help="Path to the replay executable.",
-    )
+    group.add_argument("--abacus-json", help="Path to an Abacus-style combined JSON containing per-row counterexamples.")
+
+    parser.add_argument("--klee-output", help="Path to the KLEE output directory (required with --json).")
+    parser.add_argument("--executable", required=True, help="Path to the replay executable.")
     parser.add_argument(
         "--secret",
-        required=False,
+        default="",
         help=(
-            "In --json/--file modes: comma-separated secret variable names.\n"
-            "In --input mode: comma-separated name:bytes=orig/prime (e.g., v1:8=100/200)."
+            "In --json/--file modes: comma-separated secret variable names. "
+            "In --input mode: comma-separated name:bytes=orig/prime."
         ),
     )
     parser.add_argument(
         "--public",
-        required=False,
         default="",
         help=(
-            "In --json/--file modes: comma-separated public variable names.\n"
-            "In --input mode: comma-separated name:bytes=value (e.g., v3:8=500)."
+            "In --json/--file modes: comma-separated public variable names. "
+            "In --input mode: comma-separated name:bytes=value."
         ),
     )
-    parser.add_argument(
-        "--output",
-        required=False,
-        default=None,
-        help="Path to write output JSON with reproduced_status column (only with --json/--abacus-json).",
-    )
-    parser.add_argument(
-        "--timeout",
-        required=False,
-        default=1200,
-        type=int,
-        help="Maximum time (in seconds) to allow for each replay (default: 1200s).",
-    )
-    parser.add_argument(
-        "--sym-size",
-        required=False,
-        default=4,
-        type=int,
-        help="Symbol byte size for --abacus-json mode (default: 4).",
-    )
+    parser.add_argument("--timeout", type=int, default=300, help="Timeout in seconds (default: 300).")
+    parser.add_argument("--output", help="Output JSON path for --json and --abacus-json modes.")
+    parser.add_argument("--pin-root", default=None, help="Path to the external Intel Pin kit (defaults to PIN_ROOT).")
+    parser.add_argument("--debug", action="store_true", help="Print the exact Pin command when a replay fails or times out.")
+    parser.add_argument("--sym-size", type=int, default=4, help="Symbol byte size for --abacus-json mode (default: 4).")
     parser.add_argument(
         "--library",
-        required=False,
-        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "unknown"],
-        help="Library identifier for JSON-writing modes (--json, --abacus-json).",
+        default="unknown",
+        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "constantine", "unknown"],
+        help="Library identifier for JSON-writing modes.",
     )
+
     args = parser.parse_args(argv)
 
-    if args.json_path:
+    if args.json:
         if not args.klee_output:
             parser.error("--klee-output is required when using --json")
         if not args.secret:
             parser.error("--secret is required when using --json")
-        if not args.library:
-            parser.error("--library is required when using --json")
-        mode_dataframe(
-            input_json=args.json_path,
+        return mode_dataframe(
+            input_json=args.json,
             klee_output=args.klee_output,
             executable=args.executable,
             secret=args.secret,
@@ -714,23 +1137,24 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
             timeout=args.timeout,
             output=args.output,
             library=args.library,
+            pin_root=args.pin_root,
+            debug=args.debug,
         )
-        return 0
 
-    if args.ktest_file:
+    if args.file:
         if not args.secret:
             parser.error("--secret is required when using --file")
         return mode_ktest_file(
             executable=args.executable,
-            ktest_file=args.ktest_file,
+            ktest_file=args.file,
             secret=args.secret,
             public=args.public,
             timeout=args.timeout,
+            pin_root=args.pin_root,
+            debug=args.debug,
         )
 
     if args.abacus_json:
-        if not args.library:
-            parser.error("--library is required when using --abacus-json")
         return mode_abacus_json(
             input_json=args.abacus_json,
             executable=args.executable,
@@ -738,9 +1162,10 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
             timeout=args.timeout,
             output=args.output,
             library=args.library,
+            pin_root=args.pin_root,
+            debug=args.debug,
         )
 
-    # --input mode
     if not args.secret:
         parser.error("--secret is required when using --input")
     return mode_input_values(
@@ -748,12 +1173,18 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
         secret_spec=args.secret,
         public_spec=args.public,
         timeout=args.timeout,
+        pin_root=args.pin_root,
+        debug=args.debug,
     )
 
 
-def main():
-    sys.exit(build_parsers_and_dispatch(sys.argv[1:]))
+def main() -> int:
+    try:
+        return build_parsers_and_dispatch(sys.argv[1:])
+    except RuntimeError as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

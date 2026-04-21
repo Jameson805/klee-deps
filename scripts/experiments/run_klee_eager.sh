@@ -25,6 +25,7 @@ search_strategies="random-path,nurs:covnew"
 product_program_fallback="false"
 solver_backend="stp"
 optimize_array="false"
+pin_root=""
 benchmarks_csv=""
 default_benchmarks=(mbedtls libgcrypt openssl bearssl)
 selected_benchmarks=("${default_benchmarks[@]}")
@@ -44,6 +45,7 @@ Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <durat
   --product-program-fallback - optional, default: false (enables Executor::bindLocal fallback repair)
   --solver-backend <name>  - optional, default: stp (stp|metasmt|dummy|z3)
   --optimize-array <value> - optional, default: false (false|all|index|value)
+    --pin-root <path>       - optional, path to external Intel Pin kit (defaults to PIN_ROOT)
   --benchmarks <list>      - optional, comma-separated benchmark groups to run
         valid: mbedtls,libgcrypt,openssl,bearssl
   default: all valid groups
@@ -74,6 +76,8 @@ while [[ $# -gt 0 ]]; do
             solver_backend="$2"; shift 2;;
         --optimize-array)
             optimize_array="$2"; shift 2;;
+        --pin-root)
+            pin_root="$2"; shift 2;;
         --benchmarks)
             benchmarks_csv="$2"; shift 2;;
         --)
@@ -168,6 +172,7 @@ echo "search_strategies=$search_strategies"
 echo "product_program_fallback=$product_program_fallback"
 echo "solver_backend=$solver_backend"
 echo "optimize_array=$optimize_array"
+echo "pin_root=${pin_root:-<env PIN_ROOT>}"
 echo "benchmarks=$(IFS=','; echo "${selected_benchmarks[*]}")"
 echo "##########"
 
@@ -251,10 +256,15 @@ run_case() {
     local bc_dir
     bc_dir=$(dirname "$bc")
     local library
+    local replay_args=()
     library="$(library_for_path "$bc")"
     if [[ -z "$library" ]]; then
         echo "Error: cannot infer library from path '$bc'" >&2
         exit 2
+    fi
+    if [[ -n "$replay_opts" ]]; then
+        # shellcheck disable=SC2206
+        replay_args=( $replay_opts )
     fi
 
     echo "========="
@@ -267,12 +277,31 @@ run_case() {
     rm -f "$bc_dir/klee-last"
     rm -rf "$bc_dir/klee-out-"*
 
-    python -m tools.converters.compare_with_ctchecker branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" --library "$library" "$@" $replay_opts
-    python -m tools.postprocess.reproduce_positives --json "$results_dir/${result_name}_branch.json" --klee-output "$results_dir/$result_name" --executable "$replay_script" --library "$library" $replay_opts --output "$results_dir/${result_name}_branch.json"
+    local branch_compare_cmd=(python -m tools.converters.compare_with_ctchecker branch "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_branch.json" --code-path "$code_path" --library "$library")
+    branch_compare_cmd+=("$@")
+    branch_compare_cmd+=("${replay_args[@]}")
+    "${branch_compare_cmd[@]}"
+
+    local branch_reproduce_cmd=(python -m tools.postprocess.reproduce_positives --json "$results_dir/${result_name}_branch.json" --klee-output "$results_dir/$result_name" --executable "$replay_script" --library "$library" --output "$results_dir/${result_name}_branch.json")
+    if [[ -n "$pin_root" ]]; then
+        branch_reproduce_cmd+=(--pin-root "$pin_root")
+    fi
+    branch_reproduce_cmd+=("${replay_args[@]}")
+    "${branch_reproduce_cmd[@]}"
     # make_report.py "$results_dir/${result_name}_branch.json" "$results_dir/${result_name}_branch_report.html"
 
     if [[ "$memory_flag" == "true" ]]; then
-        python -m tools.converters.compare_with_ctchecker memory "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_memory.json" --code-path "$code_path" --library "$library" "$@"
+        local memory_compare_cmd=(python -m tools.converters.compare_with_ctchecker memory "$ct_json" "$results_dir/$result_name" "$results_dir/${result_name}_memory.json" --code-path "$code_path" --library "$library")
+        memory_compare_cmd+=("$@")
+        memory_compare_cmd+=("${replay_args[@]}")
+        "${memory_compare_cmd[@]}"
+
+        local memory_reproduce_cmd=(python -m tools.postprocess.reproduce_positives --json "$results_dir/${result_name}_memory.json" --klee-output "$results_dir/$result_name" --executable "$replay_script" --library "$library" --output "$results_dir/${result_name}_memory.json")
+        if [[ -n "$pin_root" ]]; then
+            memory_reproduce_cmd+=(--pin-root "$pin_root")
+        fi
+        memory_reproduce_cmd+=("${replay_args[@]}")
+        "${memory_reproduce_cmd[@]}"
         # make_report.py "$results_dir/${result_name}_memory.json" "$results_dir/${result_name}_memory_report.html"
     fi
 }

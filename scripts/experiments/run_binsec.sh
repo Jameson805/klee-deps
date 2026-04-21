@@ -21,6 +21,7 @@ sse_depth=1000000000000
 max_time=""
 
 patch_memset_ifunc=0
+pin_root=""
 
 do_reproduce=1
 benchmarks_csv=""
@@ -38,6 +39,7 @@ Usage: $0 [--sym-size <n>] [--jump-enum <n>] [--sse-depth <n>] <max_time_seconds
   --fml-solver <name>  Optional SMT backend for BINSEC, default: z3
   --smt-solver <name>  Optional SMT solver command for BINSEC, default: z3
   --patch-memset-ifunc Optional, pin `memset_func`'s PLT/GOT slot to a concrete memset impl
+    --pin-root <path>    Path to external Intel Pin kit (defaults to PIN_ROOT)
   --benchmarks <list>  Optional comma-separated benchmark groups to run
         valid: mbedtls,libgcrypt,openssl,bearssl
   default: all valid groups
@@ -60,6 +62,8 @@ while [[ $# -gt 0 ]]; do
             binsec_smt_solver="${2:-}"; shift 2 ;;
         --patch-memset-ifunc)
             patch_memset_ifunc=1; shift ;;
+        --pin-root)
+            pin_root="${2:-}"; shift 2 ;;
         --benchmarks)
             benchmarks_csv="${2:-}"; shift 2 ;;
         -*)
@@ -129,6 +133,7 @@ echo "sse_depth=$sse_depth"
 echo "binsec_fml_solver=$binsec_fml_solver"
 echo "binsec_smt_solver=$binsec_smt_solver"
 echo "patch_memset_ifunc=$patch_memset_ifunc"
+echo "pin_root=${pin_root:-<env PIN_ROOT>}"
 echo "benchmarks=$(IFS=','; echo "${selected_benchmarks[*]}")"
 echo "##########"
 
@@ -266,6 +271,9 @@ convert_case_to_json() {
             return 2
         fi
         cmd+=(--reproduce --replay-executable "$replay_exe")
+        if [[ -n "$pin_root" ]]; then
+            cmd+=(--pin-root "$pin_root")
+        fi
     fi
 
     "${cmd[@]}"

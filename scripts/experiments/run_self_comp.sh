@@ -22,6 +22,7 @@ max_memory=10000
 search_strategies="random-path,nurs:covnew"
 do_reproduce=1
 reproduce_timeout=180
+pin_root=""
 benchmarks_csv=""
 default_benchmarks=(mbedtls libgcrypt openssl bearssl)
 selected_benchmarks=("${default_benchmarks[@]}")
@@ -43,6 +44,7 @@ Optional:
   --results-dir <name>   Default: self_comp_results
   --no-reproduce         Disable replay-based validation (enabled by default)
   --reproduce-timeout <s> Timeout per replay attempt in seconds (default: 180)
+    --pin-root <path>      Path to external Intel Pin kit (defaults to PIN_ROOT)
   --benchmarks <list>    Comma-separated benchmark groups to run
         valid: mbedtls,libgcrypt,openssl,bearssl
   default: all valid groups
@@ -65,6 +67,7 @@ while [[ $# -gt 0 ]]; do
         --results-dir) results_dir="$2"; shift 2;;
         --no-reproduce) do_reproduce=0; shift 1;;
         --reproduce-timeout) reproduce_timeout="$2"; shift 2;;
+        --pin-root) pin_root="$2"; shift 2;;
         --benchmarks) benchmarks_csv="$2"; shift 2;;
         --help|-h) usage;;
         --) shift; break;;
@@ -132,6 +135,7 @@ echo "search_strategies=$search_strategies"
 echo "results_dir=$results_dir"
 echo "do_reproduce=$do_reproduce"
 echo "reproduce_timeout=$reproduce_timeout"
+echo "pin_root=${pin_root:-<env PIN_ROOT>}"
 echo "benchmarks=$(IFS=','; echo "${selected_benchmarks[*]}")"
 echo "##########"
 
@@ -241,6 +245,9 @@ run_case() {
             --replay-executable "$replay_path"
             --reproduce-timeout "$reproduce_timeout"
         )
+        if [[ -n "$pin_root" ]]; then
+            cmd+=(--pin-root "$pin_root")
+        fi
     fi
 
     "${cmd[@]}"

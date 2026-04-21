@@ -230,6 +230,7 @@ def _run_reproduce(
     secret_layout_spec: str,
     public_layout_spec: str,
     timeout_s: int,
+    pin_root: Optional[str],
 ) -> Tuple[Optional[Tuple[str, int, int]], int, str]:
     specs = _build_replay_specs(cex, sym_size, secret_layout_spec, public_layout_spec)
     if specs is None:
@@ -251,6 +252,8 @@ def _run_reproduce(
 
     if public_spec:
         cmd += ["--public", public_spec]
+    if pin_root:
+        cmd += ["--pin-root", pin_root]
 
     proc = subprocess.run(
         cmd,
@@ -298,6 +301,11 @@ def main(argv: List[str]) -> int:
         help="Python module to run for reproduction (defaults to tools.postprocess.reproduce_positives)",
     )
     p.add_argument("--reproduce-timeout", type=int, default=1200, help="Timeout in seconds per reproduction (default: 1200)")
+    p.add_argument(
+        "--pin-root",
+        default=None,
+        help="Path to the external Intel Pin kit (defaults to PIN_ROOT)",
+    )
     p.add_argument(
         "--code-root",
         default=None,
@@ -364,6 +372,7 @@ def main(argv: List[str]) -> int:
                 secret_layout_spec=str(args.secret_layout),
                 public_layout_spec=str(args.public_layout),
                 timeout_s=int(args.reproduce_timeout),
+                pin_root=args.pin_root,
             )
 
             if loc is None:

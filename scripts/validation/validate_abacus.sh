@@ -15,6 +15,7 @@ output_dir=""
 timeout=300
 sym_size_override=""
 reproduce_module="tools.postprocess.reproduce_positives"
+pin_root=""
 
 usage() {
     cat <<'EOF'
@@ -25,7 +26,8 @@ Options:
     --output-dir DIR         Output directory for validated JSON files (default: <results-dir>, in-place overwrite)
   --sym-size N             Override sym size instead of reading it from each JSON file
   --timeout N              Replay timeout in seconds (default: 300)
-        --reproduce-module NAME  Python module to run for reproduction (default: tools.postprocess.reproduce_positives)
+    --pin-root PATH         Path to external Intel Pin kit (defaults to PIN_ROOT)
+    --reproduce-module NAME Python module to run for reproduction (default: tools.postprocess.reproduce_positives)
   -h, --help               Show this help
 
 Notes:
@@ -70,6 +72,15 @@ while [[ $# -gt 0 ]]; do
             ;;
         --timeout=*)
             timeout="${1#--timeout=}"
+            shift
+            ;;
+        --pin-root)
+            [[ $# -lt 2 ]] && echo "Missing value for --pin-root" >&2 && exit 1
+            pin_root="$2"
+            shift 2
+            ;;
+        --pin-root=*)
+            pin_root="${1#--pin-root=}"
             shift
             ;;
         --reproduce-module)
@@ -140,6 +151,12 @@ resolve_replay_executable() {
         openssl_mont_word.json)
             printf '%s\n' 'benchmarks/openssl-1.1.1q/klee_fix_pub_replay_mont_word'
             ;;
+        bearssl_aes_big.json)
+            printf '%s\n' 'benchmarks/bearssl/klee_fix_pub_replay_binsec_aes_big'
+            ;;
+        bearssl_des_tab.json)
+            printf '%s\n' 'benchmarks/bearssl/klee_fix_pub_replay_appliedcryp_des'
+            ;;
         *)
             return 1
             ;;
@@ -157,6 +174,9 @@ resolve_build_script() {
             ;;
         openssl_recp.json|openssl_mont.json|openssl_mont_consttime.json|openssl_mont_word.json)
             printf '%s\n' 'benchmarks/openssl-1.1.1q/build.sh'
+            ;;
+        bearssl_aes_big.json|bearssl_des_tab.json)
+            printf '%s\n' 'benchmarks/bearssl/build.sh'
             ;;
         *)
             return 1
@@ -176,6 +196,9 @@ resolve_library() {
         openssl_recp.json|openssl_mont.json|openssl_mont_consttime.json|openssl_mont_word.json)
             printf '%s\n' 'openssl'
             ;;
+        bearssl_aes_big.json|bearssl_des_tab.json)
+            printf '%s\n' 'bearssl'
+            ;;
         *)
             return 1
             ;;
@@ -194,6 +217,8 @@ with open(sys.argv[1], 'r', encoding='utf-8') as f:
 notes = obj.get('notes', {})
 ref = notes.get('abacus_reference_secret', {})
 sym_size = ref.get('sym_size')
+if sym_size is None:
+    sym_size = 1
 print('' if sym_size is None else sym_size)
 PY
 }
@@ -215,7 +240,10 @@ for row in rows:
     if not isinstance(row, dict):
         continue
     cex = row.get('counterexamples')
-    if isinstance(cex, dict) and cex.get('exp') is not None and cex.get('exp__prime') is not None:
+    if isinstance(cex, dict) and any(
+        isinstance(key, str) and (key.endswith('__prime') or key.endswith('_prime'))
+        for key in cex
+    ):
         raise SystemExit(0)
 
 raise SystemExit(1)
@@ -264,8 +292,13 @@ for json_file in "${json_files[@]}"; do
         fi
 
         echo "Replay executable not found: $replay_exe"
-        echo "Building with $build_script --klee-cf --preset size_$sym_size"
-        "$build_script" --klee-cf --preset "size_$sym_size"
+        if [[ "$json_name" == bearssl_aes_big.json || "$json_name" == bearssl_des_tab.json ]]; then
+            echo "Building with $build_script --klee-cf --preset default"
+            "$build_script" --klee-cf --preset default
+        else
+            echo "Building with $build_script --klee-cf --preset size_$sym_size"
+            "$build_script" --klee-cf --preset "size_$sym_size"
+        fi
     fi
 
     if [[ ! -x "$replay_exe" ]]; then
@@ -286,13 +319,19 @@ for json_file in "${json_files[@]}"; do
     fi
 
     echo "Validating $json_name with $replay_exe"
-    python -m "$reproduce_module" \
-        --abacus-json "$json_file" \
-        --output "$output_json" \
-        --executable "$replay_exe" \
-        --library "$library" \
-        --sym-size "$sym_size" \
+    cmd=(
+        python -m "$reproduce_module"
+        --abacus-json "$json_file"
+        --output "$output_json"
+        --executable "$replay_exe"
+        --library "$library"
+        --sym-size "$sym_size"
         --timeout "$timeout"
+    )
+    if [[ -n "$pin_root" ]]; then
+        cmd+=(--pin-root "$pin_root")
+    fi
+    "${cmd[@]}"
 done
 
 echo "Validated Abacus outputs written to $output_dir"

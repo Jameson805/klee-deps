@@ -282,6 +282,7 @@ def _run_reproduce(
     secret_inputs: List[InputLayout],
     public_inputs: List[InputLayout],
     timeout_s: int,
+    pin_root: Optional[str],
 ) -> Tuple[Optional[Tuple[str, int, int]], int, str]:
     """Run reproduce_positives.py --input and parse the reported divergence location.
 
@@ -319,6 +320,8 @@ def _run_reproduce(
     ]
     if public_spec:
         cmd += ["--public", public_spec]
+    if pin_root:
+        cmd += ["--pin-root", pin_root]
 
     proc = subprocess.run(
         cmd,
@@ -351,6 +354,7 @@ def build_rows(
     reproduce_module: Optional[str],
     replay_executable: Optional[str],
     reproduce_timeout_s: int,
+    pin_root: Optional[str],
 ) -> List[Dict[str, Any]]:
     code_index: Optional[Dict[str, str]] = None
     if code_root:
@@ -416,6 +420,7 @@ def build_rows(
                 secret_inputs=secret_inputs,
                 public_inputs=public_inputs,
                 timeout_s=reproduce_timeout_s,
+                pin_root=pin_root,
             )
             if loc is None:
                 if rc == 124:
@@ -556,6 +561,11 @@ def main(argv: List[str]) -> int:
         default=1200,
         help="Timeout seconds for each reproduction attempt (default: 1200).",
     )
+    p.add_argument(
+        "--pin-root",
+        default=None,
+        help="Path to the external Intel Pin kit (defaults to PIN_ROOT)",
+    )
     p.add_argument("--out", required=True, help="Output JSON path")
     p.add_argument(
         "--title",
@@ -637,6 +647,7 @@ def main(argv: List[str]) -> int:
             reproduce_module=reproduce_module if args.reproduce else None,
             replay_executable=args.replay_executable if args.reproduce else None,
             reproduce_timeout_s=args.reproduce_timeout,
+            pin_root=args.pin_root if args.reproduce else None,
         )
     except RuntimeError as err:
         print(f"Error: {err}", file=sys.stderr)

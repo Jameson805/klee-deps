@@ -188,6 +188,11 @@ def main(argv: List[str]) -> int:
         help="Forward --debug to reproduce_positives.py and print the exact replay command on failure.",
     )
     p.add_argument(
+        "--pin-root",
+        default=None,
+        help="Path to the external Intel Pin kit (defaults to PIN_ROOT)",
+    )
+    p.add_argument(
         "--library",
         required=True,
         choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "constantine", "unknown"],
@@ -419,6 +424,8 @@ def main(argv: List[str]) -> int:
         ]
         if args.reproduce_debug:
             cmd.append("--debug")
+        if args.pin_root:
+            cmd += ["--pin-root", str(args.pin_root)]
         proc = subprocess.run(cmd, check=False)
         if proc.returncode != 0:
             print(f"[reproduce] batch reproduction failed with rc={proc.returncode}", file=sys.stderr)
