@@ -23,6 +23,7 @@ output="/datapool/theta-lin-experiments/20260404"
 sliced_map_csv="$repo_root/configs/postprocess/sliced_map.csv"
 filtered_locations_csv="$repo_root/configs/postprocess/filtered_locations.csv"
 ideal_config_selection_csv="$repo_root/configs/postprocess/ideal_config_selection.csv"
+by_library_output_prefix="filtered_reproduction_status_by_library"
 run_time="4h"
 run_time_seconds="14400"
 # output="/datapool/theta-lin-experiments/test_run"
@@ -260,6 +261,8 @@ run_postprocess() {
 		--filter "$filtered_locations_csv" \
 		--sliced-map "$sliced_map_csv" \
 		--selection-csv "$ideal_config_selection_csv" \
+		--by-library-selection-tables \
+		--by-library-output-prefix "$output/$by_library_output_prefix" \
 		--output "$output/filtered_reproduction_status_summary.csv" || return 1
 }
 
