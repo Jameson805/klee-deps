@@ -23,14 +23,22 @@ def _decode_dwarf_str(value: Any) -> str:
     return str(value)
 
 
-def _resolve_line_program_path(comp_dir: str, line_prog: Any, file_index: int) -> Optional[str]:
+def _resolve_line_program_path(
+    comp_dir: str,
+    line_prog: Any,
+    file_index: int,
+    zero_based_files: bool,
+) -> Optional[str]:
     if file_index < 0:
         return None
 
     file_entries = line_prog.header["file_entry"]
-    entry_index = file_index - 1
-    if file_index == 0:
+    if zero_based_files:
+        entry_index = file_index
+    elif file_index == 0:
         entry_index = 0
+    else:
+        entry_index = file_index - 1
     if entry_index >= len(file_entries):
         return None
 
@@ -39,9 +47,15 @@ def _resolve_line_program_path(comp_dir: str, line_prog: Any, file_index: int) -
     if os.path.isabs(name):
         return os.path.normpath(name)
 
-    dir_index = file_entry.dir_index or 0
-    if dir_index > 0:
-        include_dirs = line_prog.header.get("include_directory", ())
+    dir_index = int(file_entry.dir_index or 0)
+    include_dirs = line_prog.header.get("include_directory", ())
+    if zero_based_files:
+        if dir_index < len(include_dirs):
+            directory = _decode_dwarf_str(include_dirs[dir_index])
+            if os.path.isabs(directory):
+                return os.path.normpath(os.path.join(directory, name))
+            return os.path.normpath(os.path.join(comp_dir, directory, name))
+    elif dir_index > 0:
         include_index = dir_index - 1
         if include_index < len(include_dirs):
             directory = _decode_dwarf_str(include_dirs[include_index])
@@ -50,6 +64,17 @@ def _resolve_line_program_path(comp_dir: str, line_prog: Any, file_index: int) -
             return os.path.normpath(os.path.join(comp_dir, directory, name))
 
     return os.path.normpath(os.path.join(comp_dir, name))
+
+
+def _line_program_uses_zero_based_files(line_prog: Any, entries: List[Any]) -> bool:
+    version = int(line_prog.header.get("version", 0) or 0)
+    if version >= 5:
+        return True
+
+    return any(
+        entry.state is not None and int(entry.state.file) == 0
+        for entry in entries
+    )
 
 
 def _ensure_addr_cache(exe: str) -> None:
@@ -75,13 +100,15 @@ def _ensure_addr_cache(exe: str) -> None:
             line_prog = dwarfinfo.line_program_for_CU(cu)
             if line_prog is None:
                 continue
-            for entry in line_prog.get_entries():
+            entries = line_prog.get_entries()
+            zero_based_files = _line_program_uses_zero_based_files(line_prog, entries)
+            for entry in entries:
                 state = entry.state
                 if state is None:
                     continue
                 if state.end_sequence or not state.line:
                     continue
-                path = _resolve_line_program_path(comp_dir, line_prog, state.file)
+                path = _resolve_line_program_path(comp_dir, line_prog, state.file, zero_based_files)
                 if path is None:
                     continue
                 line = int(state.line)
