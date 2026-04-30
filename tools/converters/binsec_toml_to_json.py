@@ -486,6 +486,15 @@ def default_title_for_toml_name(toml_path: str) -> Optional[str]:
         "libgcrypt_var_pub.toml": "Libgcrypt 1.10.1 (Var Pub)",
         "bearssl_aes_big.toml": "BearSSL 0.6 aes_big",
         "bearssl_des_tab.toml": "BearSSL 0.6 des_tab",
+        "openssl_almeida_tls_rempad_luk13_fix_pub.toml": "OpenSSL Almeida tls-rempad-luk13 (Fix Pub)",
+        "openssl_almeida_tls_rempad_luk13_var_pub.toml": "OpenSSL Almeida tls-rempad-luk13 (Var Pub)",
+        "appliedcryp_3way.toml": "appliedCryp 3-WAY",
+        "appliedcryp_des.toml": "appliedCryp DES",
+        "appliedcryp_loki91.toml": "appliedCryp LOKI91",
+        "ghostrider_findmax.toml": "Ghostrider findmax",
+        "ghostrider_matmul.toml": "Ghostrider matmul",
+        "libg_des.toml": "libg DES",
+        "pycrypto_arc4.toml": "PyCrypto ARC4",
     }
     if name in mapping:
         return mapping[name]
@@ -583,7 +592,7 @@ def main(argv: List[str]) -> int:
     p.add_argument(
         "--library",
         required=True,
-        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "constantine", "unknown"],
+        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "unknown"],
         help="Library identifier for this dataset.",
     )
 

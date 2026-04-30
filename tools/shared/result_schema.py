@@ -67,7 +67,6 @@ def _library_root(library: str) -> Optional[str]:
         "libgcrypt": os.path.join(repo_root, "benchmarks", "libgcrypt-and-libgpg-error"),
         "openssl": os.path.join(repo_root, "benchmarks", "openssl-1.1.1q"),
         "bearssl": os.path.join(repo_root, "benchmarks", "bearssl-0.6"),
-        "constantine": os.path.join(repo_root, "benchmarks", "Constantine"),
     }
     root = mapping.get(library)
     return root if root and os.path.isdir(root) else None

@@ -157,6 +157,30 @@ resolve_replay_executable() {
         bearssl_des_tab.json)
             printf '%s\n' 'benchmarks/bearssl/klee_fix_pub_replay_appliedcryp_des'
             ;;
+        openssl_almeida_tls_rempad_luk13.json)
+            printf '%s\n' 'benchmarks/openssl_almeida/klee_fix_pub_replay_tls_rempad_luk13'
+            ;;
+        appliedcryp_3way.json)
+            printf '%s\n' 'benchmarks/appliedCryp/klee_fix_pub_replay_3way'
+            ;;
+        appliedcryp_des.json)
+            printf '%s\n' 'benchmarks/appliedCryp/klee_fix_pub_replay_des'
+            ;;
+        appliedcryp_loki91.json)
+            printf '%s\n' 'benchmarks/appliedCryp/klee_fix_pub_replay_loki91'
+            ;;
+        ghostrider_findmax.json)
+            printf '%s\n' 'benchmarks/ghostrider/klee_fix_pub_replay_findmax'
+            ;;
+        ghostrider_matmul.json)
+            printf '%s\n' 'benchmarks/ghostrider/klee_fix_pub_replay_matmul'
+            ;;
+        libg_des.json)
+            printf '%s\n' 'benchmarks/libg/klee_fix_pub_replay_des'
+            ;;
+        pycrypto_arc4.json)
+            printf '%s\n' 'benchmarks/pycrypto/klee_fix_pub_replay_arc4'
+            ;;
         *)
             return 1
             ;;
@@ -178,6 +202,21 @@ resolve_build_script() {
         bearssl_aes_big.json|bearssl_des_tab.json)
             printf '%s\n' 'benchmarks/bearssl/build.sh'
             ;;
+        openssl_almeida_tls_rempad_luk13.json)
+            printf '%s\n' 'benchmarks/openssl_almeida/build.sh'
+            ;;
+        appliedcryp_3way.json|appliedcryp_des.json|appliedcryp_loki91.json)
+            printf '%s\n' 'benchmarks/appliedCryp/build.sh'
+            ;;
+        ghostrider_findmax.json|ghostrider_matmul.json)
+            printf '%s\n' 'benchmarks/ghostrider/build.sh'
+            ;;
+        libg_des.json)
+            printf '%s\n' 'benchmarks/libg/build.sh'
+            ;;
+        pycrypto_arc4.json)
+            printf '%s\n' 'benchmarks/pycrypto/build.sh'
+            ;;
         *)
             return 1
             ;;
@@ -198,6 +237,12 @@ resolve_library() {
             ;;
         bearssl_aes_big.json|bearssl_des_tab.json)
             printf '%s\n' 'bearssl'
+            ;;
+        openssl_almeida_tls_rempad_luk13.json)
+            printf '%s\n' 'openssl'
+            ;;
+        appliedcryp_3way.json|appliedcryp_des.json|appliedcryp_loki91.json|ghostrider_findmax.json|ghostrider_matmul.json|libg_des.json|pycrypto_arc4.json)
+            printf '%s\n' 'unknown'
             ;;
         *)
             return 1
@@ -292,13 +337,16 @@ for json_file in "${json_files[@]}"; do
         fi
 
         echo "Replay executable not found: $replay_exe"
-        if [[ "$json_name" == bearssl_aes_big.json || "$json_name" == bearssl_des_tab.json ]]; then
-            echo "Building with $build_script --klee-cf --preset default"
-            "$build_script" --klee-cf --preset default
-        else
-            echo "Building with $build_script --klee-cf --preset size_$sym_size"
-            "$build_script" --klee-cf --preset "size_$sym_size"
-        fi
+        case "$json_name" in
+            bearssl_aes_big.json|bearssl_des_tab.json|openssl_almeida_tls_rempad_luk13.json|appliedcryp_3way.json|appliedcryp_des.json|appliedcryp_loki91.json|ghostrider_findmax.json|ghostrider_matmul.json|libg_des.json|pycrypto_arc4.json)
+                echo "Building with $build_script --klee-cf --preset default"
+                "$build_script" --klee-cf --preset default
+                ;;
+            *)
+                echo "Building with $build_script --klee-cf --preset size_$sym_size"
+                "$build_script" --klee-cf --preset "size_$sym_size"
+                ;;
+        esac
     fi
 
     if [[ ! -x "$replay_exe" ]]; then

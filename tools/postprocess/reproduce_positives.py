@@ -268,7 +268,26 @@ def run_pin_trace(
             print(f"[debug] timed out running: {shell_join(cmd)}", file=sys.stderr)
         raise
 
+    trace_ready = os.path.isfile(trace_path) and os.path.getsize(trace_path) > 0
+
     if proc.returncode != 0:
+        # The replay executable returns the benchmark result directly, so non-zero
+        # exits can still be valid as long as Pin emitted a usable trace.
+        if trace_ready:
+            if debug:
+                print(
+                    f"[debug] replay exited with status {proc.returncode} but produced trace: {trace_path}",
+                    file=sys.stderr,
+                )
+                print(f"[debug] Pin command: {shell_join(cmd)}", file=sys.stderr)
+                if proc.stdout:
+                    print("=== pin stdout ===", file=sys.stderr)
+                    print(proc.stdout, file=sys.stderr, end="")
+                if proc.stderr:
+                    print("=== pin stderr ===", file=sys.stderr)
+                    print(proc.stderr, file=sys.stderr, end="")
+            return
+
         print(f"Pin exited with status {proc.returncode} running: {shell_join(cmd)}", file=sys.stderr)
         if debug:
             print(f"[debug] Pin command: {shell_join(cmd)}", file=sys.stderr)
@@ -280,7 +299,7 @@ def run_pin_trace(
             print(proc.stderr, file=sys.stderr, end="")
         raise subprocess.CalledProcessError(proc.returncode, cmd, output=proc.stdout, stderr=proc.stderr)
 
-    if not os.path.isfile(trace_path) or os.path.getsize(trace_path) == 0:
+    if not trace_ready:
         if debug:
             print(f"[debug] Pin command: {shell_join(cmd)}", file=sys.stderr)
         raise RuntimeError("Pin produced an empty trace; check PIN_ROOT, the replay executable, and the tracer build")
@@ -1117,7 +1136,7 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
     parser.add_argument(
         "--library",
         default="unknown",
-        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "constantine", "unknown"],
+        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "unknown"],
         help="Library identifier for JSON-writing modes.",
     )
 

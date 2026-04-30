@@ -25,7 +25,7 @@ pin_root=""
 
 do_reproduce=1
 benchmarks_csv=""
-default_benchmarks=(mbedtls libgcrypt openssl bearssl)
+default_benchmarks=(mbedtls libgcrypt openssl openssl_almeida bearssl appliedcryp ghostrider libg pycrypto)
 selected_benchmarks=("${default_benchmarks[@]}")
 
 usage() {
@@ -41,7 +41,7 @@ Usage: $0 [--sym-size <n>] [--jump-enum <n>] [--sse-depth <n>] <max_time_seconds
   --patch-memset-ifunc Optional, pin `memset_func`'s PLT/GOT slot to a concrete memset impl
     --pin-root <path>    Path to external Intel Pin kit (defaults to PIN_ROOT)
   --benchmarks <list>  Optional comma-separated benchmark groups to run
-        valid: mbedtls,libgcrypt,openssl,bearssl
+        valid: mbedtls,libgcrypt,openssl,openssl_almeida,bearssl,appliedcryp,ghostrider,libg,pycrypto
   default: all valid groups
 EOF
     exit 1
@@ -109,7 +109,7 @@ if [[ -n "$benchmarks_csv" ]]; then
         bench="${raw//[[:space:]]/}"
         [[ -z "$bench" ]] && continue
         case "$bench" in
-            mbedtls|libgcrypt|openssl|bearssl)
+            mbedtls|libgcrypt|openssl|openssl_almeida|bearssl|appliedcryp|ghostrider|libg|pycrypto)
                 selected_benchmarks+=("$bench")
                 ;;
             *)
@@ -154,8 +154,23 @@ code_path_for_executable() {
         benchmarks/openssl-1.1.1q/*)
             echo "benchmarks/openssl-1.1.1q"
             ;;
+        benchmarks/openssl_almeida/*)
+            echo "benchmarks/openssl_almeida"
+            ;;
         benchmarks/bearssl/*)
             echo "benchmarks/bearssl"
+            ;;
+        benchmarks/appliedCryp/*)
+            echo "benchmarks/appliedCryp"
+            ;;
+        benchmarks/ghostrider/*)
+            echo "benchmarks/ghostrider"
+            ;;
+        benchmarks/libg/*)
+            echo "benchmarks/libg"
+            ;;
+        benchmarks/pycrypto/*)
+            echo "benchmarks/pycrypto"
             ;;
         *)
             echo ""
@@ -175,8 +190,14 @@ library_for_executable() {
         benchmarks/openssl-1.1.1q/*)
             echo "openssl"
             ;;
+        benchmarks/openssl_almeida/*)
+            echo "openssl"
+            ;;
         benchmarks/bearssl/*)
             echo "bearssl"
+            ;;
+        benchmarks/appliedCryp/*|benchmarks/ghostrider/*|benchmarks/libg/*|benchmarks/pycrypto/*)
+            echo "unknown"
             ;;
         *)
             echo ""
@@ -328,7 +349,12 @@ run_case() {
 _BUILT_MBEDTLS=0
 _BUILT_LIBGCRYPT=0
 _BUILT_OPENSSL=0
+_BUILT_OPENSSL_ALMEIDA=0
 _BUILT_BEARSSL=0
+_BUILT_APPLIEDCRYP=0
+_BUILT_GHOSTRIDER=0
+_BUILT_LIBG=0
+_BUILT_PYCRYPTO=0
 
 ensure_built_mbedtls() {
     if [[ "$_BUILT_MBEDTLS" -eq 1 ]]; then
@@ -363,6 +389,17 @@ ensure_built_openssl() {
     _BUILT_OPENSSL=1
 }
 
+ensure_built_openssl_almeida() {
+    if [[ "$_BUILT_OPENSSL_ALMEIDA" -eq 1 ]]; then
+        return 0
+    fi
+    echo "##########"
+    echo "Begin experiments for OpenSSL Almeida"
+    echo "##########"
+    benchmarks/openssl_almeida/build.sh --binsec --preset default
+    _BUILT_OPENSSL_ALMEIDA=1
+}
+
 ensure_built_bearssl() {
     if [[ "$_BUILT_BEARSSL" -eq 1 ]]; then
         return 0
@@ -372,6 +409,50 @@ ensure_built_bearssl() {
     echo "##########"
     benchmarks/bearssl/build.sh --binsec --preset default
     _BUILT_BEARSSL=1
+}
+
+ensure_built_appliedcryp() {
+    if [[ "$_BUILT_APPLIEDCRYP" -eq 1 ]]; then
+        return 0
+    fi
+    echo "##########"
+    echo "Begin experiments for appliedCryp"
+    echo "##########"
+    benchmarks/appliedCryp/build.sh --binsec --preset default
+    _BUILT_APPLIEDCRYP=1
+}
+
+ensure_built_ghostrider() {
+    if [[ "$_BUILT_GHOSTRIDER" -eq 1 ]]; then
+        return 0
+    fi
+    echo "##########"
+    echo "Begin experiments for ghostrider"
+    echo "##########"
+    benchmarks/ghostrider/build.sh --binsec --preset default
+    _BUILT_GHOSTRIDER=1
+}
+
+ensure_built_libg() {
+    if [[ "$_BUILT_LIBG" -eq 1 ]]; then
+        return 0
+    fi
+    echo "##########"
+    echo "Begin experiments for libg"
+    echo "##########"
+    benchmarks/libg/build.sh --binsec --preset default
+    _BUILT_LIBG=1
+}
+
+ensure_built_pycrypto() {
+    if [[ "$_BUILT_PYCRYPTO" -eq 1 ]]; then
+        return 0
+    fi
+    echo "##########"
+    echo "Begin experiments for PyCrypto"
+    echo "##########"
+    benchmarks/pycrypto/build.sh --binsec --preset default
+    _BUILT_PYCRYPTO=1
 }
 
 run_mbedtls_case() {
@@ -426,6 +507,23 @@ run_openssl_case() {
     esac
 }
 
+run_openssl_almeida_case() {
+    local kind="$1"  # fix_pub | var_pub
+    ensure_built_openssl_almeida
+    case "$kind" in
+        fix_pub)
+            run_case "OpenSSL Almeida tls-rempad-luk13 (Fix Pub)" "$repo_root/benchmarks/openssl_almeida/generated/binsec_fix_pub.cfg" "openssl_almeida_tls_rempad_luk13_fix_pub.toml" "benchmarks/openssl_almeida/binsec_fix_pub_tls_rempad_luk13" --secret-input "data:63:data_buf"
+            ;;
+        var_pub)
+            run_case "OpenSSL Almeida tls-rempad-luk13 (Var Pub)" "$repo_root/benchmarks/openssl_almeida/generated/binsec_var_pub.cfg" "openssl_almeida_tls_rempad_luk13_var_pub.toml" "benchmarks/openssl_almeida/binsec_var_pub_tls_rempad_luk13" --secret-input "data:63:data_buf" --public-input "options:4:options_buf" --public-input "s3_flags:4:s3_flags_buf" --public-input "flags:4:flags_buf" --public-input "slicing_cheat:4:slicing_cheat_buf" --public-input "block_size:4:block_size_buf" --public-input "mac_size:4:mac_size_buf"
+            ;;
+        *)
+            echo "Error: unknown openssl_almeida kind '$kind'" >&2
+            return 2
+            ;;
+    esac
+}
+
 run_bearssl_case() {
     local target="$1"  # aes_big | des_tab
     ensure_built_bearssl
@@ -441,6 +539,53 @@ run_bearssl_case() {
             return 2
             ;;
     esac
+}
+
+run_appliedcryp_case() {
+    local target="$1"  # 3way | des | loki91
+    ensure_built_appliedcryp
+    case "$target" in
+        3way)
+            run_case "appliedCryp 3-WAY" "$repo_root/benchmarks/appliedCryp/generated/3way/binsec_fix_pub.cfg" "appliedcryp_3way.toml" "benchmarks/appliedCryp/binsec_fix_pub_3way" --secret-input "key:12:key_buf" --secret-input "data:12:data_buf"
+            ;;
+        des)
+            run_case "appliedCryp DES" "$repo_root/benchmarks/appliedCryp/generated/des/binsec_fix_pub.cfg" "appliedcryp_des.toml" "benchmarks/appliedCryp/binsec_fix_pub_des" --secret-input "key:24:key_buf" --secret-input "data:8:data_buf"
+            ;;
+        loki91)
+            run_case "appliedCryp LOKI91" "$repo_root/benchmarks/appliedCryp/generated/loki91/binsec_fix_pub.cfg" "appliedcryp_loki91.toml" "benchmarks/appliedCryp/binsec_fix_pub_loki91" --secret-input "key:24:key_buf" --secret-input "data:8:data_buf"
+            ;;
+        *)
+            echo "Error: unknown appliedCryp target '$target'" >&2
+            return 2
+            ;;
+    esac
+}
+
+run_ghostrider_case() {
+    local target="$1"  # findmax | matmul
+    ensure_built_ghostrider
+    case "$target" in
+        findmax)
+            run_case "Ghostrider findmax" "$repo_root/benchmarks/ghostrider/generated/findmax/binsec_fix_pub.cfg" "ghostrider_findmax.toml" "benchmarks/ghostrider/binsec_fix_pub_findmax" --secret-input "data:2000:data_buf"
+            ;;
+        matmul)
+            run_case "Ghostrider matmul" "$repo_root/benchmarks/ghostrider/generated/matmul/binsec_fix_pub.cfg" "ghostrider_matmul.toml" "benchmarks/ghostrider/binsec_fix_pub_matmul" --secret-input "data:32768:data_buf"
+            ;;
+        *)
+            echo "Error: unknown ghostrider target '$target'" >&2
+            return 2
+            ;;
+    esac
+}
+
+run_libg_case() {
+    ensure_built_libg
+    run_case "libg DES" "$repo_root/benchmarks/libg/generated/binsec_fix_pub.cfg" "libg_des.toml" "benchmarks/libg/binsec_fix_pub_des" --secret-input "key:24:key_buf" --secret-input "data:64:data_buf"
+}
+
+run_pycrypto_case() {
+    ensure_built_pycrypto
+    run_case "PyCrypto ARC4" "$repo_root/benchmarks/pycrypto/generated/binsec_fix_pub.cfg" "pycrypto_arc4.toml" "benchmarks/pycrypto/binsec_fix_pub_arc4" --secret-input "key:32:key_buf"
 }
 
 ########################
@@ -467,9 +612,28 @@ for benchmark in "${selected_benchmarks[@]}"; do
             run_openssl_case mont_word fix_pub
             run_openssl_case mont_word var_pub
             ;;
+        openssl_almeida)
+            run_openssl_almeida_case fix_pub
+            run_openssl_almeida_case var_pub
+            ;;
         bearssl)
             run_bearssl_case aes_big
             run_bearssl_case des_tab
+            ;;
+        appliedcryp)
+            run_appliedcryp_case 3way
+            run_appliedcryp_case des
+            run_appliedcryp_case loki91
+            ;;
+        ghostrider)
+            run_ghostrider_case findmax
+            run_ghostrider_case matmul
+            ;;
+        libg)
+            run_libg_case
+            ;;
+        pycrypto)
+            run_pycrypto_case
             ;;
     esac
 done

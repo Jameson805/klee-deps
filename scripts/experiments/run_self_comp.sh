@@ -24,7 +24,7 @@ do_reproduce=1
 reproduce_timeout=180
 pin_root=""
 benchmarks_csv=""
-default_benchmarks=(mbedtls libgcrypt openssl bearssl)
+default_benchmarks=(mbedtls libgcrypt openssl openssl_almeida bearssl appliedcryp ghostrider libg pycrypto)
 selected_benchmarks=("${default_benchmarks[@]}")
 
 usage() {
@@ -46,7 +46,7 @@ Optional:
   --reproduce-timeout <s> Timeout per replay attempt in seconds (default: 180)
     --pin-root <path>      Path to external Intel Pin kit (defaults to PIN_ROOT)
   --benchmarks <list>    Comma-separated benchmark groups to run
-        valid: mbedtls,libgcrypt,openssl,bearssl
+        valid: mbedtls,libgcrypt,openssl,openssl_almeida,bearssl,appliedcryp,ghostrider,libg,pycrypto
   default: all valid groups
   --help                 Show this help
 EOF
@@ -104,7 +104,7 @@ if [[ -n "$benchmarks_csv" ]]; then
         bench="${raw//[[:space:]]/}"
         [[ -z "$bench" ]] && continue
         case "$bench" in
-            mbedtls|libgcrypt|openssl|bearssl)
+            mbedtls|libgcrypt|openssl|openssl_almeida|bearssl|appliedcryp|ghostrider|libg|pycrypto)
                 selected_benchmarks+=("$bench")
                 ;;
             *)
@@ -181,8 +181,14 @@ library_for_path() {
         *openssl-1.1.1q*)
             echo "openssl"
             ;;
+        *openssl_almeida*)
+            echo "openssl"
+            ;;
         *bearssl*)
             echo "bearssl"
+            ;;
+        *appliedCryp*|*ghostrider*|*benchmarks/libg/*|*pycrypto*)
+            echo "unknown"
             ;;
         *)
             echo ""
@@ -293,6 +299,55 @@ run_bearssl() {
     run_case "BearSSL 0.6 des_tab (Self-Comp)" "benchmarks/bearssl/self_comp_fix_pub_appliedcryp_des.bc" "bearssl_des_tab_self_comp" "bearssl_des_tab.json" "klee_fix_pub_replay_appliedcryp_des" --secret-layout "skey:256,data:16"
 }
 
+run_openssl_almeida() {
+    echo "##########"
+    echo "Begin experiments for OpenSSL Almeida"
+    echo "##########"
+
+    benchmarks/openssl_almeida/build.sh --self-comp --preset default
+    run_case "OpenSSL Almeida tls-rempad-luk13 (Fix Pub Self-Comp)" "benchmarks/openssl_almeida/self_comp_fix_pub_tls_rempad_luk13.bc" "openssl_almeida_tls_rempad_luk13_self_comp_fix_pub" "openssl_almeida_tls_rempad_luk13_fix_pub.json" "klee_fix_pub_replay_tls_rempad_luk13" --secret-layout "data:63"
+    run_case "OpenSSL Almeida tls-rempad-luk13 (Var Pub Self-Comp)" "benchmarks/openssl_almeida/self_comp_var_pub_tls_rempad_luk13.bc" "openssl_almeida_tls_rempad_luk13_self_comp_var_pub" "openssl_almeida_tls_rempad_luk13_var_pub.json" "klee_var_pub_replay_tls_rempad_luk13" --secret-layout "data:63" --public-layout "options:4,s3_flags:4,flags:4,slicing_cheat:4,block_size:4,mac_size:4"
+}
+
+run_appliedcryp() {
+    echo "##########"
+    echo "Begin experiments for appliedCryp"
+    echo "##########"
+
+    benchmarks/appliedCryp/build.sh --self-comp --preset default
+    run_case "appliedCryp 3-WAY (Self-Comp)" "benchmarks/appliedCryp/self_comp_fix_pub_3way.bc" "appliedcryp_3way_self_comp" "appliedcryp_3way.json" "klee_fix_pub_replay_3way" --secret-layout "key:12,data:12"
+    run_case "appliedCryp DES (Self-Comp)" "benchmarks/appliedCryp/self_comp_fix_pub_des.bc" "appliedcryp_des_self_comp" "appliedcryp_des.json" "klee_fix_pub_replay_des" --secret-layout "key:24,data:8"
+    run_case "appliedCryp LOKI91 (Self-Comp)" "benchmarks/appliedCryp/self_comp_fix_pub_loki91.bc" "appliedcryp_loki91_self_comp" "appliedcryp_loki91.json" "klee_fix_pub_replay_loki91" --secret-layout "key:24,data:8"
+}
+
+run_ghostrider() {
+    echo "##########"
+    echo "Begin experiments for ghostrider"
+    echo "##########"
+
+    benchmarks/ghostrider/build.sh --self-comp --preset default
+    run_case "Ghostrider findmax (Self-Comp)" "benchmarks/ghostrider/self_comp_fix_pub_findmax.bc" "ghostrider_findmax_self_comp" "ghostrider_findmax.json" "klee_fix_pub_replay_findmax" --secret-layout "data:2000"
+    run_case "Ghostrider matmul (Self-Comp)" "benchmarks/ghostrider/self_comp_fix_pub_matmul.bc" "ghostrider_matmul_self_comp" "ghostrider_matmul.json" "klee_fix_pub_replay_matmul" --secret-layout "data:32768"
+}
+
+run_libg() {
+    echo "##########"
+    echo "Begin experiments for libg"
+    echo "##########"
+
+    benchmarks/libg/build.sh --self-comp --preset default
+    run_case "libg DES (Self-Comp)" "benchmarks/libg/self_comp_fix_pub_des.bc" "libg_des_self_comp" "libg_des.json" "klee_fix_pub_replay_des" --secret-layout "key:24,data:64"
+}
+
+run_pycrypto() {
+    echo "##########"
+    echo "Begin experiments for PyCrypto"
+    echo "##########"
+
+    benchmarks/pycrypto/build.sh --self-comp --preset default
+    run_case "PyCrypto ARC4 (Self-Comp)" "benchmarks/pycrypto/self_comp_fix_pub_arc4.bc" "pycrypto_arc4_self_comp" "pycrypto_arc4.json" "klee_fix_pub_replay_arc4" --secret-layout "key:32"
+}
+
 for benchmark in "${selected_benchmarks[@]}"; do
     case "$benchmark" in
         mbedtls)
@@ -304,8 +359,23 @@ for benchmark in "${selected_benchmarks[@]}"; do
         openssl)
             run_openssl
             ;;
+        openssl_almeida)
+            run_openssl_almeida
+            ;;
         bearssl)
             run_bearssl
+            ;;
+        appliedcryp)
+            run_appliedcryp
+            ;;
+        ghostrider)
+            run_ghostrider
+            ;;
+        libg)
+            run_libg
+            ;;
+        pycrypto)
+            run_pycrypto
             ;;
     esac
 done

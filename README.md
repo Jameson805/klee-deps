@@ -93,7 +93,7 @@ The processing stack is split by responsibility:
 - `tools/postprocess/merge_json_runs_by_experiment.py`: merges repeated runs for one experiment configuration
 - `tools/postprocess/merge_results.py`: combines many per-run JSON files into comparison CSVs keyed by source location
 - `tools/postprocess/apply_sliced_map.py`, `merge_csv_by_location.py`, and `filter_merged_results.py`: relabel sliced benchmarks, combine tables, and filter locations
-- `tools/postprocess/summarize_reproduction_status.py`: summarizes whether reported positives reproduced
+- `tools/postprocess/summarize_reproduction_status.py`: summarizes whether reported positives reproduced; with `--selection-csv` it writes selected best-of status tables, and with `--by-library-selection-tables` it also writes a per-library success-count matrix ordered as `KLEE-CF | other KLEE-based | external`
 - `tools/postprocess/reproduce_positives.py`: replays positive findings with the repository's Intel Pin tracer in `pin-tracer`
 
 CtChecker is handled as an external baseline rather than as a runner in this repository. Checked-in CtChecker outputs live under `ctchecker_results`, and helper scripts such as `tools/converters/compare_with_ctchecker.py`, `tools/postprocess/make_report.py`, and `tools/postprocess/make_plot.py` join those baseline results with KLEE-derived outputs for reporting.
@@ -124,3 +124,5 @@ CtChecker is handled as an external baseline rather than as a runner in this rep
 - Python tooling prefers the local virtual environment at `.venv` when available.
 - Replay reproduction uses Intel Pin instead of GDB. Point the workflow at an external Pin kit with `--pin-root <path>` or `PIN_ROOT=<path>`.
 - Support varies slightly by benchmark family. For example, some KLEE runs have sliced variants, BearSSL uses benchmark-local runner configs with `default` presets, and CtChecker data is not available for every benchmark.
+- Repo-owned glue files such as wrappers, benchmark-local `build.sh` scripts, runner configs, and checked-in placeholder JSONs should end with a trailing newline.
+- Imported benchmark sources, vendored data files, and raw input blobs should be kept byte-for-byte as imported unless there is a task-specific reason to modify them.

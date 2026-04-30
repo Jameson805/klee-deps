@@ -314,7 +314,7 @@ def main(argv: List[str]) -> int:
     p.add_argument(
         "--library",
         required=True,
-        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "constantine", "unknown"],
+        choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "unknown"],
         help="Library identifier for this dataset.",
     )
     args = p.parse_args(argv)

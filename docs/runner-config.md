@@ -6,6 +6,8 @@ The current shared modular-exponentiation config lives at `configs/runner/modexp
 
 Not every benchmark needs to share one config source. BearSSL `aes_big` and `des_tab` use benchmark-local configs in `configs/runner/bearssl_aes_big_runner_config.json` and `configs/runner/bearssl_des_tab_runner_config.json` because they keep different effective schedule sizes while still using the same generator and `runner.h` contract. See `benchmarks/bearssl/README.md` for the rationale behind those choices.
 
+OpenSSL Almeida `tls-rempad-luk13` also uses a benchmark-local config in `configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.json` because it models one secret record buffer plus several fixed-width public control scalars instead of the shared modular-exponentiation buffer shape.
+
 The file is parsed as a Python literal instead of strict JSON. This is intentional: it keeps byte arrays and large integers readable with `0x...` literals and plain `True`/`False` values.
 
 ## Build Model
@@ -126,6 +128,7 @@ Some benchmark integrations intentionally use benchmark-local macros and sizes i
 - For BearSSL, mod-exp-style `size_4` or `size_16` presets would be misleading: unlike `SYM_SIZE` in the modular-exponentiation benchmarks, `ctx.skey` is an expanded internal schedule, not a raw semantic key buffer. Smaller widths there would produce partially symbolic schedules with the remaining consumed words fixed to zero.
 - They therefore use a single `default` preset per target instead of exposing a family of `size_N` presets.
 - They also currently model only secret inputs, so `vars` is empty and the generated fix-pub and var-pub artifacts differ only by mode plumbing, not by any extra public buffers.
+- OpenSSL Almeida `tls-rempad-luk13` likewise uses a single `default` preset, keeps the original fixed 63-byte record length, models the record payload as the only secret input, and treats `options`, `s3_flags`, `flags`, `slicing_cheat`, `block_size`, and `mac_size` as separate 4-byte public controls.
 
 ## Example
 

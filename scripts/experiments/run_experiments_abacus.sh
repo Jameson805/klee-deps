@@ -31,7 +31,7 @@ Options:
   --output DIR           Destination root for collected outputs
   --sym-size N           Sym size to run (repeatable; default: 4 and 16)
   --benchmarks LIST      Comma-separated benchmark groups for run_abacus.sh
-						 valid: mbedtls,libgcrypt,openssl,bearssl,constantine
+						 valid: mbedtls,libgcrypt,openssl,openssl_almeida,bearssl,appliedcryp,ghostrider,libg,pycrypto
   -h, --help             Show this help
 
 Notes:

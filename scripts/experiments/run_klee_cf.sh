@@ -27,7 +27,8 @@ solver_backend="stp"
 optimize_array="false"
 pin_root=""
 benchmarks_csv=""
-default_benchmarks=(mbedtls mbedtls_sliced libgcrypt libgcrypt_sliced openssl openssl_sliced bearssl)
+default_benchmarks=(mbedtls mbedtls_sliced libgcrypt libgcrypt_sliced openssl openssl_sliced openssl_almeida bearssl)
+default_benchmarks+=(appliedcryp ghostrider libg pycrypto)
 selected_benchmarks=("${default_benchmarks[@]}")
 
 usage() {
@@ -47,7 +48,7 @@ Usage: $0 [--sym-size <n>] [--loop-max-iterations <n>] [--max-solver-time <durat
   --optimize-array <value> - optional, default: false (false|all|index|value)
     --pin-root <path>      - optional, path to external Intel Pin kit (defaults to PIN_ROOT)
   --benchmarks <list>      - optional, comma-separated benchmark groups to run
-        valid: mbedtls,mbedtls_sliced,libgcrypt,libgcrypt_sliced,openssl,openssl_sliced,bearssl
+        valid: mbedtls,mbedtls_sliced,libgcrypt,libgcrypt_sliced,openssl,openssl_sliced,openssl_almeida,bearssl,appliedcryp,ghostrider,libg,pycrypto
   default: all valid groups
 EOF
     exit 1
@@ -119,7 +120,7 @@ if [[ -n "$benchmarks_csv" ]]; then
         bench="${raw//[[:space:]]/}"
         [[ -z "$bench" ]] && continue
         case "$bench" in
-            mbedtls|mbedtls_sliced|libgcrypt|libgcrypt_sliced|openssl|openssl_sliced|bearssl)
+            mbedtls|mbedtls_sliced|libgcrypt|libgcrypt_sliced|openssl|openssl_sliced|openssl_almeida|bearssl|appliedcryp|ghostrider|libg|pycrypto)
                 selected_benchmarks+=("$bench")
                 ;;
             *)
@@ -224,8 +225,14 @@ library_for_path() {
         *openssl-1.1.1q*)
             echo "openssl"
             ;;
+        *openssl_almeida*)
+            echo "openssl"
+            ;;
         *bearssl*)
             echo "bearssl"
+            ;;
+        *appliedCryp*|*ghostrider*|*benchmarks/libg/*|*pycrypto*)
+            echo "unknown"
             ;;
         *)
             echo ""
@@ -578,6 +585,55 @@ run_bearssl() {
     run_case "BearSSL 0.6 des_tab" "benchmarks/bearssl/klee_fix_pub_appliedcryp_des.bc" "bearssl_des_tab" "benchmarks/bearssl/klee_fix_pub_replay_appliedcryp_des" "--secret skey,data" "ctchecker_results/BearSSL0.6/empty.json" "benchmarks/bearssl" true
 }
 
+run_openssl_almeida() {
+    echo "##########"
+    echo "Begin experiments for OpenSSL Almeida"
+    echo "##########"
+
+    benchmarks/openssl_almeida/build.sh --klee-cf --preset default
+    run_case "OpenSSL Almeida tls-rempad-luk13 (Fix Pub)" "benchmarks/openssl_almeida/klee_fix_pub_tls_rempad_luk13.bc" "openssl_almeida_tls_rempad_luk13_fix_pub" "benchmarks/openssl_almeida/klee_fix_pub_replay_tls_rempad_luk13" "--secret data" "ctchecker_results/OpenSSLAlmeida/empty.json" "benchmarks/openssl_almeida" true
+    run_case "OpenSSL Almeida tls-rempad-luk13 (Var Pub)" "benchmarks/openssl_almeida/klee_var_pub_tls_rempad_luk13.bc" "openssl_almeida_tls_rempad_luk13_var_pub" "benchmarks/openssl_almeida/klee_var_pub_replay_tls_rempad_luk13" "--secret data --public options,s3_flags,flags,slicing_cheat,block_size,mac_size" "ctchecker_results/OpenSSLAlmeida/empty.json" "benchmarks/openssl_almeida" true
+}
+
+run_appliedcryp() {
+    echo "##########"
+    echo "Begin experiments for appliedCryp"
+    echo "##########"
+
+    benchmarks/appliedCryp/build.sh --klee-cf --preset default
+    run_case "appliedCryp 3-WAY" "benchmarks/appliedCryp/klee_fix_pub_3way.bc" "appliedcryp_3way" "benchmarks/appliedCryp/klee_fix_pub_replay_3way" "--secret key,data" "ctchecker_results/OriginalBenchmarks/empty.json" "benchmarks/appliedCryp" true
+    run_case "appliedCryp DES" "benchmarks/appliedCryp/klee_fix_pub_des.bc" "appliedcryp_des" "benchmarks/appliedCryp/klee_fix_pub_replay_des" "--secret key,data" "ctchecker_results/OriginalBenchmarks/empty.json" "benchmarks/appliedCryp" true
+    run_case "appliedCryp LOKI91" "benchmarks/appliedCryp/klee_fix_pub_loki91.bc" "appliedcryp_loki91" "benchmarks/appliedCryp/klee_fix_pub_replay_loki91" "--secret key,data" "ctchecker_results/OriginalBenchmarks/empty.json" "benchmarks/appliedCryp" true
+}
+
+run_ghostrider() {
+    echo "##########"
+    echo "Begin experiments for ghostrider"
+    echo "##########"
+
+    benchmarks/ghostrider/build.sh --klee-cf --preset default
+    run_case "Ghostrider findmax" "benchmarks/ghostrider/klee_fix_pub_findmax.bc" "ghostrider_findmax" "benchmarks/ghostrider/klee_fix_pub_replay_findmax" "--secret data" "ctchecker_results/OriginalBenchmarks/empty.json" "benchmarks/ghostrider" true
+    run_case "Ghostrider matmul" "benchmarks/ghostrider/klee_fix_pub_matmul.bc" "ghostrider_matmul" "benchmarks/ghostrider/klee_fix_pub_replay_matmul" "--secret data" "ctchecker_results/OriginalBenchmarks/empty.json" "benchmarks/ghostrider" true
+}
+
+run_libg() {
+    echo "##########"
+    echo "Begin experiments for libg"
+    echo "##########"
+
+    benchmarks/libg/build.sh --klee-cf --preset default
+    run_case "libg DES" "benchmarks/libg/klee_fix_pub_des.bc" "libg_des" "benchmarks/libg/klee_fix_pub_replay_des" "--secret key,data" "ctchecker_results/OriginalBenchmarks/empty.json" "benchmarks/libg" true
+}
+
+run_pycrypto() {
+    echo "##########"
+    echo "Begin experiments for PyCrypto"
+    echo "##########"
+
+    benchmarks/pycrypto/build.sh --klee-cf --preset default
+    run_case "PyCrypto ARC4" "benchmarks/pycrypto/klee_fix_pub_arc4.bc" "pycrypto_arc4" "benchmarks/pycrypto/klee_fix_pub_replay_arc4" "--secret key" "ctchecker_results/OriginalBenchmarks/empty.json" "benchmarks/pycrypto" true
+}
+
 for benchmark in "${selected_benchmarks[@]}"; do
     case "$benchmark" in
         mbedtls)
@@ -598,8 +654,23 @@ for benchmark in "${selected_benchmarks[@]}"; do
         openssl_sliced)
             run_openssl_sliced
             ;;
+        openssl_almeida)
+            run_openssl_almeida
+            ;;
         bearssl)
             run_bearssl
+            ;;
+        appliedcryp)
+            run_appliedcryp
+            ;;
+        ghostrider)
+            run_ghostrider
+            ;;
+        libg)
+            run_libg
+            ;;
+        pycrypto)
+            run_pycrypto
             ;;
     esac
 done

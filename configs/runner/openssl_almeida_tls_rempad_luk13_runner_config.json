@@ -1,0 +1,78 @@
+{
+  "inputs": [
+    {
+      "id": "data_buf",
+      "name": "data",
+      "kind": "secret",
+      "size": "DATA_LEN"
+    },
+    {
+      "id": "options_buf",
+      "name": "options",
+      "kind": "public",
+      "size": 4
+    },
+    {
+      "id": "s3_flags_buf",
+      "name": "s3_flags",
+      "kind": "public",
+      "size": 4
+    },
+    {
+      "id": "flags_buf",
+      "name": "flags",
+      "kind": "public",
+      "size": 4
+    },
+    {
+      "id": "slicing_cheat_buf",
+      "name": "slicing_cheat",
+      "kind": "public",
+      "size": 4
+    },
+    {
+      "id": "block_size_buf",
+      "name": "block_size",
+      "kind": "public",
+      "size": 4
+    },
+    {
+      "id": "mac_size_buf",
+      "name": "mac_size",
+      "kind": "public",
+      "size": 4
+    }
+  ],
+  "mode_policy": {
+    "var_pub": {
+      "public_symbolic": True
+    },
+    "fix_pub": {
+      "public_symbolic": False
+    },
+    "abacus": {
+      "secret_inputs": [
+        "data_buf"
+      ],
+      "public_fixed": True
+    }
+  },
+  "presets": {
+    "default": {
+      "macros": {
+        "DATA_LEN": 63
+      },
+      "vars": {
+        "options_buf": 0,
+        "s3_flags_buf": 0,
+        "flags_buf": 0,
+        "slicing_cheat_buf": 0,
+        "block_size_buf": 16,
+        "mac_size_buf": 20
+      },
+      "abacus_secrets": {
+        "data_buf": 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
+      }
+    }
+  }
+}

@@ -12,7 +12,7 @@ fi
 sym_size=4
 abacus_root=""
 benchmarks_csv=""
-default_benchmarks=(mbedtls libgcrypt openssl bearssl)
+default_benchmarks=(mbedtls libgcrypt openssl openssl_almeida bearssl appliedcryp ghostrider libg pycrypto)
 selected_benchmarks=("${default_benchmarks[@]}")
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -62,7 +62,7 @@ if [[ -n "$benchmarks_csv" ]]; then
         bench="${raw//[[:space:]]/}"
         [[ -z "$bench" ]] && continue
         case "$bench" in
-            mbedtls|libgcrypt|openssl|bearssl)
+            mbedtls|libgcrypt|openssl|openssl_almeida|bearssl|appliedcryp|ghostrider|libg|pycrypto)
                 selected_benchmarks+=("$bench")
                 ;;
             *)
@@ -99,8 +99,14 @@ run_case() {
         *openssl-1.1.1q*)
             library="openssl"
             ;;
+        *openssl_almeida*)
+            library="openssl"
+            ;;
         *bearssl*)
             library="bearssl"
+            ;;
+        *appliedCryp*|*ghostrider*|*benchmarks/libg/*|*pycrypto*)
+            library="unknown"
             ;;
     esac
     if [[ -z "$library" ]]; then
@@ -167,6 +173,54 @@ run_bearssl() {
     run_case "benchmarks/bearssl/abacus_fix_pub_appliedcryp_des" "bearssl_des_tab.txt" "$repo_root/configs/runner/bearssl_des_tab_runner_config.json" default
 }
 
+run_openssl_almeida() {
+    echo "##########"
+    echo "Begin experiments for OpenSSL Almeida"
+    echo "##########"
+
+    benchmarks/openssl_almeida/build.sh --abacus --preset default
+    run_case "benchmarks/openssl_almeida/abacus_fix_pub_tls_rempad_luk13" "openssl_almeida_tls_rempad_luk13.txt" "$repo_root/configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.json" default
+}
+
+run_appliedcryp() {
+    echo "##########"
+    echo "Begin experiments for appliedCryp"
+    echo "##########"
+
+    benchmarks/appliedCryp/build.sh --abacus --preset default
+    run_case "benchmarks/appliedCryp/abacus_fix_pub_3way" "appliedcryp_3way.txt" "$repo_root/configs/runner/appliedcryp_3way_runner_config.json" default
+    run_case "benchmarks/appliedCryp/abacus_fix_pub_des" "appliedcryp_des.txt" "$repo_root/configs/runner/appliedcryp_des_runner_config.json" default
+    run_case "benchmarks/appliedCryp/abacus_fix_pub_loki91" "appliedcryp_loki91.txt" "$repo_root/configs/runner/appliedcryp_loki91_runner_config.json" default
+}
+
+run_ghostrider() {
+    echo "##########"
+    echo "Begin experiments for ghostrider"
+    echo "##########"
+
+    benchmarks/ghostrider/build.sh --abacus --preset default
+    run_case "benchmarks/ghostrider/abacus_fix_pub_findmax" "ghostrider_findmax.txt" "$repo_root/configs/runner/ghostrider_findmax_runner_config.json" default
+    run_case "benchmarks/ghostrider/abacus_fix_pub_matmul" "ghostrider_matmul.txt" "$repo_root/configs/runner/ghostrider_matmul_runner_config.json" default
+}
+
+run_libg() {
+    echo "##########"
+    echo "Begin experiments for libg"
+    echo "##########"
+
+    benchmarks/libg/build.sh --abacus --preset default
+    run_case "benchmarks/libg/abacus_fix_pub_des" "libg_des.txt" "$repo_root/configs/runner/libg_des_runner_config.json" default
+}
+
+run_pycrypto() {
+    echo "##########"
+    echo "Begin experiments for PyCrypto"
+    echo "##########"
+
+    benchmarks/pycrypto/build.sh --abacus --preset default
+    run_case "benchmarks/pycrypto/abacus_fix_pub_arc4" "pycrypto_arc4.txt" "$repo_root/configs/runner/pycrypto_arc4_runner_config.json" default
+}
+
 for benchmark in "${selected_benchmarks[@]}"; do
     case "$benchmark" in
         mbedtls)
@@ -178,8 +232,23 @@ for benchmark in "${selected_benchmarks[@]}"; do
         openssl)
             run_openssl
             ;;
+        openssl_almeida)
+            run_openssl_almeida
+            ;;
         bearssl)
             run_bearssl
+            ;;
+        appliedcryp)
+            run_appliedcryp
+            ;;
+        ghostrider)
+            run_ghostrider
+            ;;
+        libg)
+            run_libg
+            ;;
+        pycrypto)
+            run_pycrypto
             ;;
     esac
 done
