@@ -1,0 +1,168 @@
+[[benchmarks]]
+benchmark_id = "mbedtls"
+display_name = "Mbed TLS 3.2.1"
+library_id = "mbedtls"
+code_path = "benchmarks/mbedtls-3.2.1"
+path_prefixes = ["benchmarks/mbedtls-3.2.1/"]
+tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
+
+[benchmarks.builds.abacus]
+script = "benchmarks/mbedtls-3.2.1/build.sh"
+tool_flag = "--abacus"
+preset = "size_{sym_size}"
+
+[benchmarks.builds.self_comp]
+script = "benchmarks/mbedtls-3.2.1/build.sh"
+tool_flag = "--self-comp"
+preset = "size_{sym_size}"
+
+[benchmarks.builds.binsec]
+script = "benchmarks/mbedtls-3.2.1/build.sh"
+tool_flag = "--binsec"
+preset = "size_{sym_size}"
+
+[benchmarks.builds.klee]
+script = "benchmarks/mbedtls-3.2.1/build.sh"
+tool_flag = "--klee"
+preset = "size_{sym_size}"
+
+[benchmarks.build_aliases]
+klee_cf = "klee"
+klee_eager = "klee"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/mbedtls-3.2.1/abacus_fix_pub"
+outfile = "mbedtls.txt"
+
+[[benchmarks.self_comp_cases]]
+title = "Mbed TLS 3.2.1 (Fix Pub Self-Comp)"
+bitcode = "benchmarks/mbedtls-3.2.1/self_comp_fix_pub.bc"
+result_name = "mbedtls_self_comp_fix_pub"
+json_name = "mbedtls_fix_pub.json"
+replay_executable = "klee_fix_pub_replay"
+
+[[benchmarks.self_comp_cases]]
+title = "Mbed TLS 3.2.1 (Var Pub Self-Comp)"
+bitcode = "benchmarks/mbedtls-3.2.1/self_comp_var_pub.bc"
+result_name = "mbedtls_self_comp_var_pub"
+json_name = "mbedtls_var_pub.json"
+replay_executable = "klee_var_pub_replay"
+
+[[benchmarks.binsec_cases]]
+title = "Mbed TLS 3.2.1 (Fix Pub)"
+sse_script = "benchmarks/mbedtls-3.2.1/generated/binsec_fix_pub.cfg"
+stats_file = "mbedtls_fix_pub.toml"
+executable = "benchmarks/mbedtls-3.2.1/binsec_fix_pub"
+
+[[benchmarks.binsec_cases]]
+title = "Mbed TLS 3.2.1 (Var Pub)"
+sse_script = "benchmarks/mbedtls-3.2.1/generated/binsec_var_pub.cfg"
+stats_file = "mbedtls_var_pub.toml"
+executable = "benchmarks/mbedtls-3.2.1/binsec_var_pub"
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz", "-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=bitlen_i64_nosign", "-break", "-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz", "-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=bitlen_i64_nosign", "-break", "-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub.bc"]
+
+[[benchmarks.klee_cases]]
+title = "Mbed TLS 3.2.1 (Fix Pub)"
+bitcode = "benchmarks/mbedtls-3.2.1/klee_fix_pub.bc"
+result_name = "mbedtls_fix_pub"
+replay_script = "benchmarks/mbedtls-3.2.1/klee_fix_pub_replay"
+replay_opts = "--secret exp"
+ct_json = "ctchecker_results/mbedtls3.2.1/3.json"
+code_path = "mbedtls-3.2.1"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "library"]
+mod_exp_extra_args = ["--filename", "bignum.c", "--lines", "1968:2202"]
+
+[[benchmarks.klee_cases]]
+title = "Mbed TLS 3.2.1 (Var Pub)"
+bitcode = "benchmarks/mbedtls-3.2.1/klee_var_pub.bc"
+result_name = "mbedtls_var_pub"
+replay_script = "benchmarks/mbedtls-3.2.1/klee_var_pub_replay"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/mbedtls3.2.1/3.json"
+code_path = "mbedtls-3.2.1"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "library"]
+mod_exp_extra_args = ["--filename", "bignum.c", "--lines", "1968:2202"]
+
+[[benchmarks.klee_cases]]
+title = "Mbed TLS 3.2.1 (Var Pub Lim Loop Break)"
+bitcode = "benchmarks/mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc"
+result_name = "mbedtls_var_pub_lim_loop_break"
+replay_script = "benchmarks/mbedtls-3.2.1/klee_var_pub_replay"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/mbedtls3.2.1/3.json"
+code_path = "mbedtls-3.2.1"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "library"]
+mod_exp_extra_args = ["--filename", "bignum.c", "--lines", "1968:2202"]
+
+[[benchmarks]]
+benchmark_id = "mbedtls_sliced"
+display_name = "Mbed TLS 3.2.1 (Sliced)"
+library_id = "mbedtls"
+code_path = "benchmarks/mbedtls-3.2.1"
+path_prefixes = ["benchmarks/mbedtls-3.2.1/"]
+tools = ["klee_cf"]
+
+[benchmarks.builds.klee]
+script = "benchmarks/mbedtls-3.2.1/build.sh"
+tool_flag = "--klee"
+preset = "size_{sym_size}"
+
+[benchmarks.build_aliases]
+klee_cf = "klee"
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz", "-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_sliced_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub_sliced.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=bitlen_i64_nosign", "-break", "-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_sliced_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub_sliced.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz", "-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_sliced_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub_sliced.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=bitlen_i64_nosign", "-break", "-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_sliced_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub_sliced.bc"]
+
+[[benchmarks.klee_cases]]
+title = "Mbed TLS 3.2.1 (Fix Pub Sliced)"
+bitcode = "benchmarks/mbedtls-3.2.1/klee_fix_pub_sliced.bc"
+result_name = "mbedtls_fix_pub_sliced"
+replay_script = "benchmarks/mbedtls-3.2.1/klee_fix_pub_sliced_replay"
+replay_opts = "--secret exp"
+ct_json = "ctchecker_results/mbedtls3.2.1-sliced/2.json"
+code_path = "mbedtls-3.2.1"
+memory_flag = false
+
+[[benchmarks.klee_cases]]
+title = "Mbed TLS 3.2.1 (Var Pub Sliced)"
+bitcode = "benchmarks/mbedtls-3.2.1/klee_var_pub_sliced.bc"
+result_name = "mbedtls_var_pub_sliced"
+replay_script = "benchmarks/mbedtls-3.2.1/klee_var_pub_sliced_replay"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/mbedtls3.2.1-sliced/2.json"
+code_path = "mbedtls-3.2.1"
+memory_flag = false
+
+
+[[benchmarks.klee_cases]]
+title = "Mbed TLS 3.2.1 (Var Pub Sliced Lim Loop Break)"
+bitcode = "benchmarks/mbedtls-3.2.1/klee_var_pub_sliced_lim_loop_break.bc"
+result_name = "mbedtls_var_pub_sliced_lim_loop_break"
+replay_script = "benchmarks/mbedtls-3.2.1/klee_var_pub_sliced_replay"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/mbedtls3.2.1-sliced/2.json"
+code_path = "mbedtls-3.2.1"
+memory_flag = false

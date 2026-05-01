@@ -1,0 +1,125 @@
+[[benchmarks]]
+benchmark_id = "appliedcryp"
+display_name = "appliedCryp"
+library_id = "unknown"
+code_path = "benchmarks/appliedCryp"
+path_prefixes = ["benchmarks/appliedCryp/"]
+tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
+
+[benchmarks.builds.abacus]
+script = "benchmarks/appliedCryp/build.sh"
+tool_flag = "--abacus"
+preset = "default"
+
+[benchmarks.builds.self_comp]
+script = "benchmarks/appliedCryp/build.sh"
+tool_flag = "--self-comp"
+preset = "default"
+
+[benchmarks.builds.binsec]
+script = "benchmarks/appliedCryp/build.sh"
+tool_flag = "--binsec"
+preset = "default"
+
+[benchmarks.builds.klee]
+script = "benchmarks/appliedCryp/build.sh"
+tool_flag = "--klee"
+preset = "default"
+
+[benchmarks.build_aliases]
+klee_cf = "klee"
+klee_eager = "klee"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/appliedCryp/abacus_fix_pub_3way"
+outfile = "appliedcryp_3way.txt"
+runner_config = "configs/runner/appliedcryp_3way_runner_config.toml"
+preset_name = "default"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/appliedCryp/abacus_fix_pub_des"
+outfile = "appliedcryp_des.txt"
+runner_config = "configs/runner/appliedcryp_des_runner_config.toml"
+preset_name = "default"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/appliedCryp/abacus_fix_pub_loki91"
+outfile = "appliedcryp_loki91.txt"
+runner_config = "configs/runner/appliedcryp_loki91_runner_config.toml"
+preset_name = "default"
+
+[[benchmarks.self_comp_cases]]
+title = "appliedCryp 3-WAY (Self-Comp)"
+bitcode = "benchmarks/appliedCryp/self_comp_fix_pub_3way.bc"
+result_name = "appliedcryp_3way_self_comp"
+json_name = "appliedcryp_3way.json"
+replay_executable = "klee_fix_pub_replay_3way"
+secret_layout = "key:12,data:12"
+
+[[benchmarks.self_comp_cases]]
+title = "appliedCryp DES (Self-Comp)"
+bitcode = "benchmarks/appliedCryp/self_comp_fix_pub_des.bc"
+result_name = "appliedcryp_des_self_comp"
+json_name = "appliedcryp_des.json"
+replay_executable = "klee_fix_pub_replay_des"
+secret_layout = "key:24,data:8"
+
+[[benchmarks.self_comp_cases]]
+title = "appliedCryp LOKI91 (Self-Comp)"
+bitcode = "benchmarks/appliedCryp/self_comp_fix_pub_loki91.bc"
+result_name = "appliedcryp_loki91_self_comp"
+json_name = "appliedcryp_loki91.json"
+replay_executable = "klee_fix_pub_replay_loki91"
+secret_layout = "key:24,data:8"
+
+[[benchmarks.binsec_cases]]
+title = "appliedCryp 3-WAY"
+sse_script = "benchmarks/appliedCryp/generated/3way/binsec_fix_pub.cfg"
+stats_file = "appliedcryp_3way.toml"
+executable = "benchmarks/appliedCryp/binsec_fix_pub_3way"
+secret_inputs = ["key:12:key_buf", "data:12:data_buf"]
+
+[[benchmarks.binsec_cases]]
+title = "appliedCryp DES"
+sse_script = "benchmarks/appliedCryp/generated/des/binsec_fix_pub.cfg"
+stats_file = "appliedcryp_des.toml"
+executable = "benchmarks/appliedCryp/binsec_fix_pub_des"
+secret_inputs = ["key:24:key_buf", "data:8:data_buf"]
+
+[[benchmarks.binsec_cases]]
+title = "appliedCryp LOKI91"
+sse_script = "benchmarks/appliedCryp/generated/loki91/binsec_fix_pub.cfg"
+stats_file = "appliedcryp_loki91.toml"
+executable = "benchmarks/appliedCryp/binsec_fix_pub_loki91"
+secret_inputs = ["key:24:key_buf", "data:8:data_buf"]
+
+[[benchmarks.klee_cases]]
+title = "appliedCryp 3-WAY"
+bitcode = "benchmarks/appliedCryp/klee_fix_pub_3way.bc"
+result_name = "appliedcryp_3way"
+replay_script = "benchmarks/appliedCryp/klee_fix_pub_replay_3way"
+replay_opts = "--secret key,data"
+ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
+code_path = "benchmarks/appliedCryp"
+memory_flag = true
+
+
+[[benchmarks.klee_cases]]
+title = "appliedCryp DES"
+bitcode = "benchmarks/appliedCryp/klee_fix_pub_des.bc"
+result_name = "appliedcryp_des"
+replay_script = "benchmarks/appliedCryp/klee_fix_pub_replay_des"
+replay_opts = "--secret key,data"
+ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
+code_path = "benchmarks/appliedCryp"
+memory_flag = true
+
+[[benchmarks.klee_cases]]
+title = "appliedCryp LOKI91"
+bitcode = "benchmarks/appliedCryp/klee_fix_pub_loki91.bc"
+result_name = "appliedcryp_loki91"
+replay_script = "benchmarks/appliedCryp/klee_fix_pub_replay_loki91"
+replay_opts = "--secret key,data"
+ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
+code_path = "benchmarks/appliedCryp"
+memory_flag = true

@@ -1,0 +1,11 @@
+[campaign]
+abacus_root = "/path/to/abacus"
+num_copies = 10
+tmp_dir = "/tmp"
+output = "results/abacus_experiments"
+sym_sizes = [4, 16]
+
+[benchmarks]
+# Leave the array empty to keep the default ABACUS benchmark set.
+# Example: abacus = ["mbedtls"]
+abacus = []

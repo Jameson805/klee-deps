@@ -30,6 +30,8 @@ _NON_CT_CEX_RE = re.compile(
 )
 _ANY_TS_RE = re.compile(r"^\[(?P<ts>[0-9]+(?:\.[0-9]+)?)\]")
 _REPRO_LINE_RE = re.compile(r"0x[0-9a-fA-F]+:\s+(?P<file>.+?):(?P<line>[0-9]+):(?P<col>[0-9]+)\s*$")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, "..", ".."))
 
 
 def _parse_counterexample_tokens(raw: str) -> Dict[str, int]:
@@ -260,6 +262,7 @@ def _run_reproduce(
         capture_output=True,
         text=True,
         check=False,
+        cwd=_REPO_ROOT,
     )
     out = (proc.stdout or "") + "\n" + (proc.stderr or "")
     if proc.returncode != 0:
@@ -270,6 +273,130 @@ def _run_reproduce(
         if m:
             return (m.group("file"), int(m.group("line")), int(m.group("col"))), proc.returncode, out
     return None, proc.returncode, out
+
+
+def convert_self_comp_log(
+    *,
+    log_path: str,
+    output_path: str | None = None,
+    sym_size: int = 4,
+    reproduce: bool = False,
+    replay_executable: str | None = None,
+    secret_layout: str = "",
+    public_layout: str = "",
+    reproduce_module: str | None = None,
+    reproduce_timeout: int = 1200,
+    pin_root: str | None = None,
+    code_root: str | None = None,
+    library: str,
+) -> Dict[str, object]:
+    if not os.path.isfile(log_path):
+        raise FileNotFoundError(f"log not found: {log_path}")
+
+    if reproduce:
+        if not replay_executable:
+            raise ValueError("replay_executable is required with reproduce=True")
+        if not os.path.isfile(replay_executable):
+            raise FileNotFoundError(f"replay executable not found: {replay_executable}")
+        if not reproduce_module:
+            reproduce_module = "tools.postprocess.reproduce_positives"
+
+    code_root_abs = os.path.abspath(code_root) if code_root else None
+    _parse_named_layout(secret_layout)
+    _parse_named_layout(public_layout)
+    data = parse_log_rows(log_path, code_root_abs, library)
+
+    if reproduce:
+        for row in data:
+            filename = row.get("filename")
+            line_no = row.get("line")
+            col_no = row.get("column")
+            cex = row.get("counterexamples")
+            if not isinstance(filename, str) or not isinstance(line_no, int) or not isinstance(col_no, int):
+                continue
+            if not isinstance(cex, dict):
+                row["reproduced_status"] = STATUS_LOCATION_MISMATCH
+                print("[reproduce] skipped: missing counterexamples", file=sys.stderr, flush=True)
+                continue
+
+            reported_loc = format_location(filename, line_no, col_no)
+            print(f"[reproduce] reported={reported_loc}", file=sys.stderr, flush=True)
+
+            loc, rc, _ = _run_reproduce(
+                reproduce_module=str(reproduce_module),
+                replay_executable=str(replay_executable),
+                sym_size=int(sym_size),
+                cex=cex,
+                secret_layout_spec=str(secret_layout),
+                public_layout_spec=str(public_layout),
+                timeout_s=int(reproduce_timeout),
+                pin_root=pin_root,
+            )
+
+            if loc is None:
+                if rc == 124:
+                    row["reproduced_status"] = STATUS_TIMEOUT
+                elif rc == 1:
+                    row["reproduced_status"] = STATUS_IDENTICAL_TRACE
+                elif rc in (0, 3):
+                    row["reproduced_status"] = STATUS_LOCATION_MISMATCH
+                else:
+                    raise RuntimeError(f"reproduction failed with rc={rc}")
+                print(
+                    f"[reproduce] {row['reproduced_status']} rc={rc}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                continue
+
+            rep_file, rep_line, rep_col = loc
+            reproduced = (
+                os.path.basename(rep_file) == os.path.basename(filename)
+                and rep_line == line_no
+                and rep_col == col_no
+            )
+            row["reproduced_status"] = STATUS_SUCCESS if reproduced else STATUS_LOCATION_MISMATCH
+            print(
+                f"[reproduce] {'SUCCESS' if reproduced else 'FAIL'} divergence={format_location(rep_file, rep_line, rep_col)}",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    normalized_data: List[Dict[str, object]] = []
+    for row in data:
+        optional = {
+            k: v
+            for k, v in row.items()
+            if k not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
+        }
+        counterexamples = row.get("counterexamples")
+        normalized_data.append(
+            make_result_row(
+                filename=row.get("filename"),
+                line=row.get("line"),
+                non_ct_time=row.get("non_ct_time"),
+                counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
+                reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
+                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else library,
+                optional_fields=optional,
+            )
+        )
+
+    payload: Dict[str, object] = build_payload(
+        normalized_data,
+        optional_dtypes={
+            "column": "Int64",
+            "code": "object",
+        },
+    )
+
+    if output_path:
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+
+    return payload
 
 
 def main(argv: List[str]) -> int:
@@ -319,129 +446,24 @@ def main(argv: List[str]) -> int:
     )
     args = p.parse_args(argv)
 
-    if not os.path.isfile(args.log):
-        print(f"Error: log not found: {args.log}", file=sys.stderr)
-        return 2
-
-    reproduce_module = args.reproduce_module
-    if args.reproduce and not reproduce_module:
-        reproduce_module = "tools.postprocess.reproduce_positives"
-
-    if args.reproduce:
-        if not args.replay_executable:
-            print("Error: --replay-executable is required with --reproduce", file=sys.stderr)
-            return 2
-        if not os.path.isfile(args.replay_executable):
-            print(f"Error: replay executable not found: {args.replay_executable}", file=sys.stderr)
-            return 2
-        if not reproduce_module:
-            print("Error: missing reproduction module", file=sys.stderr)
-            return 2
-
-    code_root = os.path.abspath(args.code_root) if args.code_root else None
     try:
-        _parse_named_layout(args.secret_layout)
-        _parse_named_layout(args.public_layout)
-    except ValueError as err:
+        convert_self_comp_log(
+            log_path=args.log,
+            output_path=args.out,
+            sym_size=args.sym_size,
+            reproduce=args.reproduce,
+            replay_executable=args.replay_executable,
+            secret_layout=args.secret_layout,
+            public_layout=args.public_layout,
+            reproduce_module=args.reproduce_module,
+            reproduce_timeout=args.reproduce_timeout,
+            pin_root=args.pin_root,
+            code_root=args.code_root,
+            library=args.library,
+        )
+    except (FileNotFoundError, RuntimeError, ValueError) as err:
         print(f"Error: {err}", file=sys.stderr)
         return 2
-
-    data = parse_log_rows(args.log, code_root, args.library)
-
-    if args.reproduce:
-        for row in data:
-            filename = row.get("filename")
-            line_no = row.get("line")
-            col_no = row.get("column")
-            cex = row.get("counterexamples")
-            if not isinstance(filename, str) or not isinstance(line_no, int) or not isinstance(col_no, int):
-                continue
-            if not isinstance(cex, dict):
-                row["reproduced_status"] = STATUS_LOCATION_MISMATCH
-                print("[reproduce] skipped: missing counterexamples", file=sys.stderr, flush=True)
-                continue
-
-            reported_loc = format_location(filename, line_no, col_no)
-            print(f"[reproduce] reported={reported_loc}", file=sys.stderr, flush=True)
-
-            loc, rc, _ = _run_reproduce(
-                reproduce_module=str(reproduce_module),
-                replay_executable=str(args.replay_executable),
-                sym_size=int(args.sym_size),
-                cex=cex,
-                secret_layout_spec=str(args.secret_layout),
-                public_layout_spec=str(args.public_layout),
-                timeout_s=int(args.reproduce_timeout),
-                pin_root=args.pin_root,
-            )
-
-            if loc is None:
-                if rc == 124:
-                    row["reproduced_status"] = STATUS_TIMEOUT
-                elif rc == 1:
-                    row["reproduced_status"] = STATUS_IDENTICAL_TRACE
-                elif rc in (0, 3):
-                    row["reproduced_status"] = STATUS_LOCATION_MISMATCH
-                else:
-                    print(
-                        f"[reproduce] operational failure rc={rc}; aborting batch",
-                        file=sys.stderr,
-                        flush=True,
-                    )
-                    return rc if rc != 0 else 2
-                print(
-                    f"[reproduce] {row['reproduced_status']} rc={rc}",
-                    file=sys.stderr,
-                    flush=True,
-                )
-                continue
-
-            rep_file, rep_line, rep_col = loc
-            reproduced = (
-                os.path.basename(rep_file) == os.path.basename(filename)
-                and rep_line == line_no
-                and rep_col == col_no
-            )
-            row["reproduced_status"] = STATUS_SUCCESS if reproduced else STATUS_LOCATION_MISMATCH
-            print(
-                f"[reproduce] {'SUCCESS' if reproduced else 'FAIL'} divergence={format_location(rep_file, rep_line, rep_col)}",
-                file=sys.stderr,
-                flush=True,
-            )
-
-    normalized_data: List[Dict[str, object]] = []
-    for row in data:
-        optional = {
-            k: v
-            for k, v in row.items()
-            if k not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
-        }
-        counterexamples = row.get("counterexamples")
-        normalized_data.append(
-            make_result_row(
-                filename=row.get("filename"),
-                line=row.get("line"),
-                non_ct_time=row.get("non_ct_time"),
-                counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
-                reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
-                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else args.library,
-                optional_fields=optional,
-            )
-        )
-    data = normalized_data
-
-    payload: Dict[str, object] = build_payload(
-        data,
-        optional_dtypes={
-            "column": "Int64",
-            "code": "object",
-        },
-    )
-
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-        f.write("\n")
 
     return 0
 

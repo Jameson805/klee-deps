@@ -4,8 +4,8 @@ BearSSL Runner Integration
 This directory contains two BearSSL CBC benchmarks integrated with the shared
 runner artifact generator:
 
-- `binsec_aes_big`, configured by `configs/runner/bearssl_aes_big_runner_config.json`
-- `appliedcryp_des`, configured by `configs/runner/bearssl_des_tab_runner_config.json`
+- `binsec_aes_big`, configured by `configs/runner/bearssl_aes_big_runner_config.toml`
+- `appliedcryp_des`, configured by `configs/runner/bearssl_des_tab_runner_config.toml`
 
 The integration intentionally preserves the original benchmark shape as closely
 as possible while reducing unnecessary symbolic state.

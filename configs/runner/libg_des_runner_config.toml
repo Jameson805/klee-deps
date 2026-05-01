@@ -1,0 +1,27 @@
+[[inputs]]
+id = "key_buf"
+name = "key"
+kind = "secret"
+size = 24
+
+[[inputs]]
+id = "data_buf"
+name = "data"
+kind = "secret"
+size = 64
+
+[mode_policy.var_pub]
+public_symbolic = true
+
+[mode_policy.fix_pub]
+public_symbolic = false
+
+[mode_policy.abacus]
+secret_inputs = ["key_buf", "data_buf"]
+public_fixed = true
+
+[presets.default.vars]
+
+[presets.default.abacus_secrets]
+key_buf = 0
+data_buf = 0

@@ -1,0 +1,62 @@
+[[benchmarks]]
+benchmark_id = "pycrypto"
+display_name = "PyCrypto"
+library_id = "unknown"
+code_path = "benchmarks/pycrypto"
+path_prefixes = ["benchmarks/pycrypto/"]
+tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
+
+[benchmarks.builds.abacus]
+script = "benchmarks/pycrypto/build.sh"
+tool_flag = "--abacus"
+preset = "default"
+
+[benchmarks.builds.self_comp]
+script = "benchmarks/pycrypto/build.sh"
+tool_flag = "--self-comp"
+preset = "default"
+
+[benchmarks.builds.binsec]
+script = "benchmarks/pycrypto/build.sh"
+tool_flag = "--binsec"
+preset = "default"
+
+[benchmarks.builds.klee]
+script = "benchmarks/pycrypto/build.sh"
+tool_flag = "--klee"
+preset = "default"
+
+[benchmarks.build_aliases]
+klee_cf = "klee"
+klee_eager = "klee"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/pycrypto/abacus_fix_pub_arc4"
+outfile = "pycrypto_arc4.txt"
+runner_config = "configs/runner/pycrypto_arc4_runner_config.toml"
+preset_name = "default"
+
+[[benchmarks.self_comp_cases]]
+title = "PyCrypto ARC4 (Self-Comp)"
+bitcode = "benchmarks/pycrypto/self_comp_fix_pub_arc4.bc"
+result_name = "pycrypto_arc4_self_comp"
+json_name = "pycrypto_arc4.json"
+replay_executable = "klee_fix_pub_replay_arc4"
+secret_layout = "key:32"
+
+[[benchmarks.binsec_cases]]
+title = "PyCrypto ARC4"
+sse_script = "benchmarks/pycrypto/generated/binsec_fix_pub.cfg"
+stats_file = "pycrypto_arc4.toml"
+executable = "benchmarks/pycrypto/binsec_fix_pub_arc4"
+secret_inputs = ["key:32:key_buf"]
+
+[[benchmarks.klee_cases]]
+title = "PyCrypto ARC4"
+bitcode = "benchmarks/pycrypto/klee_fix_pub_arc4.bc"
+result_name = "pycrypto_arc4"
+replay_script = "benchmarks/pycrypto/klee_fix_pub_replay_arc4"
+replay_opts = "--secret key"
+ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
+code_path = "benchmarks/pycrypto"
+memory_flag = true

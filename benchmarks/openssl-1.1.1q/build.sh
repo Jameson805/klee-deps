@@ -7,10 +7,10 @@ cd "$script_dir"
 KLEE_PATH="../../klee-controlflow"
 
 usage() {
-    echo "Usage: $0 [--skip-deps] [--sliced] (--klee-cf | --binsec | --abacus | --self-comp) --preset NAME"
+    echo "Usage: $0 [--skip-deps] [--sliced] (--klee | --binsec | --abacus | --self-comp) --preset NAME"
     echo "  --skip-deps    Skip building OpenSSL (Configure/make)"
     echo "  --sliced       Link crypto/bin/bn_exp.c -> crypto/bin/bn_exp_sliced.c (default: -> bn_exp_orig.c)"
-    echo "  --klee-cf      Build KLEE bitcode and Replay binaries"
+    echo "  --klee         Build KLEE bitcode and Replay binaries"
     echo "  --binsec       Build BINSEC binaries"
     echo "  --abacus       Build Abacus binaries"
     echo "  --self-comp    Build self-composition KLEE bitcode"
@@ -38,13 +38,13 @@ while [[ $# -gt 0 ]]; do
             SLICED=1
             shift
             ;;
-        --klee-cf|--binsec|--abacus|--self-comp)
+        --klee|--binsec|--abacus|--self-comp)
             if [[ -n "$MODE" ]]; then
-                echo "Multiple build modes specified. Choose exactly one of --klee-cf, --binsec, --abacus, --self-comp."
+                echo "Multiple build modes specified. Choose exactly one of --klee, --binsec, --abacus, --self-comp."
                 exit 1
             fi
             case "$1" in
-                --klee-cf)   MODE="klee_cf"   ;;
+                --klee)      MODE="klee"      ;;
                 --binsec)    MODE="binsec"    ;;
                 --abacus)    MODE="abacus"    ;;
                 --self-comp) MODE="self_comp" ;;
@@ -76,7 +76,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$MODE" ]]; then
-    echo "Missing required build mode. Choose exactly one of --klee-cf, --binsec, --abacus, --self-comp."
+    echo "Missing required build mode. Choose exactly one of --klee, --binsec, --abacus, --self-comp."
     usage
     exit 1
 fi
@@ -116,7 +116,7 @@ fi
 
 mkdir -p generated
 generator_args=(
-    --config "$repo_root/configs/runner/modexp_runner_config.json"
+    --config "$repo_root/configs/runner/modexp_runner_config.toml"
     --header-out "$script_dir/generated/runner_config.generated.h"
     --preset "$PRESET"
 )
@@ -137,7 +137,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     CC=clang
     if [[ "$MODE" == "abacus" ]]; then
         CC=gcc
-    elif [[ "$MODE" == "klee_cf" || "$MODE" == "self_comp" ]]; then
+    elif [[ "$MODE" == "klee" || "$MODE" == "self_comp" ]]; then
         export LLVM_COMPILER=clang
         CC=wllvm
     fi
@@ -181,8 +181,8 @@ algos=( recp mont mont_consttime mont_word )
 for algo in "${algos[@]}"; do
     macro=$(echo "$algo" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g')
 
-    if [[ "$MODE" == "klee_cf" ]]; then
-        # KLEE-controlflow bitcode builds
+    if [[ "$MODE" == "klee" ]]; then
+        # KLEE bitcode builds
         wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF -D${macro} klee_main.c "${libs[@]}" -o "klee_var_pub_${algo}"
         extract-bc "klee_var_pub_${algo}"
         wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF -D${macro} -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "klee_fix_pub_${algo}"

@@ -10,9 +10,6 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
-if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
 from tools.postprocess.aggregate_experiment_groups import parse_column_configuration
 from tools.postprocess.apply_sliced_map import load_sliced_map
 from tools.postprocess.csv_to_latex_table import escape_latex

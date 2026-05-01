@@ -11,10 +11,10 @@ export LLVM_COMPILER=clang
 KLEE_PATH="../../klee-controlflow"
 
 usage() {
-    echo "Usage: $0 [--skip-deps] [--sliced] (--klee-cf | --binsec | --abacus | --self-comp) --preset NAME"
+    echo "Usage: $0 [--skip-deps] [--sliced] (--klee | --binsec | --abacus | --self-comp) --preset NAME"
     echo "  --skip-deps    Skip building libgpg-error and libgcrypt"
     echo "  --sliced       Build libgcrypt-1.10.1-sliced instead of libgcrypt-1.10.1"
-    echo "  --klee-cf      Build KLEE bitcode and Replay binaries"
+    echo "  --klee         Build KLEE bitcode and Replay binaries"
     echo "  --binsec       Build BINSEC binaries"
     echo "  --abacus       Build Abacus binaries"
     echo "  --self-comp    Build self-composition KLEE bitcode"
@@ -44,13 +44,13 @@ while [[ $# -gt 0 ]]; do
             SLICED=1
             shift
             ;;
-        --klee-cf|--binsec|--abacus|--self-comp)
+        --klee|--binsec|--abacus|--self-comp)
             if [[ -n "$MODE" ]]; then
-                echo "Multiple build modes specified. Choose exactly one of --klee-cf, --binsec, --abacus, --self-comp."
+                echo "Multiple build modes specified. Choose exactly one of --klee, --binsec, --abacus, --self-comp."
                 exit 1
             fi
             case "$1" in
-                --klee-cf)   MODE="klee_cf"   ;;
+                --klee)      MODE="klee"      ;;
                 --binsec)    MODE="binsec"    ;;
                 --abacus)    MODE="abacus"    ;;
                 --self-comp) MODE="self_comp" ;;
@@ -82,7 +82,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$MODE" ]]; then
-    echo "Missing required build mode. Choose exactly one of --klee-cf, --binsec, --abacus, --self-comp."
+    echo "Missing required build mode. Choose exactly one of --klee, --binsec, --abacus, --self-comp."
     usage
     exit 1
 fi
@@ -98,7 +98,7 @@ fi
 
 mkdir -p generated
 generator_args=(
-    --config "$repo_root/configs/runner/modexp_runner_config.json"
+    --config "$repo_root/configs/runner/modexp_runner_config.toml"
     --header-out "$script_dir/generated/runner_config.generated.h"
     --preset "$PRESET"
 )
@@ -121,7 +121,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     CC=clang
     if [[ "$MODE" == "abacus" ]]; then
         CC=gcc
-    elif [[ "$MODE" == "klee_cf" || "$MODE" == "self_comp" ]]; then
+    elif [[ "$MODE" == "klee" || "$MODE" == "self_comp" ]]; then
         export LLVM_COMPILER=clang
         CC=wllvm
     fi
@@ -176,8 +176,8 @@ flags=( -g -O0 -I"$repo_root/include" -Igenerated -isystem "${install_root}/incl
 klee_flags=( -I"$KLEE_PATH/include" -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" -lkleeRuntest )
 libs=( "${install_root}/lib/libgcrypt.a" "${install_root}/lib/libgpg-error.a" )
 
-if [[ "$MODE" == "klee_cf" ]]; then
-    # KLEE-controlflow bitcode builds
+if [[ "$MODE" == "klee" ]]; then
+    # KLEE bitcode builds
     wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF klee_main.c "${libs[@]}" -o klee_var_pub
     extract-bc klee_var_pub
 

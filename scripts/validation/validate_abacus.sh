@@ -31,8 +31,8 @@ Options:
   -h, --help               Show this help
 
 Notes:
-  - This script is intended to run on the host, outside the Abacus container.
-    - It validates the JSON produced by scripts/experiments/run_abacus.sh using host-side klee_fix_pub_replay executables.
+    - This script is intended to run on the host, outside the Abacus container.
+    - It validates the JSON produced by python -m scripts.experiments.run_abacus using host-side klee_fix_pub_replay executables.
 EOF
 }
 
@@ -339,12 +339,12 @@ for json_file in "${json_files[@]}"; do
         echo "Replay executable not found: $replay_exe"
         case "$json_name" in
             bearssl_aes_big.json|bearssl_des_tab.json|openssl_almeida_tls_rempad_luk13.json|appliedcryp_3way.json|appliedcryp_des.json|appliedcryp_loki91.json|ghostrider_findmax.json|ghostrider_matmul.json|libg_des.json|pycrypto_arc4.json)
-                echo "Building with $build_script --klee-cf --preset default"
-                "$build_script" --klee-cf --preset default
+                echo "Building with $build_script --klee --preset default"
+                "$build_script" --klee --preset default
                 ;;
             *)
-                echo "Building with $build_script --klee-cf --preset size_$sym_size"
-                "$build_script" --klee-cf --preset "size_$sym_size"
+                echo "Building with $build_script --klee --preset size_$sym_size"
+                "$build_script" --klee --preset "size_$sym_size"
                 ;;
         esac
     fi

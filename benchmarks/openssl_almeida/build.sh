@@ -9,13 +9,12 @@ KLEE_PATH="../../klee-controlflow"
 
 usage() {
     cat <<EOF
-Usage: $0 (--klee-cf | --klee-eager | --self-comp | --binsec | --abacus) [--preset NAME]
+Usage: $0 (--klee | --self-comp | --binsec | --abacus) [--preset NAME]
 
 Builds the OpenSSL Almeida tls-rempad-luk13 benchmark wrapper for the requested mode.
 
 Modes:
-  --klee-cf     Build KLEE-CF executables and bitcode
-  --klee-eager  Build KLEE-Eager executables and bitcode
+    --klee        Build KLEE executables and bitcode
   --self-comp   Build self-comp bitcode artifacts
   --binsec      Build BINSEC executables (32-bit)
   --abacus      Build Abacus executables (32-bit)
@@ -39,12 +38,8 @@ NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --klee-cf)
-            MODE="klee_cf"
-            shift
-            ;;
-        --klee-eager)
-            MODE="klee_eager"
+        --klee)
+            MODE="klee"
             shift
             ;;
         --self-comp)
@@ -93,7 +88,7 @@ if command -v wllvm >/dev/null 2>&1 && [[ -z "${LLVM_COMPILER:-}" ]]; then
     export LLVM_COMPILER=clang
 fi
 
-config_path="$repo_root/configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.json"
+config_path="$repo_root/configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml"
 generated_dir="$script_dir/generated"
 wrapper_source="tls_rempad_luk13_wrapper.c"
 
@@ -200,7 +195,7 @@ build_abacus_mode() {
 }
 
 case "$MODE" in
-    klee_cf|klee_eager)
+    klee)
         build_klee_mode
         ;;
     self_comp)

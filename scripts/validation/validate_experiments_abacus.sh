@@ -5,7 +5,7 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$script_dir"
 
-# Hard-coded default output root from run_experiments_abacus.sh
+# Default output root from configs/experiments/run_experiments_abacus.toml
 output_base="$repo_root/results/abacus_experiments"
 sym_sizes=(4 16)
 parallel=false

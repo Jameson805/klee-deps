@@ -508,6 +508,93 @@ def default_title_for_toml_name(toml_path: str) -> Optional[str]:
     return None
 
 
+def convert_binsec_toml(
+    *,
+    toml_path: str,
+    output_log: str,
+    executable: str,
+    sym_size: int = 4,
+    secret_inputs: List[str] | None = None,
+    public_inputs: List[str] | None = None,
+    replay_executable: str | None = None,
+    reproduce: bool = False,
+    reproduce_module: str | None = None,
+    reproduce_timeout: int = 1200,
+    pin_root: str | None = None,
+    output_path: str | None = None,
+    title: str | None = None,
+    code_path: str | None = None,
+    library: str,
+) -> Dict[str, object]:
+    if tomllib is None:
+        raise RuntimeError("tomllib not available; use Python 3.11+")
+
+    title = title or default_title_for_toml_name(toml_path)
+    needs_publics = bool(re.search(r"_var_pub\.toml$", os.path.basename(toml_path)))
+    secret_layouts = _parse_input_layouts(secret_inputs or [], [("exp", sym_size, "exp_buf")], "secret")
+    public_layouts = _parse_input_layouts(
+        public_inputs or [],
+        [("base", sym_size, "base_buf"), ("mod", sym_size, "mod_buf")] if needs_publics else [],
+        "public",
+    )
+
+    reproduce_module = reproduce_module or ("tools.postprocess.reproduce_positives" if reproduce else None)
+    if reproduce and not replay_executable:
+        raise ValueError("replay_executable is required when reproduce=True")
+
+    insecure_addrs, models = parse_binsec_toml(toml_path)
+    leaks = parse_output_log(output_log, title=title)
+    rows = build_rows(
+        insecure_addrs=insecure_addrs,
+        models=models,
+        leaks=leaks,
+        addr_executable=executable,
+        code_root=code_path,
+        library=library,
+        secret_inputs=secret_layouts,
+        public_inputs=public_layouts,
+        reproduce_module=reproduce_module if reproduce else None,
+        replay_executable=replay_executable if reproduce else None,
+        reproduce_timeout_s=reproduce_timeout,
+        pin_root=pin_root if reproduce else None,
+    )
+
+    validated_rows: List[Dict[str, Any]] = []
+    for row in rows:
+        optional = {
+            k: v
+            for k, v in row.items()
+            if k not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
+        }
+        counterexamples = row.get("counterexamples")
+        validated_rows.append(
+            make_result_row(
+                filename=row.get("filename"),
+                line=row.get("line"),
+                non_ct_time=row.get("non_ct_time"),
+                counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
+                reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
+                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else library,
+                optional_fields=optional,
+            )
+        )
+
+    payload = build_payload(
+        validated_rows,
+        optional_dtypes={
+            "column": "Int64",
+            "code": "object",
+        },
+    )
+
+    if output_path:
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+
+    return payload
+
+
 def main(argv: List[str]) -> int:
     p = argparse.ArgumentParser(
         description=(
@@ -598,10 +685,6 @@ def main(argv: List[str]) -> int:
 
     args = p.parse_args(argv)
 
-    if tomllib is None:
-        print("Error: tomllib not available; use Python 3.11+", file=sys.stderr)
-        return 2
-
     if get_addr_info is None:
         print(
             "Warning: failed to import addrinfo.get_addr_info; filename/line/column will be null. "
@@ -609,91 +692,27 @@ def main(argv: List[str]) -> int:
             file=sys.stderr,
         )
 
-    title = args.title or default_title_for_toml_name(args.toml)
-
-    needs_publics = bool(re.search(r"_var_pub\.toml$", os.path.basename(args.toml)))
-
     try:
-        secret_inputs = _parse_input_layouts(
-            args.secret_input,
-            [("exp", args.sym_size, "exp_buf")],
-            "secret",
-        )
-        public_inputs = _parse_input_layouts(
-            args.public_input,
-            [("base", args.sym_size, "base_buf"), ("mod", args.sym_size, "mod_buf")] if needs_publics else [],
-            "public",
-        )
-    except ValueError as err:
-        print(f"Error: {err}", file=sys.stderr)
-        return 2
-
-    reproduce_module = args.reproduce_module
-    if args.reproduce and reproduce_module is None:
-        reproduce_module = "tools.postprocess.reproduce_positives"
-
-    if args.reproduce:
-        if not reproduce_module:
-            print("Error: missing reproduction module", file=sys.stderr)
-            return 2
-        if not args.replay_executable:
-            print("Error: --replay-executable is required when --reproduce is set", file=sys.stderr)
-            return 2
-
-    insecure_addrs, models = parse_binsec_toml(args.toml)
-    leaks = parse_output_log(args.output_log, title=title)
-
-    try:
-        rows = build_rows(
-            insecure_addrs=insecure_addrs,
-            models=models,
-            leaks=leaks,
-            addr_executable=args.executable,
-            code_root=args.code_path,
+        convert_binsec_toml(
+            toml_path=args.toml,
+            output_log=args.output_log,
+            executable=args.executable,
+            sym_size=args.sym_size,
+            secret_inputs=args.secret_input,
+            public_inputs=args.public_input,
+            replay_executable=args.replay_executable,
+            reproduce=args.reproduce,
+            reproduce_module=args.reproduce_module,
+            reproduce_timeout=args.reproduce_timeout,
+            pin_root=args.pin_root,
+            output_path=args.out,
+            title=args.title,
+            code_path=args.code_path,
             library=args.library,
-            secret_inputs=secret_inputs,
-            public_inputs=public_inputs,
-            reproduce_module=reproduce_module if args.reproduce else None,
-            replay_executable=args.replay_executable if args.reproduce else None,
-            reproduce_timeout_s=args.reproduce_timeout,
-            pin_root=args.pin_root if args.reproduce else None,
         )
-    except RuntimeError as err:
+    except (FileNotFoundError, RuntimeError, ValueError) as err:
         print(f"Error: {err}", file=sys.stderr)
         return 2
-
-    validated_rows: List[Dict[str, Any]] = []
-    for row in rows:
-        optional = {
-            k: v
-            for k, v in row.items()
-            if k not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
-        }
-        counterexamples = row.get("counterexamples")
-        validated_rows.append(
-            make_result_row(
-                filename=row.get("filename"),
-                line=row.get("line"),
-                non_ct_time=row.get("non_ct_time"),
-                counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
-                reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
-                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else args.library,
-                optional_fields=optional,
-            )
-        )
-    rows = validated_rows
-
-    out_obj = build_payload(
-        rows,
-        optional_dtypes={
-            "column": "Int64",
-            "code": "object",
-        },
-    )
-
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(out_obj, f, indent=2)
 
     return 0
 

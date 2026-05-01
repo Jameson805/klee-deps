@@ -15,9 +15,6 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple
 
-if __package__ in {None, ""}:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-
 from tools.shared.result_schema import (
     STATUS_IDENTICAL_TRACE,
     STATUS_LOCATION_MISMATCH,
@@ -1090,6 +1087,102 @@ def mode_abacus_json(
     return 0
 
 
+def reproduce_json_positives(
+    *,
+    input_json: str,
+    klee_output: str,
+    executable: str,
+    secret: str,
+    public: str = "",
+    timeout: int = 300,
+    output: Optional[str] = None,
+    library: str = "unknown",
+    pin_root: Optional[str] = None,
+    debug: bool = False,
+) -> int:
+    return mode_dataframe(
+        input_json=input_json,
+        klee_output=klee_output,
+        executable=executable,
+        secret=secret,
+        public=public,
+        timeout=timeout,
+        output=output,
+        library=library,
+        pin_root=pin_root,
+        debug=debug,
+    )
+
+
+def reproduce_ktest_positive(
+    *,
+    executable: str,
+    ktest_file: str,
+    secret: str,
+    public: str = "",
+    timeout: int = 300,
+    pin_root: Optional[str] = None,
+    debug: bool = False,
+) -> int:
+    return mode_ktest_file(
+        executable=executable,
+        ktest_file=ktest_file,
+        secret=secret,
+        public=public,
+        timeout=timeout,
+        pin_root=pin_root,
+        debug=debug,
+    )
+
+
+def reproduce_input_values(
+    *,
+    executable: str,
+    secret_spec: str,
+    public_spec: str,
+    timeout: int = 300,
+    pin_root: Optional[str] = None,
+    debug: bool = False,
+    expected_filename: Optional[str] = None,
+    expected_line: Optional[int] = None,
+    expected_column: Optional[int] = None,
+) -> int:
+    return mode_input_values(
+        executable=executable,
+        secret_spec=secret_spec,
+        public_spec=public_spec,
+        timeout=timeout,
+        pin_root=pin_root,
+        debug=debug,
+        expected_filename=expected_filename,
+        expected_line=expected_line,
+        expected_column=expected_column,
+    )
+
+
+def reproduce_abacus_json_positives(
+    *,
+    input_json: str,
+    executable: str,
+    sym_size: int = 4,
+    timeout: int = 300,
+    output: Optional[str] = None,
+    library: str = "unknown",
+    pin_root: Optional[str] = None,
+    debug: bool = False,
+) -> int:
+    return mode_abacus_json(
+        input_json=input_json,
+        executable=executable,
+        sym_size=sym_size,
+        timeout=timeout,
+        output=output,
+        library=library,
+        pin_root=pin_root,
+        debug=debug,
+    )
+
+
 def build_parsers_and_dispatch(argv: List[str]) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -1098,7 +1191,7 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
         )
     )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--json", help="Path to the combined JSON produced by compare_with_ctchecker.py.")
+    group.add_argument("--json", help="Path to the combined JSON produced by klee_log_to_json.py or postprocess comparison.")
     group.add_argument("--file", help="Path to a single KLEE .ktest file.")
     group.add_argument(
         "--input",
@@ -1197,9 +1290,9 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
     )
 
 
-def main() -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
-        return build_parsers_and_dispatch(sys.argv[1:])
+        return build_parsers_and_dispatch(list(sys.argv[1:] if argv is None else argv))
     except RuntimeError as err:
         print(f"Error: {err}", file=sys.stderr)
         return 2

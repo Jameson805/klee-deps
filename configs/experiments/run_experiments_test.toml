@@ -1,0 +1,65 @@
+[campaign]
+num_copies = 3
+temp_dir = "/datapool/theta-lin-experiments/tmp"
+output = "/datapool/theta-lin-experiments/test"
+run_time = "2m"
+klee_root = "/home/theta-lin/klee/build/bin"
+pin_root = "/datapool/theta-lin/pin-external-4.2-99776-g21d818fa2-gcc-linux"
+sliced_map_csv = "configs/postprocess/sliced_map.csv"
+filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
+ideal_config_selection_csv = "configs/postprocess/ideal_config_selection.csv"
+by_library_output_prefix = "filtered_reproduction_status_by_library"
+
+[benchmarks]
+all = ["mbedtls"]
+
+[runs]
+klee_cf_default_4 = true
+klee_cf_default_16 = false
+klee_cf_dfs_4 = false
+klee_cf_dfs_16 = false
+klee_cf_rand_path_dfs_4 = false
+klee_cf_rand_path_dfs_16 = false
+klee_cf_no_conc_4 = false
+klee_eager_default_4 = true
+klee_eager_default_16 = false
+klee_eager_dfs_4 = false
+klee_eager_dfs_16 = false
+klee_eager_rand_path_dfs_4 = false
+klee_eager_rand_path_dfs_16 = false
+self_comp_default_4 = false
+self_comp_default_16 = false
+self_comp_dfs_4 = true
+self_comp_dfs_16 = false
+self_comp_rand_path_dfs_4 = false
+self_comp_rand_path_dfs_16 = false
+binsec_4 = true
+binsec_16 = false
+
+[run_definitions.klee_cf_default_4]
+tag = "KLEE CF Default 4"
+tool = "klee_cf"
+source = "results/klee_cf_results"
+destination = "klee_cf_default_4"
+command = ["{python_bin}", "-m", "scripts.experiments.run_klee_cf", "{run_time}", "--sym-size", "4"]
+
+[run_definitions.klee_eager_default_4]
+tag = "KLEE Eager Default 4"
+tool = "klee_eager"
+source = "results/klee_eager_results"
+destination = "klee_eager_default_4"
+command = ["{python_bin}", "-m", "scripts.experiments.run_klee_eager", "{run_time}", "--sym-size", "4"]
+
+[run_definitions.self_comp_dfs_4]
+tag = "Self Comp DFS 4"
+tool = "self_comp"
+source = "results/self_comp_results"
+destination = "self_comp_dfs_4"
+command = ["{python_bin}", "-m", "scripts.experiments.run_self_comp", "--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "dfs", "--sym-size", "4"]
+
+[run_definitions.binsec_4]
+tag = "Binsec 4"
+tool = "binsec"
+source = "results/binsec_results"
+destination = "binsec_4"
+command = ["{python_bin}", "-m", "scripts.experiments.run_binsec", "{run_time}", "--sym-size", "4"]

@@ -1,0 +1,78 @@
+[[inputs]]
+id = "exp_buf"
+name = "exp"
+kind = "secret"
+size = "SYM_SIZE"
+
+[[inputs]]
+id = "base_buf"
+name = "base"
+kind = "public"
+size = "SYM_SIZE"
+
+[[inputs]]
+id = "mod_buf"
+name = "mod"
+kind = "public"
+size = "SYM_SIZE"
+constraints = ["top_bit_set", "odd"]
+
+[mode_policy.var_pub]
+public_symbolic = true
+
+[mode_policy.fix_pub]
+public_symbolic = false
+
+[mode_policy.abacus]
+secret_inputs = ["exp_buf"]
+public_fixed = true
+
+[presets.size_1.macros]
+SYM_SIZE = 1
+
+[presets.size_1.vars]
+base_buf = 0x03
+mod_buf = 0xfb
+
+[presets.size_1.abacus_secrets]
+exp_buf = 0xf1
+
+[presets.size_2.macros]
+SYM_SIZE = 2
+
+[presets.size_2.vars]
+base_buf = 0xfb
+mod_buf = 0xfff1
+
+[presets.size_2.abacus_secrets]
+exp_buf = 0xffef
+
+[presets.size_4.macros]
+SYM_SIZE = 4
+
+[presets.size_4.vars]
+base_buf = 0xfb
+mod_buf = 0xfffffffb
+
+[presets.size_4.abacus_secrets]
+exp_buf = 0xffffffef
+
+[presets.size_8.macros]
+SYM_SIZE = 8
+
+[presets.size_8.vars]
+base_buf = 0xfb
+mod_buf = 0xffffffffffffffc5
+
+[presets.size_8.abacus_secrets]
+exp_buf = 0xffffffffffffffad
+
+[presets.size_16.macros]
+SYM_SIZE = 16
+
+[presets.size_16.vars]
+base_buf = 0xfb
+mod_buf = 0xffffffffffffffffffffffffffffff61
+
+[presets.size_16.abacus_secrets]
+exp_buf = 0xffffffffffffffffffffffffffffff53

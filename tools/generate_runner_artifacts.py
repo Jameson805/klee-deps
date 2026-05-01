@@ -1,12 +1,34 @@
 #!/usr/bin/env python3
 import argparse
-import ast
 import os
+from pathlib import Path
 import re
 import sys
+import tomllib
+
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def load_runner_config(config_path: str | Path) -> dict[str, object]:
+    path = Path(config_path)
+
+    try:
+        with path.open("rb") as handle:
+            config = tomllib.load(handle)
+    except OSError as exc:
+        raise ValueError(f"failed to load runner config {path}: {exc}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f"failed to parse runner config {path}: {exc}") from exc
+
+    if not isinstance(config, dict):
+        raise ValueError(f"runner config {path} root must be a table")
+
+    return config
 
 
 def _die(msg: str) -> None:
@@ -59,11 +81,10 @@ def _normalize_preset_bytes(label: str, resolved_size: int, value: object) -> li
 
 
 def _load_resolved_config(config_path: str, selected_preset_name: str | None) -> dict[str, object]:
-    with open(config_path, "r", encoding="utf-8") as f:
-        try:
-            cfg = ast.literal_eval(f.read())
-        except Exception as exc:
-            _die(f"Failed to parse config {config_path}: {exc}")
+    try:
+        cfg = load_runner_config(config_path)
+    except ValueError as exc:
+        _die(str(exc))
 
     if not isinstance(cfg, dict):
         _die("config root must be a dictionary")

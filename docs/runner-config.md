@@ -2,13 +2,13 @@
 
 A runner config describes the benchmark buffers and preset values that are materialized into generated runner artifacts at build time.
 
-The current shared modular-exponentiation config lives at `configs/runner/modexp_runner_config.json`. Mbed TLS, Libgcrypt, and OpenSSL 1.1.1q all consume this same config and emit benchmark-local artifacts under their own `generated/` directories.
+The current shared modular-exponentiation config lives at `configs/runner/modexp_runner_config.toml`. Mbed TLS, Libgcrypt, and OpenSSL 1.1.1q all consume this same config and emit benchmark-local artifacts under their own `generated/` directories.
 
-Not every benchmark needs to share one config source. BearSSL `aes_big` and `des_tab` use benchmark-local configs in `configs/runner/bearssl_aes_big_runner_config.json` and `configs/runner/bearssl_des_tab_runner_config.json` because they keep different effective schedule sizes while still using the same generator and `runner.h` contract. See `benchmarks/bearssl/README.md` for the rationale behind those choices.
+Not every benchmark needs to share one config source. BearSSL `aes_big` and `des_tab` use benchmark-local configs in `configs/runner/bearssl_aes_big_runner_config.toml` and `configs/runner/bearssl_des_tab_runner_config.toml` because they keep different effective schedule sizes while still using the same generator and `runner.h` contract. See `benchmarks/bearssl/README.md` for the rationale behind those choices.
 
-OpenSSL Almeida `tls-rempad-luk13` also uses a benchmark-local config in `configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.json` because it models one secret record buffer plus several fixed-width public control scalars instead of the shared modular-exponentiation buffer shape.
+OpenSSL Almeida `tls-rempad-luk13` also uses a benchmark-local config in `configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml` because it models one secret record buffer plus several fixed-width public control scalars instead of the shared modular-exponentiation buffer shape.
 
-The file is parsed as a Python literal instead of strict JSON. This is intentional: it keeps byte arrays and large integers readable with `0x...` literals and plain `True`/`False` values.
+Runner configs are now TOML. That keeps nested structures readable while still allowing `0x...` integer literals for seeds and preset values.
 
 ## Build Model
 
@@ -71,10 +71,9 @@ This means the compiler command line should not redefine preset-owned macros suc
 - Macro values defined directly in the generated header for that preset.
 - Example:
 
-```python
-"macros": {
-  "SYM_SIZE": 16
-}
+```toml
+[presets.size_16.macros]
+SYM_SIZE = 16
 ```
 
 `vars`
@@ -88,18 +87,16 @@ This means the compiler command line should not redefine preset-owned macros suc
 
 Examples:
 
-```python
-"vars": {
-  "base_buf": 0xfb,
-  "mod_buf": 0xffffffffffffffffffffffffffffff61
-}
+```toml
+[presets.size_16.vars]
+base_buf = 0xfb
+mod_buf = 0xffffffffffffffffffffffffffffff61
 ```
 
-```python
-"vars": {
-  "base_buf": [0x00, 0xfb],
-  "mod_buf": [0xff, 0xf1]
-}
+```toml
+[presets.size_2.vars]
+base_buf = [0x00, 0xfb]
+mod_buf = [0xff, 0xf1]
 ```
 
 `abacus_secrets`
@@ -136,32 +133,43 @@ In this example, `id` keeps the generated C buffer names stable while `name`
 matches the symbolic object names expected by the replay and counterexample
 tooling, and the same `inputs` section is also used to generate BINSEC secret or public declarations.
 
-```python
-{
-  "inputs": [
-    {"id": "exp_buf", "name": "exp", "kind": "secret", "size": "SYM_SIZE"},
-    {"id": "base_buf", "name": "base", "kind": "public", "size": "SYM_SIZE"},
-    {"id": "mod_buf", "name": "mod", "kind": "public", "size": "SYM_SIZE", "constraints": ["top_bit_set", "odd"]}
-  ],
-  "mode_policy": {
-    "var_pub": {"public_symbolic": True},
-    "fix_pub": {"public_symbolic": False},
-    "abacus": {
-      "secret_inputs": ["exp_buf"],
-      "public_fixed": True
-    }
-  },
-  "presets": {
-    "size_1": {
-      "macros": {"SYM_SIZE": 1},
-      "vars": {
-        "base_buf": 0x03,
-        "mod_buf": 0xfb
-      },
-      "abacus_secrets": {
-        "exp_buf": 0xf1
-      }
-    }
-  }
-}
+```toml
+[[inputs]]
+id = "exp_buf"
+name = "exp"
+kind = "secret"
+size = "SYM_SIZE"
+
+[[inputs]]
+id = "base_buf"
+name = "base"
+kind = "public"
+size = "SYM_SIZE"
+
+[[inputs]]
+id = "mod_buf"
+name = "mod"
+kind = "public"
+size = "SYM_SIZE"
+constraints = ["top_bit_set", "odd"]
+
+[mode_policy.var_pub]
+public_symbolic = true
+
+[mode_policy.fix_pub]
+public_symbolic = false
+
+[mode_policy.abacus]
+secret_inputs = ["exp_buf"]
+public_fixed = true
+
+[presets.size_1.macros]
+SYM_SIZE = 1
+
+[presets.size_1.vars]
+base_buf = 0x03
+mod_buf = 0xfb
+
+[presets.size_1.abacus_secrets]
+exp_buf = 0xf1
 ```

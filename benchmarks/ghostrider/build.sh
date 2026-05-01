@@ -9,13 +9,12 @@ KLEE_PATH="../../klee-controlflow"
 
 usage() {
     cat <<EOF
-Usage: $0 (--klee-cf | --klee-eager | --self-comp | --binsec | --abacus) [--preset NAME]
+Usage: $0 (--klee | --self-comp | --binsec | --abacus) [--preset NAME]
 
 Builds the ghostrider findmax/matmul benchmark wrappers for the requested mode.
 
 Modes:
-  --klee-cf     Build KLEE-CF executables and bitcode
-  --klee-eager  Build KLEE-Eager executables and bitcode
+    --klee        Build KLEE executables and bitcode
   --self-comp   Build self-comp bitcode artifacts
   --binsec      Build BINSEC executables (32-bit)
   --abacus      Build Abacus executables (32-bit)
@@ -39,12 +38,8 @@ NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --klee-cf)
-            MODE="klee_cf"
-            shift
-            ;;
-        --klee-eager)
-            MODE="klee_eager"
+        --klee)
+            MODE="klee"
             shift
             ;;
         --self-comp)
@@ -129,10 +124,10 @@ bench_config_for_id() {
     local id="$1"
     case "$id" in
         findmax)
-            printf '%s\n' "$repo_root/configs/runner/ghostrider_findmax_runner_config.json"
+            printf '%s\n' "$repo_root/configs/runner/ghostrider_findmax_runner_config.toml"
             ;;
         matmul)
-            printf '%s\n' "$repo_root/configs/runner/ghostrider_matmul_runner_config.json"
+            printf '%s\n' "$repo_root/configs/runner/ghostrider_matmul_runner_config.toml"
             ;;
         *)
             return 1
@@ -249,7 +244,7 @@ build_abacus_mode() {
 for id in "${bench_ids[@]}"; do
     echo "Building ghostrider benchmark: $id"
     case "$MODE" in
-        klee_cf|klee_eager)
+        klee)
             build_klee_mode "$id"
             ;;
         self_comp)

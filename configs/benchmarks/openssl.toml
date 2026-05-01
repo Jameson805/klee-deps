@@ -1,0 +1,484 @@
+[[benchmarks]]
+benchmark_id = "openssl"
+display_name = "OpenSSL 1.1.1q"
+library_id = "openssl"
+code_path = "benchmarks/openssl-1.1.1q"
+path_prefixes = ["benchmarks/openssl-1.1.1q/"]
+tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
+
+[benchmarks.builds.abacus]
+script = "benchmarks/openssl-1.1.1q/build.sh"
+tool_flag = "--abacus"
+preset = "size_{sym_size}"
+
+[benchmarks.builds.self_comp]
+script = "benchmarks/openssl-1.1.1q/build.sh"
+tool_flag = "--self-comp"
+preset = "size_{sym_size}"
+
+[benchmarks.builds.binsec]
+script = "benchmarks/openssl-1.1.1q/build.sh"
+tool_flag = "--binsec"
+preset = "size_{sym_size}"
+
+[benchmarks.builds.klee]
+script = "benchmarks/openssl-1.1.1q/build.sh"
+tool_flag = "--klee"
+preset = "size_{sym_size}"
+
+[benchmarks.build_aliases]
+klee_cf = "klee"
+klee_eager = "klee"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/openssl-1.1.1q/abacus_fix_pub_recp"
+outfile = "openssl_recp.txt"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/openssl-1.1.1q/abacus_fix_pub_mont"
+outfile = "openssl_mont.txt"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/openssl-1.1.1q/abacus_fix_pub_mont_consttime"
+outfile = "openssl_mont_consttime.txt"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/openssl-1.1.1q/abacus_fix_pub_mont_word"
+outfile = "openssl_mont_word.txt"
+
+[[benchmarks.self_comp_cases]]
+title = "OpenSSL 1.1.1q recp (Fix Pub Self-Comp)"
+bitcode = "benchmarks/openssl-1.1.1q/self_comp_fix_pub_recp.bc"
+result_name = "openssl_recp_self_comp_fix_pub"
+json_name = "openssl_recp_fix_pub.json"
+replay_executable = "klee_fix_pub_replay_recp"
+
+[[benchmarks.self_comp_cases]]
+title = "OpenSSL 1.1.1q recp (Var Pub Self-Comp)"
+bitcode = "benchmarks/openssl-1.1.1q/self_comp_var_pub_recp.bc"
+result_name = "openssl_recp_self_comp_var_pub"
+json_name = "openssl_recp_var_pub.json"
+replay_executable = "klee_var_pub_replay_recp"
+
+[[benchmarks.self_comp_cases]]
+title = "OpenSSL 1.1.1q mont (Fix Pub Self-Comp)"
+bitcode = "benchmarks/openssl-1.1.1q/self_comp_fix_pub_mont.bc"
+result_name = "openssl_mont_self_comp_fix_pub"
+json_name = "openssl_mont_fix_pub.json"
+replay_executable = "klee_fix_pub_replay_mont"
+
+[[benchmarks.self_comp_cases]]
+title = "OpenSSL 1.1.1q mont (Var Pub Self-Comp)"
+bitcode = "benchmarks/openssl-1.1.1q/self_comp_var_pub_mont.bc"
+result_name = "openssl_mont_self_comp_var_pub"
+json_name = "openssl_mont_var_pub.json"
+replay_executable = "klee_var_pub_replay_mont"
+
+[[benchmarks.self_comp_cases]]
+title = "OpenSSL 1.1.1q mont_consttime (Fix Pub Self-Comp)"
+bitcode = "benchmarks/openssl-1.1.1q/self_comp_fix_pub_mont_consttime.bc"
+result_name = "openssl_mont_consttime_self_comp_fix_pub"
+json_name = "openssl_mont_consttime_fix_pub.json"
+replay_executable = "klee_fix_pub_replay_mont_consttime"
+
+[[benchmarks.self_comp_cases]]
+title = "OpenSSL 1.1.1q mont_consttime (Var Pub Self-Comp)"
+bitcode = "benchmarks/openssl-1.1.1q/self_comp_var_pub_mont_consttime.bc"
+result_name = "openssl_mont_consttime_self_comp_var_pub"
+json_name = "openssl_mont_consttime_var_pub.json"
+replay_executable = "klee_var_pub_replay_mont_consttime"
+
+[[benchmarks.self_comp_cases]]
+title = "OpenSSL 1.1.1q mont_word (Fix Pub Self-Comp)"
+bitcode = "benchmarks/openssl-1.1.1q/self_comp_fix_pub_mont_word.bc"
+result_name = "openssl_mont_word_self_comp_fix_pub"
+json_name = "openssl_mont_word_fix_pub.json"
+replay_executable = "klee_fix_pub_replay_mont_word"
+
+[[benchmarks.self_comp_cases]]
+title = "OpenSSL 1.1.1q mont_word (Var Pub Self-Comp)"
+bitcode = "benchmarks/openssl-1.1.1q/self_comp_var_pub_mont_word.bc"
+result_name = "openssl_mont_word_self_comp_var_pub"
+json_name = "openssl_mont_word_var_pub.json"
+replay_executable = "klee_var_pub_replay_mont_word"
+
+[[benchmarks.binsec_cases]]
+title = "OpenSSL 1.1.1q recp (Fix Pub)"
+sse_script = "benchmarks/openssl-1.1.1q/generated/binsec_fix_pub.cfg"
+stats_file = "openssl_recp_fix_pub.toml"
+executable = "benchmarks/openssl-1.1.1q/binsec_fix_pub_recp"
+
+[[benchmarks.binsec_cases]]
+title = "OpenSSL 1.1.1q recp (Var Pub)"
+sse_script = "benchmarks/openssl-1.1.1q/generated/binsec_var_pub.cfg"
+stats_file = "openssl_recp_var_pub.toml"
+executable = "benchmarks/openssl-1.1.1q/binsec_var_pub_recp"
+
+[[benchmarks.binsec_cases]]
+title = "OpenSSL 1.1.1q mont (Fix Pub)"
+sse_script = "benchmarks/openssl-1.1.1q/generated/binsec_fix_pub.cfg"
+stats_file = "openssl_mont_fix_pub.toml"
+executable = "benchmarks/openssl-1.1.1q/binsec_fix_pub_mont"
+
+[[benchmarks.binsec_cases]]
+title = "OpenSSL 1.1.1q mont (Var Pub)"
+sse_script = "benchmarks/openssl-1.1.1q/generated/binsec_var_pub.cfg"
+stats_file = "openssl_mont_var_pub.toml"
+executable = "benchmarks/openssl-1.1.1q/binsec_var_pub_mont"
+
+[[benchmarks.binsec_cases]]
+title = "OpenSSL 1.1.1q mont_consttime (Fix Pub)"
+sse_script = "benchmarks/openssl-1.1.1q/generated/binsec_fix_pub.cfg"
+stats_file = "openssl_mont_consttime_fix_pub.toml"
+executable = "benchmarks/openssl-1.1.1q/binsec_fix_pub_mont_consttime"
+
+[[benchmarks.binsec_cases]]
+title = "OpenSSL 1.1.1q mont_consttime (Var Pub)"
+sse_script = "benchmarks/openssl-1.1.1q/generated/binsec_var_pub.cfg"
+stats_file = "openssl_mont_consttime_var_pub.toml"
+executable = "benchmarks/openssl-1.1.1q/binsec_var_pub_mont_consttime"
+
+[[benchmarks.binsec_cases]]
+title = "OpenSSL 1.1.1q mont_word (Fix Pub)"
+sse_script = "benchmarks/openssl-1.1.1q/generated/binsec_fix_pub.cfg"
+stats_file = "openssl_mont_word_fix_pub.toml"
+executable = "benchmarks/openssl-1.1.1q/binsec_fix_pub_mont_word"
+
+[[benchmarks.binsec_cases]]
+title = "OpenSSL 1.1.1q mont_word (Var Pub)"
+sse_script = "benchmarks/openssl-1.1.1q/generated/binsec_var_pub.cfg"
+stats_file = "openssl_mont_word_var_pub.toml"
+executable = "benchmarks/openssl-1.1.1q/binsec_var_pub_mont_word"
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_recp.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_recp.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_recp.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_recp.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_break_recp.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_recp.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_recp.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_recp.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_mont.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_mont.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_break_mont.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_mont_consttime.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont_consttime.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_mont_consttime.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont_consttime.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_break_mont_consttime.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont_consttime.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont_consttime.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont_consttime.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_mont_word.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont_word.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_mont_word.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont_word.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_break_mont_word.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont_word.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont_word.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont_word.bc"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q recp (Fix Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_fix_pub_recp.bc"
+result_name = "openssl_recp_fix_pub"
+replay_script = "benchmarks/openssl-1.1.1q/klee_fix_pub_replay_recp"
+replay_opts = "--secret exp"
+ct_json = "ctchecker_results/openSSL_1_1_1q/recp-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q recp (Var Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_recp.bc"
+result_name = "openssl_recp_var_pub"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_recp"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/recp-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q recp (Var Pub Lim Loop Break)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_recp.bc"
+result_name = "openssl_recp_var_pub_lim_loop_break"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_recp"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/recp-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q mont (Fix Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_fix_pub_mont.bc"
+result_name = "openssl_mont_fix_pub"
+replay_script = "benchmarks/openssl-1.1.1q/klee_fix_pub_replay_mont"
+replay_opts = "--secret exp"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q mont (Var Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_mont.bc"
+result_name = "openssl_mont_var_pub"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q mont (Var Pub Lim Loop Break)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont.bc"
+result_name = "openssl_mont_var_pub_lim_loop_break"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q mont_consttime (Fix Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_fix_pub_mont_consttime.bc"
+result_name = "openssl_mont_consttime_fix_pub"
+replay_script = "benchmarks/openssl-1.1.1q/klee_fix_pub_replay_mont_consttime"
+replay_opts = "--secret exp"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont_consttime-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q mont_consttime (Var Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_mont_consttime.bc"
+result_name = "openssl_mont_consttime_var_pub"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont_consttime"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont_consttime-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q mont_consttime (Var Pub Lim Loop Break)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont_consttime.bc"
+result_name = "openssl_mont_consttime_var_pub_lim_loop_break"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont_consttime"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont_consttime-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q mont_word (Fix Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_fix_pub_mont_word.bc"
+result_name = "openssl_mont_word_fix_pub"
+replay_script = "benchmarks/openssl-1.1.1q/klee_fix_pub_replay_mont_word"
+replay_opts = "--secret exp"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont_word-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q mont_word (Var Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_mont_word.bc"
+result_name = "openssl_mont_word_var_pub"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont_word"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont_word-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q mont_word (Var Pub Lim Loop Break)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont_word.bc"
+result_name = "openssl_mont_word_var_pub_lim_loop_break"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont_word"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont_word-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks]]
+benchmark_id = "openssl_sliced"
+display_name = "OpenSSL 1.1.1q (Sliced)"
+library_id = "openssl"
+code_path = "benchmarks/openssl-1.1.1q"
+path_prefixes = ["benchmarks/openssl-1.1.1q/"]
+tools = ["klee_cf"]
+
+[benchmarks.builds.klee]
+script = "benchmarks/openssl-1.1.1q/build.sh"
+tool_flag = "--klee"
+preset = "size_{sym_size}"
+extra_args = ["--sliced"]
+
+[benchmarks.build_aliases]
+klee_cf = "klee"
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_recp.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_recp.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_recp.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_recp.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_break_recp.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_recp.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_recp.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_recp.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_mont.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_mont.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_break_mont.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_mont_word.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont_word.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_mont_word.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont_word.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_fix_pub_lim_loop_break_mont_word.bc", "benchmarks/openssl-1.1.1q/klee_fix_pub_mont_word.bc"]
+
+[[benchmarks.klee_preprocess_steps]]
+arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont_word.bc", "benchmarks/openssl-1.1.1q/klee_var_pub_mont_word.bc"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q (Sliced) recp (Fix Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_fix_pub_recp.bc"
+result_name = "openssl_recp_fix_pub_sliced"
+replay_script = "benchmarks/openssl-1.1.1q/klee_fix_pub_replay_recp"
+replay_opts = "--secret exp"
+ct_json = "ctchecker_results/openSSL_1_1_1q/recp-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q (Sliced) recp (Var Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_recp.bc"
+result_name = "openssl_recp_var_pub_sliced"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_recp"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/recp-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q (Sliced) recp (Var Pub Lim Loop Break)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_recp.bc"
+result_name = "openssl_recp_var_pub_lim_loop_break_sliced"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_recp"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/recp-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q (Sliced) mont (Fix Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_fix_pub_mont.bc"
+result_name = "openssl_mont_fix_pub_sliced"
+replay_script = "benchmarks/openssl-1.1.1q/klee_fix_pub_replay_mont"
+replay_opts = "--secret exp"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q (Sliced) mont (Var Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_mont.bc"
+result_name = "openssl_mont_var_pub_sliced"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q (Sliced) mont (Var Pub Lim Loop Break)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont.bc"
+result_name = "openssl_mont_var_pub_lim_loop_break_sliced"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q (Sliced) mont_word (Fix Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_fix_pub_mont_word.bc"
+result_name = "openssl_mont_word_fix_pub_sliced"
+replay_script = "benchmarks/openssl-1.1.1q/klee_fix_pub_replay_mont_word"
+replay_opts = "--secret exp"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont_word-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q (Sliced) mont_word (Var Pub)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_mont_word.bc"
+result_name = "openssl_mont_word_var_pub_sliced"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont_word"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont_word-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
+[[benchmarks.klee_cases]]
+title = "OpenSSL 1.1.1q (Sliced) mont_word (Var Pub Lim Loop Break)"
+bitcode = "benchmarks/openssl-1.1.1q/klee_var_pub_lim_loop_break_mont_word.bc"
+result_name = "openssl_mont_word_var_pub_lim_loop_break_sliced"
+replay_script = "benchmarks/openssl-1.1.1q/klee_var_pub_replay_mont_word"
+replay_opts = "--secret exp --public base,mod"
+ct_json = "ctchecker_results/openSSL_1_1_1q/mont_word-3.json"
+code_path = "openssl-1.1.1q"
+memory_flag = false
+extra_args = ["--ctchecker-prefix", "crypto/bn"]

@@ -9,13 +9,12 @@ KLEE_PATH="../../klee-controlflow"
 
 usage() {
     cat <<EOF
-Usage: $0 (--klee-cf | --klee-eager | --self-comp | --binsec | --abacus) [--preset NAME]
+Usage: $0 (--klee | --self-comp | --binsec | --abacus) [--preset NAME]
 
 Builds the libg des benchmark wrapper for the requested mode.
 
 Modes:
-  --klee-cf     Build KLEE-CF executables and bitcode
-  --klee-eager  Build KLEE-Eager executables and bitcode
+    --klee        Build KLEE executables and bitcode
   --self-comp   Build self-comp bitcode artifacts
   --binsec      Build BINSEC executables (32-bit)
   --abacus      Build Abacus executables (32-bit)
@@ -39,12 +38,8 @@ NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --klee-cf)
-            MODE="klee_cf"
-            shift
-            ;;
-        --klee-eager)
-            MODE="klee_eager"
+        --klee)
+            MODE="klee"
             shift
             ;;
         --self-comp)
@@ -95,7 +90,7 @@ fi
 
 generated_dir="$script_dir/generated"
 wrapper_source="des_wrapper.c"
-config_path="$repo_root/configs/runner/libg_des_runner_config.json"
+config_path="$repo_root/configs/runner/libg_des_runner_config.toml"
 
 common_flags=(
     -g
@@ -188,7 +183,7 @@ build_abacus_mode() {
 }
 
 case "$MODE" in
-    klee_cf|klee_eager)
+    klee)
         build_klee_mode
         ;;
     self_comp)

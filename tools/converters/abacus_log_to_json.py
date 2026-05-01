@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
-import ast
 import argparse
 import json
 import os
 import re
 import subprocess
 import sys
+import tomllib
 from typing import Any, Dict, List, Optional, Tuple
 
 from tools.shared.result_schema import (
@@ -15,6 +15,24 @@ from tools.shared.result_schema import (
     get_source_line,
     make_result_row,
 )
+
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+
+def load_runner_config(config_path: str) -> Dict[str, Any]:
+    try:
+        with open(config_path, "rb") as handle:
+            config = tomllib.load(handle)
+    except OSError as exc:
+        raise ValueError(f"failed to load runner config {config_path}: {exc}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f"failed to parse runner config {config_path}: {exc}") from exc
+
+    if not isinstance(config, dict):
+        raise ValueError(f"runner config {config_path} root must be a table")
+
+    return config
 
 
 def _resolve_input_size(size_spec: Any, macros: Dict[str, Any]) -> int:
@@ -61,10 +79,9 @@ def _bytes_to_int(values: List[int]) -> int:
 
 def _load_abacus_secret_layout(runner_config_path: str, preset_name: str) -> List[Dict[str, Any]]:
     try:
-        with open(runner_config_path, "r", encoding="utf-8") as f:
-            runner_config = ast.literal_eval(f.read())
-    except (OSError, SyntaxError, ValueError) as exc:
-        raise ValueError(f"failed to load runner config {runner_config_path}: {exc}") from exc
+        runner_config = load_runner_config(runner_config_path)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
 
     inputs = runner_config.get("inputs")
     mode_policy = runner_config.get("mode_policy")
@@ -135,6 +152,196 @@ def _build_counterexamples(secret_layout: List[Dict[str, Any]], divergent_bytes:
     return counterexamples
 
 
+def convert_abacus_log(
+    *,
+    log_path: str,
+    output_path: str | None = None,
+    sym_size: int = 4,
+    runner_config: str | None = None,
+    preset_name: str | None = None,
+    code_root: str | None = None,
+    library: str,
+) -> Dict[str, Any]:
+    if not os.path.isfile(log_path):
+        raise FileNotFoundError(f"log not found: {log_path}")
+
+    runner_config_path = runner_config
+    if runner_config_path is None:
+        runner_config_path = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "configs",
+                "runner",
+                "modexp_runner_config.toml",
+            )
+        )
+    else:
+        runner_config_path = os.path.abspath(runner_config_path)
+
+    preset_name = preset_name or f"size_{sym_size}"
+    secret_layout = _load_abacus_secret_layout(runner_config_path, preset_name)
+
+    with open(log_path, "r", encoding="utf-8", errors="replace") as handle:
+        lines = handle.readlines()
+
+    divergent: Dict[int, List[int]] = {}
+    locations: Dict[int, Dict[str, Any]] = {}
+    se_time: Optional[float] = None
+    qif_time: Optional[float] = None
+    code_root_abs = os.path.abspath(code_root) if code_root else None
+
+    i = 0
+    while i < len(lines):
+        s = lines[i].rstrip("\n")
+
+        m_se = re.match(r"^Time taken by SE:\s*([0-9]+(?:\.[0-9]+)?)\s+seconds\s*$", s)
+        if m_se:
+            se_time = float(m_se.group(1))
+            i += 1
+            continue
+
+        m_qif = re.match(r"^Time taken by QIF:\s*([0-9]+(?:\.[0-9]+)?)\s+seconds\s*$", s)
+        if m_qif:
+            qif_time = float(m_qif.group(1))
+            i += 1
+            continue
+
+        m_div = re.match(r"^\[Divergent Input\]\s+0x([0-9a-fA-F]+):\s*$", s)
+        if m_div:
+            addr = int(m_div.group(1), 16)
+            bvals: List[int] = []
+            i += 1
+            while i < len(lines):
+                t = lines[i].rstrip("\n")
+                km = re.match(r"^\s*Key(\d+)\s*=\s*([0-9]+)\s*$", t)
+                if not km:
+                    break
+                bvals.append(int(km.group(2)))
+                i += 1
+            if bvals and all(0 <= value <= 255 for value in bvals):
+                divergent[addr] = bvals
+            continue
+
+        m_addr = re.match(r"^Address:\s*([0-9a-fA-F]+)\b", s)
+        if m_addr:
+            addr = int(m_addr.group(1), 16)
+            j = i + 1
+            while j < len(lines):
+                src_line = lines[j].rstrip("\n")
+                m_src = re.match(
+                    r"^Source code:\s+[^:]+:\s+(.+?)\s+line number:\s*([0-9]+)(?:\s+column number:\s*[0-9]+)?\s*$",
+                    src_line,
+                )
+                if m_src:
+                    src_path = m_src.group(1)
+                    line_no = int(m_src.group(2))
+                    filename = os.path.basename(src_path)
+                    if code_root_abs:
+                        try:
+                            src_abs = os.path.abspath(src_path)
+                            if os.path.commonpath([code_root_abs, src_abs]) == code_root_abs:
+                                filename = os.path.relpath(src_abs, code_root_abs)
+                        except Exception:
+                            pass
+
+                    entry: Dict[str, Any] = {
+                        "filename": filename,
+                        "line": line_no,
+                    }
+
+                    if code_root_abs:
+                        source_line = get_source_line(library, os.path.join(code_root_abs, filename), line_no)
+                        if source_line is not None:
+                            entry["code"] = source_line
+
+                    locations[addr] = entry
+                    break
+                if re.match(r"^Address:\s*([0-9a-fA-F]+)\b", src_line):
+                    break
+                j += 1
+            i = j
+            continue
+
+        i += 1
+
+    rows: List[Dict[str, Any]] = []
+    non_ct_time = (se_time + qif_time) if se_time is not None and qif_time is not None else None
+    for addr in sorted(set(divergent.keys()) | set(locations.keys())):
+        row: Dict[str, Any] = {
+            "filename": None,
+            "line": None,
+            "counterexamples": None,
+        }
+        if non_ct_time is not None:
+            row["non_ct_time"] = non_ct_time
+        if addr in locations:
+            row.update(locations[addr])
+        if addr in divergent:
+            row["counterexamples"] = _build_counterexamples(secret_layout, divergent[addr])
+        rows.append(row)
+
+    validated_rows: List[Dict[str, Any]] = []
+    for row in rows:
+        optional = {
+            key: value
+            for key, value in row.items()
+            if key not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
+        }
+        counterexamples = row.get("counterexamples")
+        validated_rows.append(
+            make_result_row(
+                filename=row.get("filename"),
+                line=row.get("line"),
+                non_ct_time=row.get("non_ct_time"),
+                counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
+                reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
+                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else library,
+                optional_fields=optional,
+            )
+        )
+
+    payload = build_payload(
+        validated_rows,
+        optional_dtypes={
+            "column": "Int64",
+            "code": "object",
+        },
+    )
+    payload["notes"] = {
+        "runner_config": runner_config_path,
+        "preset": preset_name,
+        "secret_layout": [
+            {
+                "name": entry["name"],
+                "size": entry["size"],
+            }
+            for entry in secret_layout
+        ],
+        "public_layout": [],
+        "abacus_reference_secrets": {
+            entry["name"]: entry["seed_value"]
+            for entry in secret_layout
+        },
+    }
+    if len(secret_layout) == 1 and secret_layout[0]["name"] == "exp":
+        payload["notes"]["abacus_reference_secret"] = {
+            "source": f"Loaded from {runner_config_path} preset {preset_name}",
+            "preset": preset_name,
+            "sym_size": sym_size,
+            "exp": secret_layout[0]["seed_value"],
+        }
+
+    if output_path:
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+
+    return payload
+
+
 def main(argv: List[str]) -> int:
     p = argparse.ArgumentParser(
         description=(
@@ -200,36 +407,6 @@ def main(argv: List[str]) -> int:
     )
     args = p.parse_args(argv)
 
-    if not os.path.isfile(args.log):
-        print(f"Error: log not found: {args.log}", file=sys.stderr)
-        return 2
-
-    runner_config_path = args.runner_config
-    if runner_config_path is None:
-        runner_config_path = os.path.abspath(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "..",
-                "configs",
-                "runner",
-                "modexp_runner_config.json",
-            )
-        )
-    else:
-        runner_config_path = os.path.abspath(runner_config_path)
-
-    preset_name = args.preset_name or f"size_{args.sym_size}"
-    try:
-        secret_layout = _load_abacus_secret_layout(runner_config_path, preset_name)
-    except ValueError as exc:
-        print(
-            "Error: failed to load ABACUS secret layout from "
-            f"{runner_config_path} preset {preset_name}: {exc}",
-            file=sys.stderr,
-        )
-        return 2
-
     reproduce_module = args.reproduce_module
     if args.reproduce and not reproduce_module:
         reproduce_module = "tools.postprocess.reproduce_positives"
@@ -241,168 +418,19 @@ def main(argv: List[str]) -> int:
             print("Error: missing reproduction module", file=sys.stderr)
             return 2
 
-    with open(args.log, "r", encoding="utf-8", errors="replace") as f:
-        lines = f.readlines()
-
-    divergent: Dict[int, List[int]] = {}
-    locations: Dict[int, Dict[str, Any]] = {}
-    se_time: Optional[float] = None
-    qif_time: Optional[float] = None
-
-    default_library = args.library
-    i = 0
-    while i < len(lines):
-        s = lines[i].rstrip("\n")
-
-        m_se = re.match(r"^Time taken by SE:\s*([0-9]+(?:\.[0-9]+)?)\s+seconds\s*$", s)
-        if m_se:
-            se_time = float(m_se.group(1))
-            i += 1
-            continue
-
-        m_qif = re.match(r"^Time taken by QIF:\s*([0-9]+(?:\.[0-9]+)?)\s+seconds\s*$", s)
-        if m_qif:
-            qif_time = float(m_qif.group(1))
-            i += 1
-            continue
-
-        m_div = re.match(r"^\[Divergent Input\]\s+0x([0-9a-fA-F]+):\s*$", s)
-        if m_div:
-            addr = int(m_div.group(1), 16)
-            bvals: List[int] = []
-            i += 1
-            while i < len(lines):
-                t = lines[i].rstrip("\n")
-                km = re.match(r"^\s*Key(\d+)\s*=\s*([0-9]+)\s*$", t)
-                if not km:
-                    break
-                bvals.append(int(km.group(2)))
-                i += 1
-            if bvals:
-                if all(0 <= value <= 255 for value in bvals):
-                    divergent[addr] = bvals
-            continue
-
-        m_addr = re.match(r"^Address:\s*([0-9a-fA-F]+)\b", s)
-        if m_addr:
-            addr = int(m_addr.group(1), 16)
-            j = i + 1
-            while j < len(lines):
-                src_line = lines[j].rstrip("\n")
-                m_src = re.match(
-                    r"^Source code:\s+[^:]+:\s+(.+?)\s+line number:\s*([0-9]+)(?:\s+column number:\s*[0-9]+)?\s*$",
-                    src_line,
-                )
-                if m_src:
-                    src_path = m_src.group(1)
-                    line_no = int(m_src.group(2))
-                    filename = os.path.basename(src_path)
-                    if args.code_root:
-                        try:
-                            root_abs = os.path.abspath(args.code_root)
-                            src_abs = os.path.abspath(src_path)
-                            if os.path.commonpath([root_abs, src_abs]) == root_abs:
-                                filename = os.path.relpath(src_abs, root_abs)
-                        except Exception:
-                            pass
-
-                    entry: Dict[str, Any] = {
-                        "filename": filename,
-                        "line": line_no,
-                    }
-
-                    if args.code_root:
-                        source_line = get_source_line(default_library, os.path.join(args.code_root, filename), line_no)
-                        if source_line is not None:
-                            entry["code"] = source_line
-
-                    locations[addr] = entry
-                    break
-                if re.match(r"^Address:\s*([0-9a-fA-F]+)\b", src_line):
-                    break
-                j += 1
-            i = j
-            continue
-
-        i += 1
-
-    rows: List[Dict[str, Any]] = []
-    non_ct_time = (se_time + qif_time) if se_time is not None and qif_time is not None else None
-    for addr in sorted(set(divergent.keys()) | set(locations.keys())):
-        row: Dict[str, Any] = {
-            "filename": None,
-            "line": None,
-            "counterexamples": None,
-        }
-        if non_ct_time is not None:
-            row["non_ct_time"] = non_ct_time
-        if addr in locations:
-            row.update(locations[addr])
-        if addr in divergent:
-            try:
-                row["counterexamples"] = _build_counterexamples(secret_layout, divergent[addr])
-            except ValueError as exc:
-                print(f"Error: failed to decode divergent input for 0x{addr:x}: {exc}", file=sys.stderr)
-                return 2
-
-        rows.append(row)
-
-    validated_rows: List[Dict[str, Any]] = []
-    for row in rows:
-        optional = {
-            k: v
-            for k, v in row.items()
-            if k not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
-        }
-        counterexamples = row.get("counterexamples")
-        validated_rows.append(
-            make_result_row(
-                filename=row.get("filename"),
-                line=row.get("line"),
-                non_ct_time=row.get("non_ct_time"),
-                counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
-                reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
-                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else default_library,
-                optional_fields=optional,
-            )
+    try:
+        convert_abacus_log(
+            log_path=args.log,
+            output_path=args.out,
+            sym_size=args.sym_size,
+            runner_config=args.runner_config,
+            preset_name=args.preset_name,
+            code_root=args.code_root,
+            library=args.library,
         )
-    rows = validated_rows
-
-    payload = build_payload(
-        rows,
-        optional_dtypes={
-            "column": "Int64",
-            "code": "object",
-        },
-    )
-    payload["notes"] = {
-        "runner_config": runner_config_path,
-        "preset": preset_name,
-        "secret_layout": [
-            {
-                "name": entry["name"],
-                "size": entry["size"],
-            }
-            for entry in secret_layout
-        ],
-        "public_layout": [],
-        "abacus_reference_secrets": {
-            entry["name"]: entry["seed_value"]
-            for entry in secret_layout
-        },
-    }
-    if len(secret_layout) == 1 and secret_layout[0]["name"] == "exp":
-        payload["notes"]["abacus_reference_secret"] = {
-            "source": f"Loaded from {runner_config_path} preset {preset_name}",
-            "preset": preset_name,
-            "sym_size": args.sym_size,
-            "exp": secret_layout[0]["seed_value"],
-        }
-
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-        f.write("\n")
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
 
     if args.reproduce:
         cmd = [
@@ -426,7 +454,7 @@ def main(argv: List[str]) -> int:
             cmd.append("--debug")
         if args.pin_root:
             cmd += ["--pin-root", str(args.pin_root)]
-        proc = subprocess.run(cmd, check=False)
+        proc = subprocess.run(cmd, check=False, cwd=_REPO_ROOT)
         if proc.returncode != 0:
             print(f"[reproduce] batch reproduction failed with rc={proc.returncode}", file=sys.stderr)
             return proc.returncode

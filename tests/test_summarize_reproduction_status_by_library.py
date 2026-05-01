@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_PATH = REPO_ROOT / "tools/postprocess/summarize_reproduction_status.py"
+SCRIPT_MODULE = "tools.postprocess.summarize_reproduction_status"
 
 
 class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
@@ -138,7 +138,8 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
             by_library_prefix = tmp_path / "by_library"
             command = [
                 sys.executable,
-                str(SCRIPT_PATH),
+                "-m",
+                SCRIPT_MODULE,
                 str(root),
                 "-f",
                 str(filter_csv),

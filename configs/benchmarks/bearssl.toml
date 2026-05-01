@@ -1,0 +1,94 @@
+[[benchmarks]]
+benchmark_id = "bearssl"
+display_name = "BearSSL 0.6"
+library_id = "bearssl"
+code_path = "benchmarks/bearssl"
+path_prefixes = ["benchmarks/bearssl/"]
+tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
+
+[benchmarks.builds.abacus]
+script = "benchmarks/bearssl/build.sh"
+tool_flag = "--abacus"
+preset = "default"
+
+[benchmarks.builds.self_comp]
+script = "benchmarks/bearssl/build.sh"
+tool_flag = "--self-comp"
+preset = "default"
+
+[benchmarks.builds.binsec]
+script = "benchmarks/bearssl/build.sh"
+tool_flag = "--binsec"
+preset = "default"
+
+[benchmarks.builds.klee]
+script = "benchmarks/bearssl/build.sh"
+tool_flag = "--klee"
+preset = "default"
+
+[benchmarks.build_aliases]
+klee_cf = "klee"
+klee_eager = "klee"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/bearssl/abacus_fix_pub_binsec_aes_big"
+outfile = "bearssl_aes_big.txt"
+runner_config = "configs/runner/bearssl_aes_big_runner_config.toml"
+preset_name = "default"
+
+[[benchmarks.abacus_cases]]
+executable = "benchmarks/bearssl/abacus_fix_pub_appliedcryp_des"
+outfile = "bearssl_des_tab.txt"
+runner_config = "configs/runner/bearssl_des_tab_runner_config.toml"
+preset_name = "default"
+
+[[benchmarks.self_comp_cases]]
+title = "BearSSL 0.6 aes_big (Self-Comp)"
+bitcode = "benchmarks/bearssl/self_comp_fix_pub_binsec_aes_big.bc"
+result_name = "bearssl_aes_big_self_comp"
+json_name = "bearssl_aes_big.json"
+replay_executable = "klee_fix_pub_replay_binsec_aes_big"
+secret_layout = "skey:48,data:32"
+
+[[benchmarks.self_comp_cases]]
+title = "BearSSL 0.6 des_tab (Self-Comp)"
+bitcode = "benchmarks/bearssl/self_comp_fix_pub_appliedcryp_des.bc"
+result_name = "bearssl_des_tab_self_comp"
+json_name = "bearssl_des_tab.json"
+replay_executable = "klee_fix_pub_replay_appliedcryp_des"
+secret_layout = "skey:256,data:16"
+
+[[benchmarks.binsec_cases]]
+title = "BearSSL 0.6 aes_big"
+sse_script = "benchmarks/bearssl/generated/binsec_aes_big/binsec_fix_pub.cfg"
+stats_file = "bearssl_aes_big.toml"
+executable = "benchmarks/bearssl/binsec_fix_pub_binsec_aes_big"
+secret_inputs = ["skey:48:skey_buf", "data:32:data_buf"]
+
+[[benchmarks.binsec_cases]]
+title = "BearSSL 0.6 des_tab"
+sse_script = "benchmarks/bearssl/generated/appliedcryp_des/binsec_fix_pub.cfg"
+stats_file = "bearssl_des_tab.toml"
+executable = "benchmarks/bearssl/binsec_fix_pub_appliedcryp_des"
+secret_inputs = ["skey:256:skey_buf", "data:16:data_buf"]
+
+[[benchmarks.klee_cases]]
+title = "BearSSL 0.6 aes_big"
+bitcode = "benchmarks/bearssl/klee_fix_pub_binsec_aes_big.bc"
+result_name = "bearssl_aes_big"
+replay_script = "benchmarks/bearssl/klee_fix_pub_replay_binsec_aes_big"
+replay_opts = "--secret skey,data"
+ct_json = "ctchecker_results/BearSSL0.6/empty.json"
+code_path = "benchmarks/bearssl"
+memory_flag = true
+
+
+[[benchmarks.klee_cases]]
+title = "BearSSL 0.6 des_tab"
+bitcode = "benchmarks/bearssl/klee_fix_pub_appliedcryp_des.bc"
+result_name = "bearssl_des_tab"
+replay_script = "benchmarks/bearssl/klee_fix_pub_replay_appliedcryp_des"
+replay_opts = "--secret skey,data"
+ct_json = "ctchecker_results/BearSSL0.6/empty.json"
+code_path = "benchmarks/bearssl"
+memory_flag = true

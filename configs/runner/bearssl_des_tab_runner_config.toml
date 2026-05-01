@@ -1,0 +1,32 @@
+[[inputs]]
+id = "skey_buf"
+name = "skey"
+kind = "secret"
+size = "EFFECTIVE_SKEY_LEN"
+
+[[inputs]]
+id = "data_buf"
+name = "data"
+kind = "secret"
+size = "DATA_LEN"
+
+[mode_policy.var_pub]
+public_symbolic = true
+
+[mode_policy.fix_pub]
+public_symbolic = false
+
+[mode_policy.abacus]
+secret_inputs = ["skey_buf", "data_buf"]
+public_fixed = true
+
+[presets.default.macros]
+EFFECTIVE_SKEY_LEN = 256
+DATA_LEN = 16
+N_ROUND = 2
+
+[presets.default.vars]
+
+[presets.default.abacus_secrets]
+skey_buf = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9eb
+data_buf = 0xffffffffffffffffffffffffffffff61
