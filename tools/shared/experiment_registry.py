@@ -9,10 +9,12 @@ shared layer does not grow a second schema language.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib
 from pathlib import Path
 import tomllib
 
 from scripts.experiments.common import (
+    CampaignTool,
     expect_array,
     expect_string,
     expect_table,
@@ -106,6 +108,22 @@ def definition_for_path(path: str) -> BenchmarkDefinition | None:
         if any(prefix in normalized_path for prefix in benchmark_definition.path_prefixes):
             return benchmark_definition
     return None
+
+
+def available_campaign_tools() -> dict[str, CampaignTool]:
+    global _CAMPAIGN_TOOLS_BY_ID
+    if _CAMPAIGN_TOOLS_BY_ID is None:
+        _CAMPAIGN_TOOLS_BY_ID = _load_campaign_tools()
+    return dict(_CAMPAIGN_TOOLS_BY_ID)
+
+
+def campaign_tool(tool_id: str) -> CampaignTool:
+    tools = available_campaign_tools()
+    try:
+        return tools[tool_id]
+    except KeyError as error:
+        supported_tools = ", ".join(sorted(tools))
+        raise ValueError(f"unknown campaign tool {tool_id!r}; expected one of {supported_tools}") from error
 
 
 def _benchmark_ids_for_tool(tool_id: str) -> list[str]:
@@ -246,4 +264,34 @@ def _load_registry() -> tuple[
     )
 
 
+def _load_campaign_tools() -> dict[str, CampaignTool]:
+    tools: dict[str, CampaignTool] = {}
+    for tool_id in sorted(_BENCHMARK_IDS_BY_TOOL):
+        module_name = f"scripts.experiments.run_{tool_id}"
+        module = importlib.import_module(module_name)
+        spec = getattr(module, "CAMPAIGN_TOOL", None)
+        if spec is None:
+            factory = getattr(module, "campaign_tool", None)
+            if factory is None:
+                spec = CampaignTool(tool_id=tool_id, module_name=module.__name__)
+            else:
+                spec = factory()
+                if not isinstance(spec, CampaignTool):
+                    raise TypeError(
+                        f"{module.__name__}.campaign_tool() must return CampaignTool, got {type(spec).__name__}"
+                    )
+        elif not isinstance(spec, CampaignTool):
+            raise TypeError(
+                f"{module.__name__}.CAMPAIGN_TOOL must be CampaignTool, got {type(spec).__name__}"
+            )
+
+        if spec.tool_id != tool_id:
+            raise ValueError(
+                f"{module.__name__} campaign metadata reported tool_id {spec.tool_id!r}, expected {tool_id!r}"
+            )
+        tools[tool_id] = spec
+    return tools
+
+
 _BENCHMARK_DEFINITIONS, _BENCHMARKS_BY_ID, _BENCHMARK_IDS_BY_TOOL = _load_registry()
+_CAMPAIGN_TOOLS_BY_ID: dict[str, CampaignTool] | None = None

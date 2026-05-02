@@ -1,26 +1,33 @@
 #!/usr/bin/env python3
 """Launch the ABACUS-only campaign from TOML.
 
-Unlike the main campaign runner, this mode executes one configuration at a time
-inside a pre-existing ABACUS environment. The control flow stays in one
-function because the batch is linear: validate config, launch each sym-size
-through isolated workspace copies, then merge the per-size JSON outputs.
+Unlike the main campaign runner, this mode executes one ABACUS configuration at
+a time inside a pre-existing ABACUS environment. The control flow stays in one
+function because the batch is linear: validate config, launch each sym-size as
+multiple direct worker processes, then merge the per-size JSON outputs.
 """
 
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
-import subprocess
+import sys
 import tomllib
 
-from scripts.experiments.common import REPO_ROOT
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from scripts.experiments.common import (
+    REPO_ROOT,
+    LaunchedProcess,
+    benchmark_csv_from_config,
+    launch_prefixed_module,
+    terminate_processes,
+    wait_for_processes,
+    worker_log_path,
+)
 from tools.postprocess.merge_json_runs_by_experiment import main as merge_json_runs_main
-from tools.shared.experiment_registry import selected_benchmarks
-
-
-RUNNER_MODULE = "scripts.experiments.parallel_klee_copies"
-RUN_ABACUS_MODULE = "scripts.experiments.run_abacus"
+from tools.shared.experiment_registry import campaign_tool, selected_benchmarks
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -63,20 +70,10 @@ def main(argv: list[str] | None = None) -> int:
     if not all(isinstance(sym_size, int) and sym_size >= 0 for sym_size in sym_sizes):
         raise SystemExit("campaign.sym_sizes must contain only non-negative integers")
 
-    def benchmark_csv_from_config(value: object, label: str) -> str | None:
-        if value is None or value == "":
-            return None
-        if isinstance(value, str):
-            return value
-        if isinstance(value, list):
-            if not value:
-                return None
-            if not all(isinstance(item, str) for item in value):
-                raise SystemExit(f"{label} must be a string or array of strings")
-            return ",".join(value)
-        raise SystemExit(f"{label} must be a string or array of strings")
-
-    benchmark_csv = benchmark_csv_from_config(benchmarks_section.get("abacus"), "benchmarks.abacus")
+    try:
+        benchmark_csv = benchmark_csv_from_config(benchmarks_section.get("abacus"), "benchmarks.abacus")
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
     try:
         normalized_benchmarks = selected_benchmarks("abacus", benchmark_csv)
     except ValueError as error:
@@ -86,46 +83,41 @@ def main(argv: list[str] | None = None) -> int:
     if not abacus_root.is_dir():
         raise SystemExit(f"abacus root path does not exist: {abacus_root}")
 
-    python_bin = "python"
+    tool = campaign_tool("abacus")
     output_dir = Path(output_raw)
     output_dir.mkdir(parents=True, exist_ok=True)
-    bench_args = [] if benchmark_csv is None else ["--benchmarks", ",".join(normalized_benchmarks)]
+    benchmark_csv_value = None if benchmark_csv is None else ",".join(normalized_benchmarks)
     for sym_size in sym_sizes:
         destination = output_dir / f"abacus_{sym_size}"
         if args.postprocess_only:
             continue
-        process = subprocess.Popen(
-            [
-                python_bin,
-                "-m",
-                RUNNER_MODULE,
-                "--tmp-dir",
-                tmp_dir_raw,
-                "--clean-destination",
-                str(num_copies),
-                "results/abacus_results",
-                str(destination),
-                "--",
-                python_bin,
-                "-m",
-                RUN_ABACUS_MODULE,
-                str(abacus_root),
-                "--sym-size",
-                str(sym_size),
-                *bench_args,
-            ],
-            cwd=REPO_ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-        assert process.stdout is not None
-        for line in process.stdout:
-            print(f"[ABACUS SYM {sym_size}] {line}", end="")
-        process.stdout.close()
-        if process.wait() != 0:
-            raise SystemExit(1)
+        launched_runs: list[LaunchedProcess] = []
+        try:
+            destination.mkdir(parents=True, exist_ok=True)
+            for copy_index in range(num_copies):
+                worker_destination = destination / str(copy_index)
+                worker_destination.mkdir(parents=True, exist_ok=True)
+                current_worker_log_path = worker_log_path(destination, copy_index)
+                worker_argv = tool.build_worker_argv(
+                    [str(abacus_root), "--sym-size", str(sym_size)],
+                    benchmark_csv=benchmark_csv_value,
+                    results_dir=worker_destination,
+                    tmp_dir=tmp_dir_raw,
+                )
+                launched_runs.append(
+                    launch_prefixed_module(
+                        f"ABACUS SYM {sym_size} #{copy_index}",
+                        tool.module_name,
+                        worker_argv,
+                        cwd=REPO_ROOT,
+                        log_path=current_worker_log_path,
+                    )
+                )
+            if wait_for_processes(launched_runs) != 0:
+                raise SystemExit(1)
+        except BaseException:
+            terminate_processes(launched_runs)
+            raise
 
     for sym_size in sym_sizes:
         destination = output_dir / f"abacus_{sym_size}"

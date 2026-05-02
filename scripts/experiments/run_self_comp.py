@@ -15,14 +15,20 @@ from pathlib import Path
 import resource
 import shlex
 import shutil
+import sys
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.experiments.common import (
+    CampaignTool,
     ExperimentContext,
     REPO_ROOT,
     expect_array,
     expect_string,
     expect_table,
     optional_string,
+    prepare_benchmark_workspace,
     resolve_repo_path,
 )
 from tools.converters.self_comp_log_to_json import convert_self_comp_log
@@ -31,6 +37,9 @@ from tools.shared.experiment_registry import build_for_tool, definition, definit
 # Keep timestamps in the live log stream so the converter can recover event
 # timing without needing another wrapper script on disk.
 TIMESTAMP_CODE = "import sys,time\nfor raw in sys.stdin.buffer:\n    line = raw.decode('utf-8', errors='replace')\n    sys.stdout.write(f'[{time.time():.3f}] {line}')\n    sys.stdout.flush()"
+
+
+CAMPAIGN_TOOL = CampaignTool(tool_id="self_comp", module_name=__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -46,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-reproduce", action="store_true")
     parser.add_argument("--reproduce-timeout", type=int, default=180)
     parser.add_argument("--pin-root")
+    parser.add_argument("--tmp-dir", default="/tmp", help="Parent directory for temporary benchmark workspaces")
     parser.add_argument(
         "--benchmarks",
         help=f"Comma-separated benchmark groups to run. Valid: {','.join(selected_benchmarks('self_comp', None))}",
@@ -85,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
         context.log(f"do_reproduce={0 if args.no_reproduce else 1}")
         context.log(f"reproduce_timeout={args.reproduce_timeout}")
         context.log(f"pin_root={args.pin_root or os.environ.get('PIN_ROOT', '<unset>')}")
+        context.log(f"tmp_dir={Path(args.tmp_dir).expanduser().resolve()}")
         context.log(f"benchmarks={','.join(benchmarks)}")
         context.log("##########")
 
@@ -94,39 +105,43 @@ def main(argv: list[str] | None = None) -> int:
             context.log("##########")
             context.log(f"Begin experiments for {benchmark_definition.display_name}")
             context.log("##########")
-            build_command = [build.script, build.tool_flag]
-            if build.preset:
-                build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
-            context.run(build_command)
-            raw_cases = benchmark_definition.extra_config.get("self_comp_cases")
-            if raw_cases is None:
-                continue
-            if "self_comp" not in benchmark_definition.tools:
-                raise ValueError(f"{benchmark_definition.config_location}.self_comp_cases requires 'self_comp' in tools")
-            for index, raw_case in enumerate(expect_array(raw_cases, f"{benchmark_definition.config_location}.self_comp_cases")):
-                case_table = expect_table(raw_case, f"{benchmark_definition.config_location}.self_comp_cases[{index}]")
-                converter_args: list[str] = []
-                if secret_layout := optional_string(case_table, "secret_layout", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"):
-                    converter_args.extend(["--secret-layout", secret_layout])
-                if public_layout := optional_string(case_table, "public_layout", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"):
-                    converter_args.extend(["--public-layout", public_layout])
-                run_case(
-                    context,
-                    klee_root,
-                    results_dir,
-                    args,
-                    expect_string(case_table, "title", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
-                    expect_string(case_table, "bitcode", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
-                    expect_string(case_table, "result_name", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
-                    expect_string(case_table, "json_name", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
-                    expect_string(case_table, "replay_executable", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
-                    *converter_args,
-                )
+            with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
+                context.log(f"temporary_workspace={workspace.root}")
+                build_command = [build.script, build.tool_flag]
+                if build.preset:
+                    build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
+                context.run(build_command, cwd=workspace.root)
+                raw_cases = benchmark_definition.extra_config.get("self_comp_cases")
+                if raw_cases is None:
+                    continue
+                if "self_comp" not in benchmark_definition.tools:
+                    raise ValueError(f"{benchmark_definition.config_location}.self_comp_cases requires 'self_comp' in tools")
+                for index, raw_case in enumerate(expect_array(raw_cases, f"{benchmark_definition.config_location}.self_comp_cases")):
+                    case_table = expect_table(raw_case, f"{benchmark_definition.config_location}.self_comp_cases[{index}]")
+                    converter_args: list[str] = []
+                    if secret_layout := optional_string(case_table, "secret_layout", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"):
+                        converter_args.extend(["--secret-layout", secret_layout])
+                    if public_layout := optional_string(case_table, "public_layout", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"):
+                        converter_args.extend(["--public-layout", public_layout])
+                    run_case(
+                        context,
+                        workspace,
+                        klee_root,
+                        results_dir,
+                        args,
+                        expect_string(case_table, "title", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
+                        expect_string(case_table, "bitcode", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
+                        expect_string(case_table, "result_name", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
+                        expect_string(case_table, "json_name", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
+                        expect_string(case_table, "replay_executable", f"{benchmark_definition.config_location}.self_comp_cases[{index}]"),
+                        *converter_args,
+                    )
     return 0
 
 
 def run_case(
     context: ExperimentContext,
+    workspace,
     klee_root: Path,
     results_dir: Path,
     args: argparse.Namespace,
@@ -137,14 +152,15 @@ def run_case(
     replay_executable: str,
     *converter_args: str,
 ) -> None:
-    bitcode_path = REPO_ROOT / bitcode
+    bitcode_path = workspace.resolve_repo_path(bitcode)
     bitcode_dir = bitcode_path.parent
     case_log = results_dir / f"{result_name}.log"
     case_json = results_dir / json_name
-    benchmark_definition = definition_for_path(bitcode)
+    benchmark_definition = definition_for_path(str(bitcode_path))
     if benchmark_definition is None:
         raise SystemExit(f"Error: cannot infer library from path '{bitcode}'")
     library = benchmark_definition.library_id
+    code_root = workspace.resolve_code_path(benchmark_definition.code_path)
 
     def cleanup_outputs() -> None:
         # Self-comp cases reuse one benchmark directory, so stale KLEE outputs
@@ -168,7 +184,7 @@ def run_case(
         f"--max-memory={args.max_memory} --emit-all-errors=true {shlex.quote(bitcode)} 2>&1 | "
         f"python -u -c {shlex.quote(TIMESTAMP_CODE)} || true"
     )
-    context.run_and_capture(["bash", "-euo", "pipefail", "-c", klee_script], log_path=case_log, check=False)
+    context.run_and_capture(["bash", "-euo", "pipefail", "-c", klee_script], log_path=case_log, cwd=bitcode_dir, check=False)
 
     klee_output = bitcode_dir / "klee-out-0"
     if klee_output.is_dir():
@@ -210,7 +226,7 @@ def run_case(
             public_layout=public_layout,
             reproduce_timeout=args.reproduce_timeout,
             pin_root=args.pin_root,
-            code_root=str(bitcode_dir),
+            code_root=str(code_root),
             library=library,
         )
     except (FileNotFoundError, RuntimeError, ValueError) as error:

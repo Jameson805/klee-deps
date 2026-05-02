@@ -16,12 +16,14 @@ import shlex
 import shutil
 
 from scripts.experiments.common import (
+    BenchmarkWorkspace,
     ExperimentContext,
     REPO_ROOT,
     expect_array,
     expect_string,
     expect_table,
     optional_string_list,
+    prepare_benchmark_workspace,
     resolve_repo_path,
 )
 from tools.converters.klee_log_to_json import convert_klee_output
@@ -50,6 +52,12 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--solver-backend", default="stp", choices=SOLVER_BACKENDS)
     parser.add_argument("--optimize-array", default="false", choices=OPTIMIZE_ARRAY_VALUES)
     parser.add_argument("--pin-root")
+    parser.add_argument("--tmp-dir", default="/tmp", help="Parent directory for temporary benchmark workspaces")
+    parser.add_argument(
+        "--results-dir",
+        default=("results/klee_cf_results" if mode == "klee_cf" else "results/klee_eager_results"),
+        help="Directory where run outputs are written",
+    )
     parser.add_argument(
         "--benchmarks",
         help=f"Comma-separated benchmark groups to run. Valid: {','.join(selected_benchmarks(mode, None))}",
@@ -78,7 +86,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     env = dict(os.environ)
     env["PATH"] = f"{klee_bin_dir}:{env.get('PATH', '')}"
     os.environ["PATH"] = env["PATH"]
-    results_dir = REPO_ROOT / ("results/klee_cf_results" if mode == "klee_cf" else "results/klee_eager_results")
+    results_dir = resolve_repo_path(args.results_dir)
     shutil.rmtree(results_dir, ignore_errors=True)
     results_dir.mkdir(parents=True, exist_ok=True)
     with (results_dir / "output.log").open("a", encoding="utf-8") as output_handle:
@@ -102,6 +110,8 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         context.log(f"solver_backend={args.solver_backend}")
         context.log(f"optimize_array={args.optimize_array}")
         context.log(f"pin_root={args.pin_root or os.environ.get('PIN_ROOT', '<unset>')}")
+        context.log(f"tmp_dir={Path(args.tmp_dir).expanduser().resolve()}")
+        context.log(f"results_dir={results_dir}")
         context.log(f"benchmarks={','.join(benchmarks)}")
         context.log("##########")
 
@@ -113,6 +123,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
 def run_case(
     context: ExperimentContext,
     env: dict[str, str],
+    workspace: BenchmarkWorkspace,
     results_dir: Path,
     args: argparse.Namespace,
     mode: str,
@@ -125,10 +136,10 @@ def run_case(
     memory_flag: bool,
     *extra_args: str,
 ) -> None:
-    bitcode_path = resolve_repo_path(bitcode)
+    bitcode_path = workspace.resolve_repo_path(bitcode)
     bitcode_dir = bitcode_path.parent
-    replay_script_path = resolve_repo_path(replay_script)
-    code_root = resolve_repo_path(code_path)
+    replay_script_path = workspace.resolve_repo_path(replay_script)
+    code_root = workspace.resolve_code_path(code_path)
     benchmark_definition = definition_for_path(str(bitcode_path))
     if benchmark_definition is None:
         raise SystemExit(f"Error: cannot infer library from path '{bitcode}'")
@@ -202,7 +213,7 @@ def run_case(
             str(bitcode_path),
         ]
     )
-    context.run(command, env=env, check=False)
+    context.run(command, env=env, check=False, cwd=bitcode_dir)
 
     source_output = bitcode_dir / "klee-out-0"
     if not source_output.is_dir():
@@ -305,77 +316,81 @@ def run_benchmark(
     context.log("##########")
     context.log(f"Begin experiments for {benchmark_definition.display_name}")
     context.log("##########")
-    build_command = [build.script, build.tool_flag]
-    if build.preset:
-        build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
-    build_command.extend(build.extra_args)
-    context.run(build_command, env=env)
-    raw_steps = benchmark_definition.extra_config.get("klee_preprocess_steps")
-    if raw_steps is not None:
-        if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
-            raise ValueError(f"{benchmark_definition.config_location}.klee_preprocess_steps requires a KLEE tool in tools")
-        loop_limiter = REPO_ROOT / "loop-limiter/build/libLoopLimiter.so"
-        # Preprocessing stays explicit in the benchmark TOML because only a
-        # subset of cases need loop bounding and each benchmark blacklists a
-        # different set of helper routines.
-        for index, raw_step in enumerate(expect_array(raw_steps, f"{benchmark_definition.config_location}.klee_preprocess_steps")):
-            step_table = expect_table(raw_step, f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}]")
-            arguments = optional_string_list(
-                step_table,
-                "arguments",
-                f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}]",
-            )
-            if not arguments:
-                raise ValueError(
-                    f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}].arguments must not be empty"
+    with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
+        context.log(f"temporary_workspace={workspace.root}")
+        build_command = [build.script, build.tool_flag]
+        if build.preset:
+            build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
+        build_command.extend(build.extra_args)
+        context.run(build_command, env=env, cwd=workspace.root)
+        raw_steps = benchmark_definition.extra_config.get("klee_preprocess_steps")
+        if raw_steps is not None:
+            if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
+                raise ValueError(f"{benchmark_definition.config_location}.klee_preprocess_steps requires a KLEE tool in tools")
+            loop_limiter = REPO_ROOT / "loop-limiter/build/libLoopLimiter.so"
+            # Preprocessing stays explicit in the benchmark TOML because only a
+            # subset of cases need loop bounding and each benchmark blacklists a
+            # different set of helper routines.
+            for index, raw_step in enumerate(expect_array(raw_steps, f"{benchmark_definition.config_location}.klee_preprocess_steps")):
+                step_table = expect_table(raw_step, f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}]")
+                arguments = optional_string_list(
+                    step_table,
+                    "arguments",
+                    f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}]",
                 )
-            context.run(
-                [
-                    "opt",
-                    "-load",
-                    str(loop_limiter),
-                    f"-load-pass-plugin={loop_limiter}",
-                    "-passes=loop-limiter",
-                    f"-max-iterations={args.loop_max_iterations}",
-                    *arguments,
-                ],
-                env=env,
-            )
+                if not arguments:
+                    raise ValueError(
+                        f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}].arguments must not be empty"
+                    )
+                context.run(
+                    [
+                        "opt",
+                        "-load",
+                        str(loop_limiter),
+                        f"-load-pass-plugin={loop_limiter}",
+                        "-passes=loop-limiter",
+                        f"-max-iterations={args.loop_max_iterations}",
+                        *arguments,
+                    ],
+                    env=env,
+                    cwd=workspace.root,
+                )
 
-    raw_cases = benchmark_definition.extra_config.get("klee_cases")
-    if raw_cases is None:
-        return
-    if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
-        raise ValueError(f"{benchmark_definition.config_location}.klee_cases requires a KLEE tool in tools")
-    for index, raw_case in enumerate(expect_array(raw_cases, f"{benchmark_definition.config_location}.klee_cases")):
-        case_location = f"{benchmark_definition.config_location}.klee_cases[{index}]"
-        case_table = expect_table(raw_case, case_location)
-        extra_args = list(
-            optional_string_list(case_table, "extra_args", case_location)
-        )
-        if args.mod_exp_only:
-            extra_args.extend(
-                optional_string_list(
-                    case_table,
-                    "mod_exp_extra_args",
-                    case_location,
-                )
+        raw_cases = benchmark_definition.extra_config.get("klee_cases")
+        if raw_cases is None:
+            return
+        if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
+            raise ValueError(f"{benchmark_definition.config_location}.klee_cases requires a KLEE tool in tools")
+        for index, raw_case in enumerate(expect_array(raw_cases, f"{benchmark_definition.config_location}.klee_cases")):
+            case_location = f"{benchmark_definition.config_location}.klee_cases[{index}]"
+            case_table = expect_table(raw_case, case_location)
+            extra_args = list(
+                optional_string_list(case_table, "extra_args", case_location)
             )
-        memory_flag = case_table.get("memory_flag")
-        if not isinstance(memory_flag, bool):
-            raise ValueError(f"{case_location}.memory_flag must be a boolean")
-        run_case(
-            context,
-            env,
-            results_dir,
-            args,
-            mode,
-            expect_string(case_table, "title", case_location),
-            expect_string(case_table, "bitcode", case_location),
-            expect_string(case_table, "result_name", case_location),
-            expect_string(case_table, "replay_script", case_location),
-            expect_string(case_table, "replay_opts", case_location),
-            expect_string(case_table, "code_path", case_location),
-            memory_flag,
-            *extra_args,
-        )
+            if args.mod_exp_only:
+                extra_args.extend(
+                    optional_string_list(
+                        case_table,
+                        "mod_exp_extra_args",
+                        case_location,
+                    )
+                )
+            memory_flag = case_table.get("memory_flag")
+            if not isinstance(memory_flag, bool):
+                raise ValueError(f"{case_location}.memory_flag must be a boolean")
+            run_case(
+                context,
+                env,
+                workspace,
+                results_dir,
+                args,
+                mode,
+                expect_string(case_table, "title", case_location),
+                expect_string(case_table, "bitcode", case_location),
+                expect_string(case_table, "result_name", case_location),
+                expect_string(case_table, "replay_script", case_location),
+                expect_string(case_table, "replay_opts", case_location),
+                expect_string(case_table, "code_path", case_location),
+                memory_flag,
+                *extra_args,
+            )

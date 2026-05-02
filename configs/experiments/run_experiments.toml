@@ -45,146 +45,125 @@ binsec_16 = true
 [run_definitions.klee_cf_default_4]
 tag = "KLEE CF Default 4"
 tool = "klee_cf"
-source = "results/klee_cf_results"
 destination = "klee_cf_default_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_cf", "{run_time}", "--sym-size", "4"]
+args = ["{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_cf_default_16]
 tag = "KLEE CF Default 16"
 tool = "klee_cf"
-source = "results/klee_cf_results"
 destination = "klee_cf_default_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_cf", "{run_time}", "--sym-size", "16"]
+args = ["{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_cf_dfs_4]
 tag = "KLEE CF DFS 4"
 tool = "klee_cf"
-source = "results/klee_cf_results"
 destination = "klee_cf_dfs_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_cf", "{run_time}", "--sym-size", "4", "--search", "dfs"]
+args = ["{run_time}", "--sym-size", "4", "--search", "dfs", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_cf_dfs_16]
 tag = "KLEE CF DFS 16"
 tool = "klee_cf"
-source = "results/klee_cf_results"
 destination = "klee_cf_dfs_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_cf", "{run_time}", "--sym-size", "16", "--search", "dfs"]
+args = ["{run_time}", "--sym-size", "16", "--search", "dfs", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_cf_rand_path_dfs_4]
 tag = "KLEE CF Rand Path DFS 4"
 tool = "klee_cf"
-source = "results/klee_cf_results"
 destination = "klee_cf_rand_path_dfs_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_cf", "{run_time}", "--sym-size", "4", "--search", "random-path,dfs"]
+args = ["{run_time}", "--sym-size", "4", "--search", "random-path,dfs", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_cf_rand_path_dfs_16]
 tag = "KLEE CF Rand Path DFS 16"
 tool = "klee_cf"
-source = "results/klee_cf_results"
 destination = "klee_cf_rand_path_dfs_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_cf", "{run_time}", "--sym-size", "16", "--search", "random-path,dfs"]
+args = ["{run_time}", "--sym-size", "16", "--search", "random-path,dfs", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_cf_no_conc_4]
 tag = "KLEE CF NO CONC 4"
 tool = "klee_cf"
-source = "results/klee_cf_results"
 destination = "klee_cf_no_conc_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_cf", "{run_time}", "--sym-size", "4", "--concretize-on-solver-timeout", "false"]
+args = ["{run_time}", "--sym-size", "4", "--concretize-on-solver-timeout", "false", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_eager_default_4]
 tag = "KLEE Eager Default 4"
 tool = "klee_eager"
-source = "results/klee_eager_results"
 destination = "klee_eager_default_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_eager", "{run_time}", "--sym-size", "4"]
+args = ["{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_eager_default_16]
 tag = "KLEE Eager Default 16"
 tool = "klee_eager"
-source = "results/klee_eager_results"
 destination = "klee_eager_default_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_eager", "{run_time}", "--sym-size", "16"]
+args = ["{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_eager_dfs_4]
 tag = "KLEE Eager DFS 4"
 tool = "klee_eager"
-source = "results/klee_eager_results"
 destination = "klee_eager_dfs_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_eager", "{run_time}", "--sym-size", "4", "--search", "dfs"]
+args = ["{run_time}", "--sym-size", "4", "--search", "dfs", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_eager_dfs_16]
 tag = "KLEE Eager DFS 16"
 tool = "klee_eager"
-source = "results/klee_eager_results"
 destination = "klee_eager_dfs_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_eager", "{run_time}", "--sym-size", "16", "--search", "dfs"]
+args = ["{run_time}", "--sym-size", "16", "--search", "dfs", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_eager_rand_path_dfs_4]
 tag = "KLEE Eager Rand Path DFS 4"
 tool = "klee_eager"
-source = "results/klee_eager_results"
 destination = "klee_eager_rand_path_dfs_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_eager", "{run_time}", "--sym-size", "4", "--search", "random-path,dfs"]
+args = ["{run_time}", "--sym-size", "4", "--search", "random-path,dfs", "--pin-root", "{pin_root}"]
 
 [run_definitions.klee_eager_rand_path_dfs_16]
 tag = "KLEE Eager Rand Path DFS 16"
 tool = "klee_eager"
-source = "results/klee_eager_results"
 destination = "klee_eager_rand_path_dfs_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_klee_eager", "{run_time}", "--sym-size", "16", "--search", "random-path,dfs"]
+args = ["{run_time}", "--sym-size", "16", "--search", "random-path,dfs", "--pin-root", "{pin_root}"]
 
 [run_definitions.self_comp_default_4]
 tag = "Self Comp Default 4"
 tool = "self_comp"
-source = "results/self_comp_results"
 destination = "self_comp_default_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_self_comp", "--klee-root", "{klee_root}", "--max-time", "{run_time}", "--sym-size", "4"]
+args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
 
 [run_definitions.self_comp_default_16]
 tag = "Self Comp Default 16"
 tool = "self_comp"
-source = "results/self_comp_results"
 destination = "self_comp_default_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_self_comp", "--klee-root", "{klee_root}", "--max-time", "{run_time}", "--sym-size", "16"]
+args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
 
 [run_definitions.self_comp_dfs_4]
 tag = "Self Comp DFS 4"
 tool = "self_comp"
-source = "results/self_comp_results"
 destination = "self_comp_dfs_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_self_comp", "--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "dfs", "--sym-size", "4"]
+args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
 
 [run_definitions.self_comp_dfs_16]
 tag = "Self Comp DFS 16"
 tool = "self_comp"
-source = "results/self_comp_results"
 destination = "self_comp_dfs_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_self_comp", "--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "dfs", "--sym-size", "16"]
+args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
 
 [run_definitions.self_comp_rand_path_dfs_4]
 tag = "Self Comp Rand Path DFS 4"
 tool = "self_comp"
-source = "results/self_comp_results"
 destination = "self_comp_rand_path_dfs_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_self_comp", "--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "random-path,dfs", "--sym-size", "4"]
+args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "random-path,dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
 
 [run_definitions.self_comp_rand_path_dfs_16]
 tag = "Self Comp Rand Path DFS 16"
 tool = "self_comp"
-source = "results/self_comp_results"
 destination = "self_comp_rand_path_dfs_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_self_comp", "--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "random-path,dfs", "--sym-size", "16"]
+args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "random-path,dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
 
 [run_definitions.binsec_4]
 tag = "Binsec 4"
 tool = "binsec"
-source = "results/binsec_results"
 destination = "binsec_4"
-command = ["{python_bin}", "-m", "scripts.experiments.run_binsec", "{run_time}", "--sym-size", "4"]
+args = ["{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
 
 [run_definitions.binsec_16]
 tag = "Binsec 16"
 tool = "binsec"
-source = "results/binsec_results"
 destination = "binsec_16"
-command = ["{python_bin}", "-m", "scripts.experiments.run_binsec", "{run_time}", "--sym-size", "16"]
+args = ["{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
