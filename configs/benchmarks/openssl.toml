@@ -32,22 +32,23 @@ klee_eager = "klee"
 
 [[benchmarks.abacus_cases]]
 executable = "benchmarks/openssl-1.1.1q/abacus_fix_pub_recp"
-outfile = "openssl_recp.txt"
+outfile = "openssl_recp_fix_pub.txt"
 
 [[benchmarks.abacus_cases]]
 executable = "benchmarks/openssl-1.1.1q/abacus_fix_pub_mont"
-outfile = "openssl_mont.txt"
+outfile = "openssl_mont_fix_pub.txt"
 
 [[benchmarks.abacus_cases]]
 executable = "benchmarks/openssl-1.1.1q/abacus_fix_pub_mont_consttime"
-outfile = "openssl_mont_consttime.txt"
+outfile = "openssl_mont_consttime_fix_pub.txt"
 
 [[benchmarks.abacus_cases]]
 executable = "benchmarks/openssl-1.1.1q/abacus_fix_pub_mont_word"
-outfile = "openssl_mont_word.txt"
+outfile = "openssl_mont_word_fix_pub.txt"
 
 [[benchmarks.self_comp_cases]]
 title = "OpenSSL 1.1.1q recp (Fix Pub Self-Comp)"
+
 bitcode = "benchmarks/openssl-1.1.1q/self_comp_fix_pub_recp.bc"
 result_name = "openssl_recp_self_comp_fix_pub"
 json_name = "openssl_recp_fix_pub.json"
@@ -319,6 +320,7 @@ ct_json = "ctchecker_results/openSSL_1_1_1q/mont_word-3.json"
 code_path = "openssl-1.1.1q"
 memory_flag = false
 extra_args = ["--ctchecker-prefix", "crypto/bn"]
+
 
 [[benchmarks.klee_cases]]
 title = "OpenSSL 1.1.1q mont_word (Var Pub Lim Loop Break)"

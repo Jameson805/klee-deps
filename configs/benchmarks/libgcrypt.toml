@@ -32,10 +32,11 @@ klee_eager = "klee"
 
 [[benchmarks.abacus_cases]]
 executable = "benchmarks/libgcrypt-and-libgpg-error/abacus_fix_pub"
-outfile = "libgcrypt.txt"
+outfile = "libgcrypt_fix_pub.txt"
 
 [[benchmarks.self_comp_cases]]
 title = "Libgcrypt 1.10.1 (Fix Pub Self-Comp)"
+
 bitcode = "benchmarks/libgcrypt-and-libgpg-error/self_comp_fix_pub.bc"
 result_name = "libgcrypt_self_comp_fix_pub"
 json_name = "libgcrypt_fix_pub.json"
@@ -156,6 +157,7 @@ ct_json = "ctchecker_results/libgcrypt1.10.1-sliced/3.json"
 code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi"
 memory_flag = false
 mod_exp_extra_args = ["--filename", "mpi-pow.c", "--lines", "404:771"]
+
 
 [[benchmarks.klee_cases]]
 title = "Libgcrypt 1.10.1 (Var Pub Sliced Lim Loop Break)"

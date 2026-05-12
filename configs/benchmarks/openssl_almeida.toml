@@ -32,7 +32,7 @@ klee_eager = "klee"
 
 [[benchmarks.abacus_cases]]
 executable = "benchmarks/openssl_almeida/abacus_fix_pub_tls_rempad_luk13"
-outfile = "openssl_almeida_tls_rempad_luk13.txt"
+outfile = "openssl_almeida_tls_rempad_luk13_fix_pub.txt"
 runner_config = "configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml"
 preset_name = "default"
 

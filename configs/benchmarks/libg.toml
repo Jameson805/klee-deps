@@ -30,33 +30,23 @@ preset = "default"
 klee_cf = "klee"
 klee_eager = "klee"
 
-[[benchmarks.abacus_cases]]
-executable = "benchmarks/libg/abacus_fix_pub_des"
-outfile = "libg_des.txt"
-runner_config = "configs/runner/libg_des_runner_config.toml"
-preset_name = "default"
+[benchmarks.mode_case_templates]
+abacus_executable = "benchmarks/libg/abacus_{public_mode}_{artifact_suffix}"
+self_comp_bitcode = "benchmarks/libg/self_comp_{public_mode}_{artifact_suffix}.bc"
+self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
+binsec_sse_script = "benchmarks/libg/generated/binsec_{public_mode}.cfg"
+binsec_executable = "benchmarks/libg/binsec_{public_mode}_{artifact_suffix}"
+klee_bitcode = "benchmarks/libg/klee_{public_mode}_{artifact_suffix}.bc"
+klee_replay_script = "benchmarks/libg/klee_{public_mode}_replay_{artifact_suffix}"
 
-[[benchmarks.self_comp_cases]]
-title = "libg DES (Self-Comp)"
-bitcode = "benchmarks/libg/self_comp_fix_pub_des.bc"
-result_name = "libg_des_self_comp"
-json_name = "libg_des.json"
-replay_executable = "klee_fix_pub_replay_des"
-secret_layout = "key:24,data:64"
-
-[[benchmarks.binsec_cases]]
-title = "libg DES"
-sse_script = "benchmarks/libg/generated/binsec_fix_pub.cfg"
-stats_file = "libg_des.toml"
-executable = "benchmarks/libg/binsec_fix_pub_des"
-secret_inputs = ["key:24:key_buf", "data:64:data_buf"]
-
-[[benchmarks.klee_cases]]
-title = "libg DES"
-bitcode = "benchmarks/libg/klee_fix_pub_des.bc"
-result_name = "libg_des"
-replay_script = "benchmarks/libg/klee_fix_pub_replay_des"
+[[benchmarks.mode_cases]]
+display_name = "DES"
+artifact_suffix = "des"
+output_stem = "libg_des"
 replay_opts = "--secret key,data"
 ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
-code_path = "benchmarks/libg"
 memory_flag = true
+secret_layout = "key:24,data:64"
+secret_inputs = ["key:24:key_buf", "data:64:data_buf"]
+runner_config = "configs/runner/libg_des_runner_config.toml"
+preset_name = "default"

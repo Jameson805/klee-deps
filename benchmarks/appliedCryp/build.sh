@@ -169,6 +169,7 @@ generate_runner_artifacts_for_id() {
         generator_args+=(
             --binsec-base "$repo_root/configs/binsec/binsec_base.cfg"
             --binsec-fix-pub-out "$generated_dir/binsec_fix_pub.cfg"
+            --binsec-var-pub-out "$generated_dir/binsec_var_pub.cfg"
         )
     fi
 
@@ -194,10 +195,19 @@ build_klee_mode() {
     wrapper="$(bench_wrapper_for_id "$id")"
     flags=("${common_flags[@]}" -I "$generated_dir")
 
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -DCONCRETE_PUBS "$wrapper" -o "klee_fix_pub_${id}"
-    extract-bc "klee_fix_pub_${id}"
+    local var_exe="klee_var_pub_${id}"
+    local fix_exe="klee_fix_pub_${id}"
+    local var_replay="klee_var_pub_replay_${id}"
+    local fix_replay="klee_fix_pub_replay_${id}"
 
-    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS "$wrapper" -o "klee_fix_pub_replay_${id}"
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF "$wrapper" -o "$var_exe"
+    extract-bc "$var_exe"
+
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -DCONCRETE_PUBS "$wrapper" -o "$fix_exe"
+    extract-bc "$fix_exe"
+
+    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY "$wrapper" -o "$var_replay"
+    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS "$wrapper" -o "$fix_replay"
 }
 
 build_self_comp_mode() {
@@ -211,11 +221,21 @@ build_self_comp_mode() {
     wrapper="$(bench_wrapper_for_id "$id")"
     flags=("${common_flags[@]}" -I "$generated_dir")
 
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP -DCONCRETE_PUBS "$wrapper" -o "self_comp_fix_pub_${id}"
-    extract-bc "self_comp_fix_pub_${id}"
-    record_branch "self_comp_fix_pub_${id}.bc"
+    local var_exe="self_comp_var_pub_${id}"
+    local fix_exe="self_comp_fix_pub_${id}"
+    local var_replay="klee_var_pub_replay_${id}"
+    local fix_replay="klee_fix_pub_replay_${id}"
 
-    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS "$wrapper" -o "klee_fix_pub_replay_${id}"
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP "$wrapper" -o "$var_exe"
+    extract-bc "$var_exe"
+    record_branch "$var_exe.bc"
+
+    wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP -DCONCRETE_PUBS "$wrapper" -o "$fix_exe"
+    extract-bc "$fix_exe"
+    record_branch "$fix_exe.bc"
+
+    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY "$wrapper" -o "$var_replay"
+    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS "$wrapper" -o "$fix_replay"
 }
 
 build_binsec_mode() {
@@ -229,10 +249,20 @@ build_binsec_mode() {
     wrapper="$(bench_wrapper_for_id "$id")"
     flags=("${common_flags[@]}" -I "$generated_dir")
 
+    local var_exe="binsec_var_pub_${id}"
+    local fix_exe="binsec_fix_pub_${id}"
+    local var_replay="binsec_var_pub_replay_${id}"
+    local fix_replay="binsec_fix_pub_replay_${id}"
+
     clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
-        -DBINSEC -DCONCRETE_PUBS "${flags[@]}" "$wrapper" -o "binsec_fix_pub_${id}"
+        -DBINSEC "${flags[@]}" "$wrapper" -o "$var_exe"
     clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
-        -DREPLAY -DCONCRETE_PUBS "${flags[@]}" "$wrapper" -o "binsec_fix_pub_replay_${id}"
+        -DBINSEC -DCONCRETE_PUBS "${flags[@]}" "$wrapper" -o "$fix_exe"
+
+    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+        -DREPLAY "${flags[@]}" "$wrapper" -o "$var_replay"
+    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+        -DREPLAY -DCONCRETE_PUBS "${flags[@]}" "$wrapper" -o "$fix_replay"
 }
 
 build_abacus_mode() {

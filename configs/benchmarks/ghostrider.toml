@@ -30,65 +30,35 @@ preset = "default"
 klee_cf = "klee"
 klee_eager = "klee"
 
-[[benchmarks.abacus_cases]]
-executable = "benchmarks/ghostrider/abacus_fix_pub_findmax"
-outfile = "ghostrider_findmax.txt"
+[benchmarks.mode_case_templates]
+abacus_executable = "benchmarks/ghostrider/abacus_{public_mode}_{artifact_suffix}"
+self_comp_bitcode = "benchmarks/ghostrider/self_comp_{public_mode}_{artifact_suffix}.bc"
+self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
+binsec_sse_script = "benchmarks/ghostrider/generated/{artifact_suffix}/binsec_{public_mode}.cfg"
+binsec_executable = "benchmarks/ghostrider/binsec_{public_mode}_{artifact_suffix}"
+klee_bitcode = "benchmarks/ghostrider/klee_{public_mode}_{artifact_suffix}.bc"
+klee_replay_script = "benchmarks/ghostrider/klee_{public_mode}_replay_{artifact_suffix}"
+
+[[benchmarks.mode_cases]]
+display_name = "findmax"
+artifact_suffix = "findmax"
+output_stem = "ghostrider_findmax"
+replay_opts = "--secret data"
+ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
+memory_flag = true
+secret_layout = "data:2000"
+secret_inputs = ["data:2000:data_buf"]
 runner_config = "configs/runner/ghostrider_findmax_runner_config.toml"
 preset_name = "default"
 
-[[benchmarks.abacus_cases]]
-executable = "benchmarks/ghostrider/abacus_fix_pub_matmul"
-outfile = "ghostrider_matmul.txt"
+[[benchmarks.mode_cases]]
+display_name = "matmul"
+artifact_suffix = "matmul"
+output_stem = "ghostrider_matmul"
+replay_opts = "--secret data"
+ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
+memory_flag = true
+secret_layout = "data:32768"
+secret_inputs = ["data:32768:data_buf"]
 runner_config = "configs/runner/ghostrider_matmul_runner_config.toml"
 preset_name = "default"
-
-[[benchmarks.self_comp_cases]]
-title = "Ghostrider findmax (Self-Comp)"
-bitcode = "benchmarks/ghostrider/self_comp_fix_pub_findmax.bc"
-result_name = "ghostrider_findmax_self_comp"
-json_name = "ghostrider_findmax.json"
-replay_executable = "klee_fix_pub_replay_findmax"
-secret_layout = "data:2000"
-
-[[benchmarks.self_comp_cases]]
-title = "Ghostrider matmul (Self-Comp)"
-bitcode = "benchmarks/ghostrider/self_comp_fix_pub_matmul.bc"
-result_name = "ghostrider_matmul_self_comp"
-json_name = "ghostrider_matmul.json"
-replay_executable = "klee_fix_pub_replay_matmul"
-secret_layout = "data:32768"
-
-[[benchmarks.binsec_cases]]
-title = "Ghostrider findmax"
-sse_script = "benchmarks/ghostrider/generated/findmax/binsec_fix_pub.cfg"
-stats_file = "ghostrider_findmax.toml"
-executable = "benchmarks/ghostrider/binsec_fix_pub_findmax"
-secret_inputs = ["data:2000:data_buf"]
-
-[[benchmarks.binsec_cases]]
-title = "Ghostrider matmul"
-sse_script = "benchmarks/ghostrider/generated/matmul/binsec_fix_pub.cfg"
-stats_file = "ghostrider_matmul.toml"
-executable = "benchmarks/ghostrider/binsec_fix_pub_matmul"
-secret_inputs = ["data:32768:data_buf"]
-
-[[benchmarks.klee_cases]]
-title = "Ghostrider findmax"
-bitcode = "benchmarks/ghostrider/klee_fix_pub_findmax.bc"
-result_name = "ghostrider_findmax"
-replay_script = "benchmarks/ghostrider/klee_fix_pub_replay_findmax"
-replay_opts = "--secret data"
-ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
-code_path = "benchmarks/ghostrider"
-memory_flag = true
-
-
-[[benchmarks.klee_cases]]
-title = "Ghostrider matmul"
-bitcode = "benchmarks/ghostrider/klee_fix_pub_matmul.bc"
-result_name = "ghostrider_matmul"
-replay_script = "benchmarks/ghostrider/klee_fix_pub_replay_matmul"
-replay_opts = "--secret data"
-ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
-code_path = "benchmarks/ghostrider"
-memory_flag = true

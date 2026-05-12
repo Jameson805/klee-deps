@@ -32,10 +32,11 @@ klee_eager = "klee"
 
 [[benchmarks.abacus_cases]]
 executable = "benchmarks/mbedtls-3.2.1/abacus_fix_pub"
-outfile = "mbedtls.txt"
+outfile = "mbedtls_fix_pub.txt"
 
 [[benchmarks.self_comp_cases]]
 title = "Mbed TLS 3.2.1 (Fix Pub Self-Comp)"
+
 bitcode = "benchmarks/mbedtls-3.2.1/self_comp_fix_pub.bc"
 result_name = "mbedtls_self_comp_fix_pub"
 json_name = "mbedtls_fix_pub.json"
@@ -155,6 +156,7 @@ replay_opts = "--secret exp --public base,mod"
 ct_json = "ctchecker_results/mbedtls3.2.1-sliced/2.json"
 code_path = "mbedtls-3.2.1"
 memory_flag = false
+
 
 
 [[benchmarks.klee_cases]]
