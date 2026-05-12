@@ -5,12 +5,21 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+
+from tools.shared.configuration_metadata import copy_column_metadata
 
 
 FILTER_REQUIRED_COLUMNS = {"library", "file", "line_start", "line_end"}
 INPUT_REQUIRED_COLUMNS = {"library", "file", "line"}
+
+
+@dataclass(frozen=True)
+class FilterConfiguration:
+    ranges_by_location: dict[tuple[str, str], list[tuple[int, int]]]
+    libraries_with_filters: set[str]
 
 
 def _normalize_text(value: object) -> str:
@@ -37,8 +46,9 @@ def _validate_columns(fieldnames: Iterable[str] | None, required: set[str], csv_
         raise SystemExit(f"{csv_path} is missing required column(s): {', '.join(missing)}")
 
 
-def load_filters(filter_path: Path) -> dict[tuple[str, str], list[tuple[int, int]]]:
+def load_filters(filter_path: Path) -> FilterConfiguration:
     filters: dict[tuple[str, str], list[tuple[int, int]]] = {}
+    libraries_with_filters: set[str] = set()
 
     with filter_path.open(newline="") as handle:
         reader = csv.DictReader(handle)
@@ -46,7 +56,8 @@ def load_filters(filter_path: Path) -> dict[tuple[str, str], list[tuple[int, int
 
         for row_number, row in enumerate(reader, start=2):
             try:
-                key = (_normalize_text(row["library"]), _normalize_file(row["file"]))
+                library = _normalize_text(row["library"])
+                key = (library, _normalize_file(row["file"]))
                 line_start = _normalize_int(row["line_start"], "line_start")
                 line_end = _normalize_int(row["line_end"], "line_end")
             except Exception as exc:
@@ -59,27 +70,32 @@ def load_filters(filter_path: Path) -> dict[tuple[str, str], list[tuple[int, int
                 )
 
             filters.setdefault(key, []).append((line_start, line_end))
+            libraries_with_filters.add(library)
 
-    return filters
+    return FilterConfiguration(
+        ranges_by_location=filters,
+        libraries_with_filters=libraries_with_filters,
+    )
 
 
 def location_matches(
-    filters: dict[tuple[str, str], list[tuple[int, int]]],
+    filters: FilterConfiguration,
     *,
     library: object,
     file: object,
     line: object,
 ) -> bool:
-    key = (_normalize_text(library), _normalize_file(file))
-    ranges = filters.get(key)
+    normalized_library = _normalize_text(library)
+    key = (normalized_library, _normalize_file(file))
+    ranges = filters.ranges_by_location.get(key)
     if not ranges:
-        return False
+        return normalized_library not in filters.libraries_with_filters
 
     normalized_line = _normalize_int(line, "line")
     return any(line_start <= normalized_line <= line_end for line_start, line_end in ranges)
 
 
-def row_matches(filters: dict[tuple[str, str], list[tuple[int, int]]], row: dict[str, str]) -> bool:
+def row_matches(filters: FilterConfiguration, row: dict[str, str]) -> bool:
     return location_matches(
         filters,
         library=row["library"],
@@ -115,6 +131,8 @@ def filter_csv(input_path: Path, filter_path: Path, output_path: Path) -> tuple[
         writer.writeheader()
         writer.writerows(output_rows)
 
+    copy_column_metadata(input_path, output_path)
+
     return kept_rows, total_rows
 
 
@@ -122,7 +140,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Filter a merged-results CSV by keeping only rows whose "
-            "(library, file, line) match any configured inclusive line range."
+            "(library, file, line) match any configured inclusive line range. "
+            "Libraries that do not appear in the filter CSV are kept unchanged."
         )
     )
     parser.add_argument("input_csv", help="Input merged-results CSV path")

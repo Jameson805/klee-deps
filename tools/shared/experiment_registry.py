@@ -21,6 +21,7 @@ from scripts.experiments.common import (
     optional_string,
     optional_string_list,
 )
+from tools.shared.configuration_metadata import case_output_metadata
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -39,6 +40,126 @@ def expect_string_list(table: dict[str, object], key: str, location: str) -> lis
     if not all(isinstance(item, str) and item for item in values):
         raise ValueError(f"{location}.{key} must contain only non-empty strings")
     return list(values)
+
+
+def public_mode_label(public_mode: str) -> str:
+    labels = {
+        "fix_pub": "Fix Pub",
+        "var_pub": "Var Pub",
+        "var_pub_lim_loop_break": "Var Pub Lim Loop Break",
+    }
+    try:
+        return labels[public_mode]
+    except KeyError as error:
+        raise ValueError(f"unsupported public mode {public_mode!r}") from error
+
+
+def _expand_mode_cases(definition_table: dict[str, object], location: str) -> dict[str, object]:
+    raw_mode_cases = definition_table.get("mode_cases")
+    if raw_mode_cases is None:
+        return {}
+
+    templates = expect_table(
+        definition_table.get("mode_case_templates"),
+        f"{location}.mode_case_templates",
+    )
+    mode_cases = expect_array(raw_mode_cases, f"{location}.mode_cases")
+    benchmark_display_name = expect_string(definition_table, "display_name", location)
+    default_code_path = expect_string(definition_table, "code_path", location)
+
+    expanded: dict[str, list[dict[str, object]]] = {
+        "abacus_cases": [],
+        "self_comp_cases": [],
+        "binsec_cases": [],
+        "klee_cases": [],
+    }
+    for index, raw_case in enumerate(mode_cases):
+        case_location = f"{location}.mode_cases[{index}]"
+        case_table = expect_table(raw_case, case_location)
+        case_display_name = expect_string(case_table, "display_name", case_location)
+        artifact_suffix = expect_string(case_table, "artifact_suffix", case_location)
+        output_stem = expect_string(case_table, "output_stem", case_location)
+        replay_opts = expect_string(case_table, "replay_opts", case_location)
+        ct_json = expect_string(case_table, "ct_json", case_location)
+        memory_flag = case_table.get("memory_flag")
+        if not isinstance(memory_flag, bool):
+            raise ValueError(f"{case_location}.memory_flag must be a boolean")
+
+        public_modes = optional_string_list(case_table, "public_modes", case_location) or ["fix_pub", "var_pub"]
+        abacus_modes = optional_string_list(case_table, "abacus_modes", case_location) or ["fix_pub"]
+        code_path = optional_string(case_table, "code_path", case_location) or default_code_path
+        secret_layout = optional_string(case_table, "secret_layout", case_location)
+        public_layout = optional_string(case_table, "public_layout", case_location)
+        secret_inputs = optional_string_list(case_table, "secret_inputs", case_location)
+        public_inputs = optional_string_list(case_table, "public_inputs", case_location)
+        runner_config = optional_string(case_table, "runner_config", case_location)
+        preset_name = optional_string(case_table, "preset_name", case_location)
+
+        for public_mode in public_modes:
+            case_title = f"{benchmark_display_name} {case_display_name} ({public_mode_label(public_mode)})"
+            shared_metadata = {
+                "source_column_suffix": public_mode,
+                "public_mode": public_mode,
+                "sliced": False,
+            }
+            expanded["self_comp_cases"].append(
+                {
+                    "title": f"{case_title} Self-Comp",
+                    "bitcode": expect_string(templates, "self_comp_bitcode", f"{location}.mode_case_templates").format(public_mode=public_mode, artifact_suffix=artifact_suffix),
+                    "result_name": f"{output_stem}_self_comp_{public_mode}",
+                    "json_name": f"{output_stem}_{public_mode}.json",
+                    "replay_executable": expect_string(templates, "self_comp_replay_executable", f"{location}.mode_case_templates").format(public_mode=public_mode, artifact_suffix=artifact_suffix),
+                    **shared_metadata,
+                    **({"secret_layout": secret_layout} if secret_layout else {}),
+                    **({"public_layout": public_layout} if public_layout else {}),
+                }
+            )
+            expanded["binsec_cases"].append(
+                {
+                    "title": case_title,
+                    "sse_script": expect_string(templates, "binsec_sse_script", f"{location}.mode_case_templates").format(public_mode=public_mode, artifact_suffix=artifact_suffix),
+                    "stats_file": f"{output_stem}_{public_mode}.toml",
+                    "executable": expect_string(templates, "binsec_executable", f"{location}.mode_case_templates").format(public_mode=public_mode, artifact_suffix=artifact_suffix),
+                    **shared_metadata,
+                    **({"secret_inputs": secret_inputs} if secret_inputs else {}),
+                    **({"public_inputs": public_inputs} if public_inputs else {}),
+                }
+            )
+            expanded["klee_cases"].append(
+                {
+                    "title": case_title,
+                    "bitcode": expect_string(templates, "klee_bitcode", f"{location}.mode_case_templates").format(public_mode=public_mode, artifact_suffix=artifact_suffix),
+                    "result_name": f"{output_stem}_{public_mode}",
+                    "replay_script": expect_string(templates, "klee_replay_script", f"{location}.mode_case_templates").format(public_mode=public_mode, artifact_suffix=artifact_suffix),
+                    "replay_opts": replay_opts,
+                    "ct_json": ct_json,
+                    "code_path": code_path,
+                    "memory_flag": memory_flag,
+                    **shared_metadata,
+                }
+            )
+
+        for public_mode in abacus_modes:
+            expanded["abacus_cases"].append(
+                {
+                    "executable": expect_string(templates, "abacus_executable", f"{location}.mode_case_templates").format(public_mode=public_mode, artifact_suffix=artifact_suffix),
+                    "outfile": f"{output_stem}_{public_mode}.txt",
+                    "source_column_suffix": public_mode,
+                    "public_mode": public_mode,
+                    "sliced": False,
+                    **({"runner_config": runner_config} if runner_config else {}),
+                    **({"preset_name": preset_name} if preset_name else {}),
+                }
+            )
+
+    return expanded
+
+
+def normalized_case_output_metadata(case_table: dict[str, object], location: str) -> dict[str, object]:
+    try:
+        return case_output_metadata(case_table)
+    except ValueError as error:
+        raise ValueError(f"{location}: {error}") from error
 
 
 @dataclass(frozen=True)
@@ -241,9 +362,10 @@ def _load_registry() -> tuple[
                 extra_config={
                     key: value
                     for key, value in definition_table.items()
-                    if key not in generic_fields
+                    if key not in generic_fields and key not in {"mode_cases", "mode_case_templates"}
                 },
             )
+            benchmark_definition.extra_config.update(_expand_mode_cases(definition_table, location))
             definitions.append(benchmark_definition)
             seen_ids.add(benchmark_id)
             for tool_id in tools:

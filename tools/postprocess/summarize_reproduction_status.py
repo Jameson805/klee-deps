@@ -10,22 +10,26 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
-from tools.postprocess.aggregate_experiment_groups import parse_column_configuration
 from tools.postprocess.apply_sliced_map import load_sliced_map
 from tools.postprocess.csv_to_latex_table import escape_latex
 from tools.postprocess.filter_merged_results import load_filters, location_matches
-from tools.postprocess.merge_results import column_and_library_from_json_filename
+from tools.postprocess.selection_helpers import load_selected_configurations
+from tools.shared.configuration_metadata import build_column_metadata, load_run_metadata
 from tools.shared.result_schema import (
+    KIND_BRANCH,
+    KIND_MEMORY,
     REPRODUCED_STATUSES,
     STATUS_IDENTICAL_TRACE,
     STATUS_LOCATION_MISMATCH,
     STATUS_NOT_REPRODUCED,
     STATUS_SUCCESS,
     STATUS_TIMEOUT,
+    normalize_result_kind,
 )
 
 
 INCONSISTENT_STATUS = "inconsistent_across_repetitions"
+TOTAL_COLUMN = "total"
 STATUS_COLUMNS = [
     STATUS_SUCCESS,
     STATUS_TIMEOUT,
@@ -48,9 +52,20 @@ OUTPUT_COLUMNS = [
     "total_filtered_positives",
 ]
 
+SIDE_CHANNEL_BRANCH = KIND_BRANCH
+SIDE_CHANNEL_MEMORY = KIND_MEMORY
+SIDE_CHANNEL_COLUMNS = [SIDE_CHANNEL_BRANCH, SIDE_CHANNEL_MEMORY]
+
 
 def _empty_status_counts() -> dict[str, int]:
     return {status_name: 0 for status_name in STATUS_COLUMNS}
+
+
+def _empty_side_channel_status_counts() -> dict[str, dict[str, int]]:
+    return {
+        side_channel_kind: _empty_status_counts()
+        for side_channel_kind in SIDE_CHANNEL_COLUMNS
+    }
 
 
 def _selected_output_path(output_path: Path) -> Path:
@@ -72,18 +87,21 @@ def _basename_only(path_value: str) -> str:
     return os.path.basename(path_value.replace("\\", "/"))
 
 
-def _read_rows(json_path: Path) -> list[dict[str, Any]]:
+def _read_payload(json_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     with json_path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
 
     if isinstance(payload, dict):
         rows = payload.get("data")
         if isinstance(rows, list):
-            return [row for row in rows if isinstance(row, dict)]
+            metadata = payload.get("metadata")
+            if metadata is not None and not isinstance(metadata, dict):
+                raise SystemExit(f"{json_path}: expected metadata to be a JSON object")
+            return [row for row in rows if isinstance(row, dict)], dict(metadata or {})
         raise SystemExit(f"{json_path}: expected a top-level 'data' list")
 
     if isinstance(payload, list):
-        return [row for row in payload if isinstance(row, dict)]
+        return [row for row in payload if isinstance(row, dict)], {}
 
     raise SystemExit(f"{json_path}: expected a JSON object or list")
 
@@ -175,6 +193,9 @@ def _resolve_location(
                 f"{json_path} data[{row_number}]: invalid column {column_value!r}"
             ) from None
 
+    # Keep library keys consistent with merge_results: the JSON filename encodes
+    # the benchmark identifier, while row-level `library` values may be only a
+    # coarse family label such as "unknown".
     library = library_hint
 
     filename = _basename_only(filename)
@@ -217,13 +238,29 @@ def _resolve_location(
     return library, filename, line, column, context
 
 
+def _resolve_side_channel_kind(row: Mapping[str, Any], json_path: Path) -> str:
+    raw_kind = row.get("kind")
+    if raw_kind is None:
+        raise SystemExit(f"{json_path}: missing required row field 'kind'")
+    try:
+        return normalize_result_kind(raw_kind)
+    except (TypeError, ValueError) as error:
+        raise SystemExit(f"{json_path}: invalid row field 'kind': {error}") from error
+
+
 def collect_reproduction_status_counts(
     root_dir: Path,
     *,
     filter_path: Path,
     sliced_map_path: Optional[Path],
     keep_unmapped: bool,
-) -> tuple[list[str], dict[str, dict[str, int]], dict[str, dict[str, dict[str, int]]]]:
+) -> tuple[
+    list[str],
+    dict[str, dict[str, int]],
+    dict[str, dict[str, dict[str, int]]],
+    dict[str, dict[str, dict[str, dict[str, int]]]],
+    dict[str, dict[str, Any]],
+]:
     if not root_dir.is_dir():
         raise SystemExit(f"Input '{root_dir}' is not a directory")
 
@@ -233,37 +270,43 @@ def collect_reproduction_status_counts(
     ordered_configurations: list[str] = []
     counts_by_configuration: dict[str, dict[str, int]] = {}
     counts_by_configuration_and_library: dict[str, dict[str, dict[str, int]]] = {}
+    counts_by_configuration_library_and_kind: dict[
+        str,
+        dict[str, dict[str, dict[str, int]]],
+    ] = {}
+    configuration_metadata: dict[str, dict[str, Any]] = {}
+    run_metadata_by_name = load_run_metadata(root_dir)
 
-    run_names = sorted(
-        directory.name for directory in root_dir.iterdir() if directory.is_dir()
-    )
+    run_names = sorted(run_metadata_by_name)
     for run_name in run_names:
         run_dir = root_dir / run_name
+        if not run_dir.is_dir():
+            raise SystemExit(f"{root_dir}: run metadata references missing run directory {run_name!r}")
+        run_metadata = run_metadata_by_name[run_name]
         for entry in sorted(run_dir.iterdir(), key=lambda path: path.name):
-            if not entry.is_file():
+            if not entry.is_file() or entry.suffix.lower() != ".json":
                 continue
 
-            stem = entry.stem.lower()
-            resolved = column_and_library_from_json_filename(
-                entry.name,
-                run_name,
-                sliced_only="_sliced" in stem,
-            )
-            if resolved is None:
-                continue
-
-            configuration, library_hint = resolved
+            rows, case_metadata = _read_payload(entry)
+            if not case_metadata:
+                raise SystemExit(f"{entry}: missing required payload metadata")
+            metadata = build_column_metadata(run_metadata, case_metadata)
+            configuration = str(metadata["source_column"])
+            library_hint = case_metadata.get("library_key")
+            if not isinstance(library_hint, str) or not library_hint:
+                raise SystemExit(f"{entry}: payload metadata is missing non-empty library_key")
             if configuration not in counts_by_configuration:
                 ordered_configurations.append(configuration)
                 counts_by_configuration[configuration] = _empty_status_counts()
                 counts_by_configuration_and_library[configuration] = {}
+                counts_by_configuration_library_and_kind[configuration] = {}
+                configuration_metadata[configuration] = metadata
 
-            rows = _read_rows(entry)
             for row_number, row in enumerate(rows, start=1):
                 library, filename, line, column, context = _resolve_location(
                     row,
                     library_hint=library_hint,
-                    sliced="_sliced" in stem,
+                    sliced=bool(case_metadata.get("sliced")),
                     sliced_map=sliced_map,
                     keep_unmapped=keep_unmapped,
                     json_path=entry,
@@ -276,9 +319,15 @@ def collect_reproduction_status_counts(
                     library,
                     _empty_status_counts(),
                 )
+                kind_counts = counts_by_configuration_library_and_kind[configuration].setdefault(
+                    library,
+                    _empty_side_channel_status_counts(),
+                )
                 bucket = _resolve_status_bucket(row.get("reproduced_status"), context=context)
+                side_channel_kind = _resolve_side_channel_kind(row, entry)
                 counts_by_configuration[configuration][bucket] += 1
                 library_counts[bucket] += 1
+                kind_counts[side_channel_kind][bucket] += 1
 
     if not ordered_configurations:
         raise SystemExit(f"No top-level result JSON files found under '{root_dir}'")
@@ -287,28 +336,31 @@ def collect_reproduction_status_counts(
         ordered_configurations,
         counts_by_configuration,
         counts_by_configuration_and_library,
+        counts_by_configuration_library_and_kind,
+        configuration_metadata,
     )
 
 
 def _build_summary_rows(
     ordered_configurations: Sequence[str],
     counts_by_configuration: Mapping[str, Mapping[str, int]],
+    configuration_metadata: Mapping[str, Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     output_rows: list[dict[str, Any]] = []
     for configuration in ordered_configurations:
-        parsed = parse_column_configuration(configuration)
+        metadata = configuration_metadata[configuration]
         counts = counts_by_configuration[configuration]
         output_rows.append(
             {
-                "configuration": parsed.source_column,
-                "configuration_label": parsed.configuration_label,
-                "comparison_tool": parsed.comparison_tool,
-                "tool_family": parsed.tool_family,
-                "sliced": parsed.sliced,
-                "searcher": parsed.searcher,
-                "sym_size": parsed.sym_size,
-                "public_mode": parsed.public_mode,
-                "concretization_policy": parsed.concretization_policy,
+                "configuration": configuration,
+                "configuration_label": metadata["configuration_label"],
+                "comparison_tool": metadata["comparison_tool"],
+                "tool_family": metadata["tool_family"],
+                "sliced": metadata["sliced"],
+                "searcher": metadata["searcher"],
+                "sym_size": metadata["sym_size"],
+                "public_mode": metadata["public_mode"],
+                "concretization_policy": metadata["concretization_policy"],
                 **{status_name: counts[status_name] for status_name in STATUS_COLUMNS},
                 "total_filtered_positives": sum(counts.values()),
             }
@@ -335,101 +387,47 @@ def summarize_reproduction_statuses(
     sliced_map_path: Optional[Path],
     keep_unmapped: bool,
 ) -> tuple[int, int]:
-    ordered_configurations, counts_by_configuration, _ = collect_reproduction_status_counts(
+    (
+        ordered_configurations,
+        counts_by_configuration,
+        _,
+        _,
+        configuration_metadata,
+    ) = collect_reproduction_status_counts(
         root_dir,
         filter_path=filter_path,
         sliced_map_path=sliced_map_path,
         keep_unmapped=keep_unmapped,
     )
 
-    output_rows = _build_summary_rows(ordered_configurations, counts_by_configuration)
+    output_rows = _build_summary_rows(
+        ordered_configurations,
+        counts_by_configuration,
+        configuration_metadata,
+    )
     _write_summary_csv(output_rows, output_path)
 
     return len(output_rows), sum(row["total_filtered_positives"] for row in output_rows)
-
-
-def _normalize_plot_groups(plot_groups: Any) -> str:
-    if plot_groups is None:
-        return ""
-
-    normalized_groups: list[str] = []
-    for raw_group in str(plot_groups).replace(";", "|").split("|"):
-        group = raw_group.strip()
-        if group and group not in normalized_groups:
-            normalized_groups.append(group)
-
-    return "|".join(normalized_groups)
 
 
 def _load_selected_configurations(
     selection_csv: Path,
     summary_rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    with selection_csv.open("r", newline="", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle)
-        if not reader.fieldnames:
-            raise SystemExit(f"{selection_csv}: CSV has no header")
-
-        required_columns = {"comparison_tool", "source_column"}
-        missing_columns = sorted(required_columns.difference(reader.fieldnames))
-        if missing_columns:
-            joined = ", ".join(missing_columns)
-            raise SystemExit(
-                f"{selection_csv}: missing required column(s): {joined}"
-            )
-
-        rows = list(reader)
-
-    seen_comparison_tools: set[str] = set()
     lookup = {
         str(row["configuration"]).strip(): dict(row)
         for row in summary_rows
     }
-    selected_rows: list[dict[str, Any]] = []
-    for row_number, selection_row in enumerate(rows, start=2):
-        comparison_tool = str(selection_row["comparison_tool"]).strip()
-        source_column = str(selection_row["source_column"]).strip()
-        display_label = str(selection_row.get("display_label", "")).strip()
-        plot_groups = _normalize_plot_groups(selection_row.get("plot_groups", ""))
-
-        if not comparison_tool:
-            raise SystemExit(f"{selection_csv} line {row_number}: empty comparison_tool")
-        if not source_column:
-            raise SystemExit(f"{selection_csv} line {row_number}: empty source_column")
-        if comparison_tool in seen_comparison_tools:
-            raise SystemExit(
-                f"{selection_csv} line {row_number}: duplicate comparison_tool {comparison_tool!r}"
-            )
-        seen_comparison_tools.add(comparison_tool)
-
-        summary_row = lookup.get(source_column)
-        if summary_row is None:
-            raise SystemExit(
-                f"{selection_csv} line {row_number}: source_column {source_column!r} does not exist"
-            )
-        if str(summary_row["comparison_tool"]).strip() != comparison_tool:
-            raise SystemExit(
-                f"{selection_csv} line {row_number}: comparison_tool {comparison_tool!r} "
-                f"does not match summary metadata {summary_row['comparison_tool']!r}"
-            )
-
-        selected_rows.append(
-            {
-                "source_column": source_column,
-                "comparison_tool": comparison_tool,
-                "display_label": display_label or source_column,
-                "plot_groups": plot_groups,
-                "summary_row": summary_row,
-                **{
-                    status_name: int(summary_row[status_name])
-                    for status_name in STATUS_COLUMNS
-                },
-            }
-        )
-
-    if not selected_rows:
-        raise SystemExit(f"{selection_csv}: selection CSV is empty")
-
+    selected_rows = load_selected_configurations(
+        selection_csv,
+        lookup,
+        missing_context="Skipping selection rows whose source_column was not present in the summary",
+        empty_context="No selected configurations matched the summary; skipping selected summary outputs.",
+    )
+    for selected_row in selected_rows:
+        for status_name in STATUS_COLUMNS:
+            selected_row[status_name] = int(selected_row[status_name])
+        selected_row["summary_row"] = dict(selected_row)
     return selected_rows
 
 
@@ -445,6 +443,10 @@ def _load_selection_rows(
                 status_name: int(selected_configuration[status_name])
                 for status_name in STATUS_COLUMNS
             },
+            TOTAL_COLUMN: sum(
+                int(selected_configuration[status_name])
+                for status_name in STATUS_COLUMNS
+            ),
         }
         for selected_configuration in selected_configurations
     ]
@@ -460,7 +462,7 @@ def _nonzero_status_columns(selected_rows: Sequence[Mapping[str, Any]]) -> list[
 
 def _write_selected_csv(selected_rows: Sequence[Mapping[str, Any]], output_path: Path) -> Path:
     kept_status_columns = _nonzero_status_columns(selected_rows)
-    fieldnames = ["configuration", *kept_status_columns]
+    fieldnames = ["configuration", *kept_status_columns, TOTAL_COLUMN]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as handle:
@@ -474,8 +476,8 @@ def _write_selected_csv(selected_rows: Sequence[Mapping[str, Any]], output_path:
 
 def _selected_rows_to_latex(selected_rows: Sequence[Mapping[str, Any]]) -> str:
     kept_status_columns = _nonzero_status_columns(selected_rows)
-    fieldnames = ["configuration", *kept_status_columns]
-    alignment = "l" + "r" * len(kept_status_columns)
+    fieldnames = ["configuration", *kept_status_columns, TOTAL_COLUMN]
+    alignment = "l" + "r" * (len(kept_status_columns) + 1)
 
     lines = [
         rf"\begin{{NiceTabular}}{{{alignment}}}",
@@ -486,6 +488,7 @@ def _selected_rows_to_latex(selected_rows: Sequence[Mapping[str, Any]]) -> str:
     for row in selected_rows:
         cells = [escape_latex(str(row["configuration"]))]
         cells.extend(escape_latex(str(int(row[status_name]))) for status_name in kept_status_columns)
+        cells.append(escape_latex(str(int(row[TOTAL_COLUMN]))))
         lines.append("    " + " & ".join(cells) + r" \\")
     lines.extend([
         r"    \bottomrule",
@@ -540,7 +543,7 @@ def _selected_configuration_group_order(
 
     for selected_configuration in selected_configurations:
         comparison_tool = str(selected_configuration.get("comparison_tool", "")).strip()
-        normalized_groups = _normalize_plot_groups(selected_configuration.get("plot_groups", ""))
+        normalized_groups = str(selected_configuration.get("plot_groups", "")).strip()
         groups = set(normalized_groups.split("|")) if normalized_groups else set()
 
         if comparison_tool == "klee_cf":
@@ -566,8 +569,11 @@ def _selected_configuration_group_order(
 
 def _selected_by_library_rows(
     selected_configurations: Sequence[Mapping[str, Any]],
-    counts_by_configuration_and_library: Mapping[str, Mapping[str, Mapping[str, int]]],
-) -> tuple[list[str], list[dict[str, int | str]], list[int]]:
+    counts_by_configuration_library_and_kind: Mapping[
+        str,
+        Mapping[str, Mapping[str, Mapping[str, int]]],
+    ],
+) -> tuple[list[str], list[str], list[dict[str, str]], list[int]] | None:
     if not selected_configurations:
         raise SystemExit("Selection CSV is empty")
 
@@ -579,36 +585,55 @@ def _selected_by_library_rows(
         {
             library
             for selected_configuration in ordered_configurations
-            for library in counts_by_configuration_and_library.get(
+            for library in counts_by_configuration_library_and_kind.get(
                 str(selected_configuration["source_column"]),
                 {},
             )
         }
     )
     if not libraries:
-        raise SystemExit("Selected configurations have no filtered library counts")
+        return None
 
-    fieldnames = [
+    csv_fieldnames = [
+        "library",
+        *[
+            fieldname
+            for selected_configuration in ordered_configurations
+            for fieldname in (
+                f"{label_map[str(selected_configuration['source_column'])]}_control_flow",
+                f"{label_map[str(selected_configuration['source_column'])]}_memory",
+            )
+        ],
+    ]
+    latex_fieldnames = [
         "library",
         *[
             label_map[str(selected_configuration["source_column"])]
             for selected_configuration in ordered_configurations
         ],
     ]
-    rows: list[dict[str, int | str]] = []
+    rows: list[dict[str, str]] = []
     for library in libraries:
-        row: dict[str, int | str] = {"library": library}
+        row: dict[str, str] = {"library": library}
         for selected_configuration in ordered_configurations:
             source_column = str(selected_configuration["source_column"])
             label = label_map[source_column]
-            row[label] = int(
-                counts_by_configuration_and_library.get(source_column, {})
-                .get(library, {})
-                .get(STATUS_SUCCESS, 0)
+            library_counts = counts_by_configuration_library_and_kind.get(source_column, {}).get(
+                library,
+                {},
             )
+            branch_successes = int(
+                library_counts.get(SIDE_CHANNEL_BRANCH, {}).get(STATUS_SUCCESS, 0)
+            )
+            memory_successes = int(
+                library_counts.get(SIDE_CHANNEL_MEMORY, {}).get(STATUS_SUCCESS, 0)
+            )
+            row[f"{label}_control_flow"] = str(branch_successes)
+            row[f"{label}_memory"] = str(memory_successes)
+            row[label] = f"{branch_successes}/{memory_successes}"
         rows.append(row)
 
-    return fieldnames, rows, group_sizes
+    return csv_fieldnames, latex_fieldnames, rows, group_sizes
 
 
 def _selected_by_library_alignment(group_sizes: Sequence[int]) -> str:
@@ -623,21 +648,22 @@ def _selected_by_library_alignment(group_sizes: Sequence[int]) -> str:
 
 def _write_selected_by_library_csv(
     fieldnames: Sequence[str],
-    rows: Sequence[Mapping[str, int | str]],
+    rows: Sequence[Mapping[str, str]],
     output_path: Path,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(fieldnames))
         writer.writeheader()
-        writer.writerows(rows)
+        for row in rows:
+            writer.writerow({fieldname: row[fieldname] for fieldname in fieldnames})
 
     return output_path
 
 
 def _selected_by_library_rows_to_latex(
     fieldnames: Sequence[str],
-    rows: Sequence[Mapping[str, int | str]],
+    rows: Sequence[Mapping[str, str]],
     group_sizes: Sequence[int],
 ) -> str:
     alignment = _selected_by_library_alignment(group_sizes)
@@ -660,7 +686,7 @@ def _selected_by_library_rows_to_latex(
 
 def _write_selected_by_library_latex(
     fieldnames: Sequence[str],
-    rows: Sequence[Mapping[str, int | str]],
+    rows: Sequence[Mapping[str, str]],
     group_sizes: Sequence[int],
     output_path: Path,
 ) -> Path:
@@ -674,21 +700,27 @@ def _write_selected_by_library_latex(
 
 def write_selected_by_library_outputs(
     selected_configurations: Sequence[Mapping[str, Any]],
-    counts_by_configuration_and_library: Mapping[str, Mapping[str, Mapping[str, int]]],
+    counts_by_configuration_library_and_kind: Mapping[
+        str,
+        Mapping[str, Mapping[str, Mapping[str, int]]],
+    ],
     *,
     output_prefix: Path,
-) -> tuple[Path, Path]:
-    fieldnames, rows, group_sizes = _selected_by_library_rows(
+) -> tuple[Path, Path] | None:
+    selected_rows = _selected_by_library_rows(
         selected_configurations,
-        counts_by_configuration_and_library,
+        counts_by_configuration_library_and_kind,
     )
+    if selected_rows is None:
+        return None
+    csv_fieldnames, latex_fieldnames, rows, group_sizes = selected_rows
     csv_path = _write_selected_by_library_csv(
-        fieldnames,
+        csv_fieldnames,
         rows,
         output_prefix.with_suffix(".csv"),
     )
     latex_path = _write_selected_by_library_latex(
-        fieldnames,
+        latex_fieldnames,
         rows,
         group_sizes,
         output_prefix.with_suffix(".tex"),
@@ -778,13 +810,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ordered_configurations,
         counts_by_configuration,
         counts_by_configuration_and_library,
+        counts_by_configuration_library_and_kind,
+        configuration_metadata,
     ) = collect_reproduction_status_counts(
         Path(args.root_dir),
         filter_path=Path(args.filter_csv),
         sliced_map_path=Path(args.sliced_map_csv) if args.sliced_map_csv else None,
         keep_unmapped=args.keep_unmapped,
     )
-    summary_rows = _build_summary_rows(ordered_configurations, counts_by_configuration)
+    summary_rows = _build_summary_rows(
+        ordered_configurations,
+        counts_by_configuration,
+        configuration_metadata,
+    )
     _write_summary_csv(summary_rows, output_path)
     row_count = len(summary_rows)
     total_count = sum(row["total_filtered_positives"] for row in summary_rows)
@@ -798,44 +836,53 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             Path(args.selection_csv),
             summary_rows,
         )
-        selected_rows = [
-            {
-                "configuration": str(selected_configuration["display_label"]),
-                **{
-                    status_name: int(selected_configuration[status_name])
-                    for status_name in STATUS_COLUMNS
-                },
-            }
-            for selected_configuration in selected_configurations
-        ]
-        selected_output_path = (
-            Path(args.selected_output)
-            if args.selected_output
-            else _selected_output_path(output_path)
-        )
-        selected_latex_output_path = (
-            Path(args.selected_latex_output)
-            if args.selected_latex_output
-            else _selected_latex_output_path(output_path)
-        )
-        csv_path = _write_selected_csv(selected_rows, selected_output_path)
-        latex_path = _write_selected_latex(selected_rows, selected_latex_output_path)
-        print(f"Wrote {csv_path}")
-        print(f"Wrote {latex_path}")
+        if selected_configurations:
+            selected_rows = [
+                {
+                    "configuration": str(selected_configuration["display_label"]),
+                    **{
+                        status_name: int(selected_configuration[status_name])
+                        for status_name in STATUS_COLUMNS
+                    },
+                    TOTAL_COLUMN: sum(
+                        int(selected_configuration[status_name])
+                        for status_name in STATUS_COLUMNS
+                    ),
+                }
+                for selected_configuration in selected_configurations
+            ]
+            selected_output_path = (
+                Path(args.selected_output)
+                if args.selected_output
+                else _selected_output_path(output_path)
+            )
+            selected_latex_output_path = (
+                Path(args.selected_latex_output)
+                if args.selected_latex_output
+                else _selected_latex_output_path(output_path)
+            )
+            csv_path = _write_selected_csv(selected_rows, selected_output_path)
+            latex_path = _write_selected_latex(selected_rows, selected_latex_output_path)
+            print(f"Wrote {csv_path}")
+            print(f"Wrote {latex_path}")
 
-        if args.by_library_selection_tables:
-            by_library_output_prefix = (
-                Path(args.by_library_output_prefix)
-                if args.by_library_output_prefix
-                else _by_library_output_prefix(output_path)
-            )
-            grouped_csv_path, grouped_latex_path = write_selected_by_library_outputs(
-                selected_configurations,
-                counts_by_configuration_and_library,
-                output_prefix=by_library_output_prefix,
-            )
-            print(f"Wrote {grouped_csv_path}")
-            print(f"Wrote {grouped_latex_path}")
+            if args.by_library_selection_tables:
+                by_library_output_prefix = (
+                    Path(args.by_library_output_prefix)
+                    if args.by_library_output_prefix
+                    else _by_library_output_prefix(output_path)
+                )
+                selected_by_library_outputs = write_selected_by_library_outputs(
+                    selected_configurations,
+                    counts_by_configuration_library_and_kind,
+                    output_prefix=by_library_output_prefix,
+                )
+                if selected_by_library_outputs is None:
+                    print("Skipping by-library selection tables: selected configurations have no filtered library counts")
+                else:
+                    grouped_csv_path, grouped_latex_path = selected_by_library_outputs
+                    print(f"Wrote {grouped_csv_path}")
+                    print(f"Wrote {grouped_latex_path}")
 
     return 0
 

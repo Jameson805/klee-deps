@@ -15,6 +15,7 @@ FINAL_COLUMN_ORDER = [
     "filename",
     "line",
     "column",
+    "kind",
     "reproduced_status",
     "visit_count",
     "non_ct_count",
@@ -66,20 +67,23 @@ def _geometric_mean(values: List[float]) -> Optional[float]:
     return math.exp(sum(math.log(value) for value in cleaned) / len(cleaned))
 
 
-def _read_rows(path: str) -> List[Dict[str, Any]]:
+def _read_payload(path: str) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     with open(path, "r", encoding="utf-8") as f:
         payload = json.load(f)
 
     if isinstance(payload, dict):
         data = payload.get("data")
         if isinstance(data, list):
-            return [row for row in data if isinstance(row, dict)]
-        return []
+            metadata = payload.get("metadata")
+            if metadata is not None and not isinstance(metadata, dict):
+                raise SystemExit(f"{path}: payload metadata must be a JSON object")
+            return [row for row in data if isinstance(row, dict)], dict(metadata or {})
+        return [], {}
 
     if isinstance(payload, list):
-        return [row for row in payload if isinstance(row, dict)]
+        return [row for row in payload if isinstance(row, dict)], {}
 
-    return []
+    return [], {}
 
 
 def _group_input_files(dst_dir: str) -> Dict[str, List[str]]:
@@ -94,16 +98,34 @@ def _group_input_files(dst_dir: str) -> Dict[str, List[str]]:
     return grouped
 
 
-def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
-    by_location: Dict[Tuple[str, int, Optional[int], str], Dict[str, Any]] = {}
+def _remove_previous_merged_outputs(dst_dir: str) -> None:
+    # Merged outputs live directly under dst_dir, while per-run inputs live under
+    # dst_dir/<copy_index>/*.json. Clear only the old merged layer so reruns do not
+    # keep obsolete experiment names such as legacy _branch/_memory files.
+    pattern = os.path.join(dst_dir, "*.json")
+    for path in glob(pattern):
+        if os.path.isfile(path):
+            os.remove(path)
+
+
+def _merge_single_experiment(
+    paths: Sequence[str],
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    by_location: Dict[Tuple[str, int, Optional[int], str, Optional[str]], Dict[str, Any]] = {}
+    merged_metadata: Dict[str, Any] | None = None
 
     for path in paths:
-        rows = _read_rows(path)
+        rows, metadata = _read_payload(path)
+        if merged_metadata is None:
+            merged_metadata = metadata
+        elif metadata != merged_metadata:
+            raise SystemExit(f"{path}: metadata does not match other repetitions for this experiment")
         for row in rows:
             filename = row.get("filename")
             line = _to_int(row.get("line"))
             column = _to_int(row.get("column"))
             library = row.get("library")
+            kind = row.get("kind")
             visit_count = _to_float(row.get("visit_count"))
             non_ct_count = _to_float(row.get("non_ct_count"))
             visit_time = _to_float(row.get("visit_time"))
@@ -121,7 +143,7 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
             if non_ct_time is None:
                 continue
 
-            key = (filename, line, column, library)
+            key = (filename, line, column, library, kind if isinstance(kind, str) else None)
             slot = by_location.setdefault(
                 key,
                 {
@@ -154,9 +176,15 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
                 counts[key_status] = counts.get(key_status, 0) + 1
 
     merged_rows: List[Dict[str, Any]] = []
-    for (filename, line, column, library), slot in sorted(
+    for (filename, line, column, library, kind), slot in sorted(
         by_location.items(),
-        key=lambda item: (item[0][3], item[0][0], item[0][1], -1 if item[0][2] is None else item[0][2]),
+        key=lambda item: (
+            item[0][3],
+            item[0][0],
+            item[0][1],
+            -1 if item[0][2] is None else item[0][2],
+            "" if item[0][4] is None else item[0][4],
+        ),
     ):
         visit_count = _geometric_mean(slot["visit_count_values"])
         non_ct_count = _geometric_mean(slot["non_ct_count_values"])
@@ -177,6 +205,8 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
         }
         if column is not None:
             row["column"] = column
+        if kind is not None:
+            row["kind"] = kind
         if visit_count is not None:
             row["visit_count"] = visit_count
         if non_ct_count is not None:
@@ -185,15 +215,17 @@ def _merge_single_experiment(paths: Sequence[str]) -> List[Dict[str, Any]]:
             row["visit_time"] = visit_time
         merged_rows.append(row)
 
-    return merged_rows
+    return merged_rows, dict(merged_metadata or {})
 
 
 def merge_all(dst_dir: str) -> int:
     grouped = _group_input_files(dst_dir)
     written = 0
 
+    _remove_previous_merged_outputs(dst_dir)
+
     for base, paths in sorted(grouped.items(), key=lambda kv: _natural_key(kv[0])):
-        merged_rows = _merge_single_experiment(paths)
+        merged_rows, metadata = _merge_single_experiment(paths)
         out_path = os.path.join(dst_dir, base)
 
         if merged_rows:
@@ -208,6 +240,8 @@ def merge_all(dst_dir: str) -> int:
             "columns": final_columns,
             "data": merged_rows,
         }
+        if metadata:
+            payload["metadata"] = metadata
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
             f.write("\n")
@@ -221,8 +255,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Merge per-run JSON results by experiment name from dst/*/*.json into dst/<experiment>.json. "
-            "Rows are keyed by (filename,line,column), filtered to non-null non_ct_time, "
-            "then aggregated by geometric mean (optional metrics remain null when unavailable). "
+            "Rows are keyed by (filename,line,column), filtered to non-null non_ct_time, then aggregated by geometric "
+            "mean over the retained repetitions "
+            "(optional metrics remain null when unavailable). "
             "reproduced_status is aggregated as a status->count map."
         )
     )

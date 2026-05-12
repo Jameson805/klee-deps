@@ -4,20 +4,100 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tomllib
 from typing import Any, Dict, List, Optional, Tuple
 
 from tools.shared.result_schema import (
+    KIND_BRANCH,
+    KIND_MEMORY,
     STATUS_NOT_REPRODUCED,
     build_payload,
     get_source_line,
     make_result_row,
 )
+from tools.shared.runtime_limits import configure_int_max_str_digits
+
+
+configure_int_max_str_digits()
 
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_INSTRUCTION_KIND_CACHE: Dict[Tuple[str, int], str] = {}
+
+
+def _classify_instruction_text(text: str) -> Optional[str]:
+    # ABACUS logs report only the divergent instruction address, not whether the
+    # underlying side channel was control-flow- or memory-driven. We therefore
+    # classify the instruction text itself and fail loudly when that heuristic is
+    # too ambiguous to support the canonical `kind` field.
+    stripped = text.strip()
+    if not stripped:
+        return None
+
+    parts = stripped.split(None, 1)
+    mnemonic = parts[0].lower()
+    operands = parts[1] if len(parts) == 2 else ""
+
+    if mnemonic.startswith("j") or mnemonic in {"call", "callq", "jmp", "jmpq", "ret", "retq", "loop", "loope", "loopne"}:
+        return KIND_BRANCH
+    if mnemonic in {"lea", "leaq", "nop", "nopl", "nopw", "endbr32", "endbr64"}:
+        return None
+    if "(" in operands or "[" in operands:
+        return KIND_MEMORY
+    return None
+
+
+def _instruction_text_for_address(executable_path: str, address: int) -> str:
+    objdump = shutil.which("objdump")
+    if objdump is None:
+        raise RuntimeError("objdump is required to classify ABACUS findings")
+
+    command = [
+        objdump,
+        "-d",
+        f"--start-address=0x{address:x}",
+        f"--stop-address=0x{address + 16:x}",
+        executable_path,
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"objdump failed for {executable_path} at 0x{address:x}: {result.stderr.strip()}"
+        )
+
+    for line in result.stdout.splitlines():
+        match = re.match(r"^\s*([0-9a-fA-F]+):\s*(.*)$", line)
+        if not match:
+            continue
+        if int(match.group(1), 16) != address:
+            continue
+        fields = line.split("\t")
+        if len(fields) >= 3:
+            return fields[-1].strip()
+        return match.group(2).strip()
+
+    raise RuntimeError(f"objdump did not return an instruction for 0x{address:x} in {executable_path}")
+
+
+def _instruction_kind_for_address(executable_path: str, address: int) -> str:
+    cache_key = (os.path.abspath(executable_path), address)
+    cached_kind = _INSTRUCTION_KIND_CACHE.get(cache_key)
+    if cached_kind is not None:
+        return cached_kind
+
+    # Keep the classification executable-local so repeated ABACUS locations do not
+    # pay another objdump call during one conversion run.
+    instruction_text = _instruction_text_for_address(cache_key[0], address)
+    kind = _classify_instruction_text(instruction_text)
+    if kind is None:
+        raise RuntimeError(
+            f"could not classify instruction at 0x{address:x} in {cache_key[0]} as branch or memory: {instruction_text}"
+        )
+    _INSTRUCTION_KIND_CACHE[cache_key] = kind
+    return kind
 
 
 def load_runner_config(config_path: str) -> Dict[str, Any]:
@@ -155,12 +235,14 @@ def _build_counterexamples(secret_layout: List[Dict[str, Any]], divergent_bytes:
 def convert_abacus_log(
     *,
     log_path: str,
+    executable_path: str,
     output_path: str | None = None,
     sym_size: int = 4,
     runner_config: str | None = None,
     preset_name: str | None = None,
     code_root: str | None = None,
     library: str,
+    metadata: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     if not os.path.isfile(log_path):
         raise FileNotFoundError(f"log not found: {log_path}")
@@ -273,6 +355,9 @@ def convert_abacus_log(
             "filename": None,
             "line": None,
             "counterexamples": None,
+            # ABACUS kind is inferred from the divergent instruction because the raw
+            # log format does not carry an explicit branch-vs-memory label.
+            "kind": _instruction_kind_for_address(executable_path, addr),
         }
         if non_ct_time is not None:
             row["non_ct_time"] = non_ct_time
@@ -305,9 +390,11 @@ def convert_abacus_log(
     payload = build_payload(
         validated_rows,
         optional_dtypes={
+            "kind": "object",
             "column": "Int64",
             "code": "object",
         },
+        metadata=metadata,
     )
     payload["notes"] = {
         "runner_config": runner_config_path,
@@ -350,6 +437,7 @@ def main(argv: List[str]) -> int:
         )
     )
     p.add_argument("--log", required=True, help="Path to Abacus per-case log")
+    p.add_argument("--executable", required=True, help="Path to the analyzed executable")
     p.add_argument("--out", required=True, help="Output JSON path")
     p.add_argument("--sym-size", type=int, default=4, help="SYM_SIZE bytes (default: 4)")
     p.add_argument(
@@ -421,6 +509,7 @@ def main(argv: List[str]) -> int:
     try:
         convert_abacus_log(
             log_path=args.log,
+            executable_path=args.executable,
             output_path=args.out,
             sym_size=args.sym_size,
             runner_config=args.runner_config,

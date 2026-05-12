@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from __future__ import annotations
 
 import argparse
@@ -10,7 +9,30 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
-from tools.shared.result_schema import STATUS_NOT_REPRODUCED, build_payload, get_source_line, make_result_row
+from tools.shared.result_schema import (
+    STATUS_NOT_REPRODUCED,
+    KIND_BRANCH,
+    KIND_MEMORY,
+    build_payload,
+    get_source_line,
+    make_result_row,
+    normalize_result_kind,
+)
+from tools.shared.runtime_limits import configure_int_max_str_digits
+
+
+configure_int_max_str_digits()
+
+
+KLEE_OPTIONAL_DTYPES = {
+    "kind": "object",
+    "column": "Int64",
+    "inst_id": "Int64",
+    "visit_count": "Int64",
+    "non_ct_count": "Int64",
+    "visit_time": "float64",
+    "code": "object",
+}
 
 
 def parse_list(value: str) -> list[str]:
@@ -140,7 +162,7 @@ def _extract_var(ktest_file: str, variable: str) -> bool:
 def extract_counterexamples(
     rows: list[dict[str, object]],
     klee_output: str,
-    ct_type: str,
+    kind: str,
     secrets: list[str],
     publics: list[str],
 ) -> None:
@@ -148,14 +170,13 @@ def extract_counterexamples(
         return
 
     require_tools(["ktest-tool"])
-    preferred_kind = "branch" if ct_type == "branch" else "memory"
     for row in rows:
         non_ct_count = _to_int(row.get("non_ct_count")) or 0
         inst_id = _to_int(row.get("inst_id"))
         if non_ct_count <= 0 or inst_id is None:
             continue
 
-        ktest_file = os.path.join(klee_output, f"{preferred_kind}_counterexample_{inst_id}.ktest")
+        ktest_file = os.path.join(klee_output, f"{kind}_counterexample_{inst_id}.ktest")
         if not os.path.isfile(ktest_file):
             print(f"[counterexamples] missing ktest file: {ktest_file}", file=sys.stderr)
             continue
@@ -183,9 +204,13 @@ def extract_counterexamples(
             row["counterexamples"] = counterexamples
 
 
+def build_klee_payload(rows: list[dict[str, object]]) -> dict[str, object]:
+    return build_payload(rows, optional_dtypes=KLEE_OPTIONAL_DTYPES)
+
+
 def convert_klee_output(
     *,
-    ct_type: str,
+    kind: str,
     klee_output: str,
     output_path: str | None = None,
     code_path: str | None = None,
@@ -196,14 +221,13 @@ def convert_klee_output(
     public: str = "",
     library: str,
 ) -> dict[str, object]:
-    if ct_type not in {"branch", "memory"}:
-        raise ValueError(f"unsupported ct_type {ct_type!r}")
+    kind = normalize_result_kind(kind)
 
     messages_path = os.path.join(klee_output, "messages.txt")
     if not os.path.isfile(messages_path):
         raise FileNotFoundError(f"messages.txt not found under {klee_output}")
 
-    rows = load_preaggregated_from_messages(messages_path, ct_type.upper())
+    rows = load_preaggregated_from_messages(messages_path, kind.upper())
 
     if src_prefix:
         prefix_parts = [part for part in os.path.normpath(src_prefix).split(os.sep) if part not in ("", ".")]
@@ -243,7 +267,7 @@ def convert_klee_output(
                 if source_line is not None:
                     row["code"] = source_line
 
-    extract_counterexamples(rows, klee_output, ct_type, parse_list(secret), parse_list(public))
+    extract_counterexamples(rows, klee_output, kind, parse_list(secret), parse_list(public))
 
     normalized_rows: list[dict[str, object]] = []
     for row in rows:
@@ -259,6 +283,7 @@ def convert_klee_output(
             for key, value in row.items()
             if key not in {"filename", "line", "non_ct_time", "counterexamples", "reproduced_status", "library"}
         }
+        optional["kind"] = kind
         if "non_ct_count" not in optional:
             optional["non_ct_count"] = 0
         if "visit_count" not in optional and row.get("visit_count") is not None:
@@ -277,17 +302,7 @@ def convert_klee_output(
             )
         )
 
-    payload = build_payload(
-        normalized_rows,
-        optional_dtypes={
-            "column": "Int64",
-            "inst_id": "Int64",
-            "visit_count": "Int64",
-            "non_ct_count": "Int64",
-            "visit_time": "float64",
-            "code": "object",
-        },
-    )
+    payload = build_klee_payload(normalized_rows)
 
     if output_path:
         output_dir = os.path.dirname(os.path.abspath(output_path))
@@ -304,7 +319,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         description="Convert aggregated KLEE messages.txt output into the shared combined JSON format.",
     )
-    parser.add_argument("ct_type", choices=["branch", "memory"])
+    parser.add_argument("kind", choices=[KIND_BRANCH, KIND_MEMORY])
     parser.add_argument("klee_output", help="Path to the KLEE output directory")
     parser.add_argument("output_path", help="Output JSON path")
     parser.add_argument("--code-path", default="", help="Path to the source code root for the filenames in the KLEE output")
@@ -327,7 +342,7 @@ def main(argv: list[str]) -> int:
 
     try:
         convert_klee_output(
-            ct_type=args.ct_type,
+            kind=args.kind,
             klee_output=args.klee_output,
             output_path=args.output_path,
             code_path=args.code_path,

@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
+from tools.shared.configuration_metadata import copy_column_metadata
+
 
 MAP_REQUIRED_COLUMNS = {
     "library",
@@ -20,6 +22,7 @@ MAP_REQUIRED_COLUMNS = {
 }
 
 INPUT_REQUIRED_COLUMNS = {"library", "file", "line", "column"}
+
 
 
 def _normalize_text(value: object) -> str:
@@ -155,6 +158,8 @@ def relabel_csv(
         writer = csv.DictWriter(out_handle, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(output_rows)
+
+    copy_column_metadata(input_path, output_path)
 
     return relabeled_rows, len(unmapped_rows)
 

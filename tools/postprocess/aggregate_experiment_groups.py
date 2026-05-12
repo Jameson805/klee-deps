@@ -23,13 +23,19 @@ from collections import OrderedDict
 from dataclasses import asdict, dataclass
 import importlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
 
+from tools.postprocess.selection_helpers import (
+    load_selected_configurations,
+    normalize_plot_groups as normalize_plot_groups_shared,
+)
+from tools.shared.configuration_metadata import load_column_metadata_bundle
 
-METADATA_COLS = ["library", "file", "line", "column"]
+
+METADATA_COLS = ["library", "file", "line", "column", "kind"]
 MULTI_TOKEN_TOOL_PREFIXES = ["klee_cf", "klee_eager", "self_comp"]
 KLEE_LIKE_TOOLS = {"klee_cf", "klee_eager", "self_comp"}
 LINESTYLES = ("-", ":", "--")
@@ -103,11 +109,13 @@ def metric_columns(df: pd.DataFrame) -> list[str]:
 
 
 def normalize_location_keys(df: pd.DataFrame) -> pd.DataFrame:
-    for key in METADATA_COLS:
+    for key in METADATA_COLS[:4]:
         if key not in df.columns:
             raise ValueError(f"Missing required key column {key!r}")
 
     normalized = df.copy()
+    if "kind" not in normalized.columns:
+        normalized["kind"] = ""
     normalized["library"] = normalized["library"].astype(str).str.strip()
     normalized["file"] = normalized["file"].astype(str).str.strip()
     normalized["line"] = pd.to_numeric(normalized["line"], errors="coerce").astype(
@@ -116,7 +124,8 @@ def normalize_location_keys(df: pd.DataFrame) -> pd.DataFrame:
     normalized["column"] = pd.to_numeric(
         normalized["column"], errors="coerce"
     ).astype("Int64")
-    normalized = normalized.dropna(subset=METADATA_COLS)
+    normalized["kind"] = normalized["kind"].fillna("").astype(str).str.strip()
+    normalized = normalized.dropna(subset=METADATA_COLS[:4])
     return normalized.sort_values(METADATA_COLS, kind="stable").reset_index(
         drop=True
     )
@@ -159,75 +168,45 @@ def normalize_suffix(raw_suffix: str) -> str:
     return "_".join(cleaned_parts) or "all"
 
 
-def parse_column_configuration(column_name: str) -> ColumnConfiguration:
-    tool_family = extract_tool_prefix(column_name)
-    remainder = column_name[len(tool_family) :].lstrip("_")
-    parts = remainder.split("_") if remainder else []
-
-    number_index = next((idx for idx, part in enumerate(parts) if part.isdigit()), None)
-    if number_index is None:
-        run_parts = parts
-        sym_size = "all"
-        suffix_parts: list[str] = []
-    else:
-        run_parts = parts[:number_index]
-        sym_size = parts[number_index]
-        suffix_parts = parts[number_index + 1 :]
-
-    sliced = False
-    if suffix_parts and suffix_parts[0] == "sliced":
-        sliced = True
-        suffix_parts = suffix_parts[1:]
-
-    concretization_policy = "default"
-    normalized_run_parts: list[str] = []
-    idx = 0
-    while idx < len(run_parts):
-        if run_parts[idx : idx + 2] == ["no", "conc"]:
-            concretization_policy = "no_conc"
-            idx += 2
-            continue
-        normalized_run_parts.append(run_parts[idx])
-        idx += 1
-
-    if tool_family in KLEE_LIKE_TOOLS:
-        searcher = "_".join(normalized_run_parts) or "default"
-    else:
-        searcher = "default"
-
-    raw_suffix = "_".join(suffix_parts) or "all"
-    normalized_suffix = normalize_suffix(raw_suffix)
-    comparison_tool = f"{tool_family}_sliced" if sliced else tool_family
-
-    label_parts: list[str] = []
-    if tool_family in KLEE_LIKE_TOOLS:
-        label_parts.append(f"search={searcher}")
-    if sym_size != "all":
-        label_parts.append(f"sym={sym_size}")
-    if normalized_suffix != "all":
-        label_parts.append(f"mode={normalized_suffix}")
-    if concretization_policy != "default":
-        label_parts.append(f"conc={concretization_policy}")
-
+def column_configuration_from_metadata(column_name: str, metadata: Mapping[str, Any]) -> ColumnConfiguration:
     return ColumnConfiguration(
         source_column=column_name,
-        tool_family=tool_family,
-        comparison_tool=comparison_tool,
-        sliced=sliced,
-        searcher=searcher,
-        sym_size=sym_size,
-        public_mode=normalized_suffix,
-        concretization_policy=concretization_policy,
-        raw_suffix=raw_suffix,
-        normalized_suffix=normalized_suffix,
-        configuration_label=", ".join(label_parts) or "default",
+        tool_family=str(metadata["tool_family"]),
+        comparison_tool=str(metadata["comparison_tool"]),
+        sliced=bool(metadata["sliced"]),
+        searcher=str(metadata["searcher"]),
+        sym_size=str(metadata["sym_size"]),
+        public_mode=str(metadata["public_mode"]),
+        concretization_policy=str(metadata["concretization_policy"]),
+        raw_suffix=str(metadata["raw_suffix"]),
+        normalized_suffix=str(metadata["normalized_suffix"]),
+        configuration_label=str(metadata["configuration_label"]),
     )
 
 
-def summarize_configurations(df: pd.DataFrame) -> pd.DataFrame:
+def load_input_column_metadata(input_csv: Path, extra_input_csvs: list[Path]) -> dict[str, dict[str, Any]]:
+    metadata_by_column: dict[str, dict[str, Any]] = {}
+    for csv_path in [input_csv, *extra_input_csvs]:
+        _, by_column = load_column_metadata_bundle(csv_path)
+        for column, metadata in by_column.items():
+            existing = metadata_by_column.get(column)
+            if existing is not None and existing != metadata:
+                raise ValueError(f"Conflicting column metadata for {column!r} across input CSVs")
+            metadata_by_column[column] = metadata
+    return metadata_by_column
+
+
+def summarize_configurations(
+    df: pd.DataFrame,
+    column_metadata_by_source: Mapping[str, Mapping[str, Any]],
+) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     for column in metric_columns(df):
-        config = parse_column_configuration(column)
+        try:
+            metadata = column_metadata_by_source[column]
+        except KeyError as error:
+            raise ValueError(f"Missing column metadata for {column!r}") from error
+        config = column_configuration_from_metadata(column, metadata)
         numeric = pd.to_numeric(df[column], errors="coerce").dropna()
         rows.append(
             {
@@ -291,6 +270,43 @@ def configuration_metadata(summary: pd.DataFrame) -> pd.DataFrame:
         "normalized_suffix",
     ]
     return summary.loc[:, metadata_columns].copy()
+
+
+def select_best_configurations(summary: pd.DataFrame) -> pd.DataFrame:
+    if summary.empty:
+        return summary.copy()
+
+    return (
+        summary.sort_values(
+            [
+                "comparison_tool",
+                "insecure_locations_found",
+                "max_time",
+                "source_column",
+            ],
+            ascending=[True, False, True, True],
+            na_position="last",
+            kind="stable",
+        )
+        .groupby("comparison_tool", sort=False, as_index=False)
+        .head(1)
+        .reset_index(drop=True)
+    )
+
+
+def best_selection_table(best_summary: pd.DataFrame) -> pd.DataFrame:
+    if best_summary.empty:
+        return pd.DataFrame(
+            columns=["comparison_tool", "source_column", "display_label"]
+        )
+
+    return pd.DataFrame(
+        {
+            "comparison_tool": best_summary["comparison_tool"],
+            "source_column": best_summary["source_column"],
+            "display_label": best_summary["comparison_tool"],
+        }
+    )
 
 
 def load_plot_modules():
@@ -768,7 +784,7 @@ def make_log_cactus_plot(
             label=curve["legend_label"],
         )
 
-        if show_curve_ids and curve.get("curve_id"):
+        if show_curve_ids and curve.get("curve_id") and curve["times"].size > 0:
             curve_id_anchors.append(
                 {
                     "curve_id": curve["curve_id"],
@@ -1072,14 +1088,7 @@ def write_exploration_outputs(
 def normalize_plot_groups(plot_groups: Any) -> str:
     if pd.isna(plot_groups):
         return ""
-
-    normalized_groups: list[str] = []
-    for raw_group in str(plot_groups).replace(";", "|").split("|"):
-        group = raw_group.strip()
-        if group and group not in normalized_groups:
-            normalized_groups.append(group)
-
-    return "|".join(normalized_groups)
+    return normalize_plot_groups_shared(plot_groups)
 
 
 def sanitize_output_token(value: str) -> str:
@@ -1091,65 +1100,16 @@ def sanitize_output_token(value: str) -> str:
 
 
 def load_selection(selection_csv: Path, summary: pd.DataFrame) -> pd.DataFrame:
-    selection = pd.read_csv(selection_csv)
-    required_columns = {"comparison_tool", "source_column"}
-    missing_columns = required_columns.difference(selection.columns)
-    if missing_columns:
-        joined = ", ".join(sorted(missing_columns))
-        raise ValueError(f"Selection CSV is missing required columns: {joined}")
-
-    selection = selection.copy()
-    selection["comparison_tool"] = selection["comparison_tool"].astype(str).str.strip()
-    selection["source_column"] = selection["source_column"].astype(str).str.strip()
-
-    if selection["comparison_tool"].duplicated().any():
-        duplicates = selection.loc[
-            selection["comparison_tool"].duplicated(), "comparison_tool"
-        ].tolist()
-        joined = ", ".join(sorted(set(duplicates)))
-        raise ValueError(
-            "Selection CSV must contain at most one row per comparison_tool: "
-            f"{joined}"
-        )
-
-    lookup = summary.set_index("source_column", drop=False)
-    rows: list[dict[str, Any]] = []
-    for _, selection_row in selection.iterrows():
-        source_column = selection_row["source_column"]
-        if source_column not in lookup.index:
-            raise ValueError(
-                f"Selection source_column {source_column!r} does not exist in the input CSV"
-            )
-
-        summary_row = lookup.loc[source_column]
-        comparison_tool = selection_row["comparison_tool"]
-        if comparison_tool != summary_row["comparison_tool"]:
-            raise ValueError(
-                "Selection comparison_tool does not match the source column metadata: "
-                f"{comparison_tool!r} vs {summary_row['comparison_tool']!r}"
-            )
-
-        display_label = source_column
-        if "display_label" in selection.columns and pd.notna(selection_row["display_label"]):
-            candidate = str(selection_row["display_label"]).strip()
-            if candidate:
-                display_label = candidate
-
-        plot_groups = ""
-        if "plot_groups" in selection.columns:
-            plot_groups = normalize_plot_groups(selection_row["plot_groups"])
-
-        rows.append(
-            {
-                **summary_row.to_dict(),
-                "display_label": display_label,
-                "plot_groups": plot_groups,
-            }
-        )
-
-    if not rows:
-        raise ValueError("Selection CSV is empty")
-
+    lookup = {
+        str(row["source_column"]): row.to_dict()
+        for _, row in summary.iterrows()
+    }
+    rows = load_selected_configurations(
+        selection_csv,
+        lookup,
+        missing_context="Skipping selection rows whose source_column was not present in the input CSV",
+        empty_context="No selected configurations matched the input CSV; skipping selected-comparison outputs.",
+    )
     return pd.DataFrame(rows)
 
 
@@ -1264,7 +1224,17 @@ def write_selected_comparison_outputs(
         )
 
 
-def main() -> int:
+def automatic_selection_summary(best_summary: pd.DataFrame) -> pd.DataFrame:
+    if best_summary.empty:
+        return best_summary.copy()
+
+    automatic_summary = best_summary.copy()
+    automatic_summary["display_label"] = automatic_summary["comparison_tool"]
+    automatic_summary["plot_groups"] = ""
+    return automatic_summary
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Explore experiment configurations from merged CSVs without row-wise "
@@ -1297,18 +1267,21 @@ def main() -> int:
             "optional plot_groups separated by '|' or ';'."
         ),
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     input_path = Path(args.input_csv)
     extra_input_paths = [Path(path) for path in args.extra_input_csv]
     output_base = args.output
 
     df = load_input_dataframe(input_path, extra_input_paths)
+    column_metadata_by_source = load_input_column_metadata(input_path, extra_input_paths)
     if not metric_columns(df):
         raise SystemExit("No experiment result columns found in the merged CSV input")
 
-    summary = summarize_configurations(df)
+    summary = summarize_configurations(df, column_metadata_by_source)
     metadata = configuration_metadata(summary)
+    best_summary = select_best_configurations(summary)
+    best_selection = best_selection_table(best_summary)
 
     metadata_path = Path(f"{output_base}_config_metadata.csv")
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1319,10 +1292,27 @@ def main() -> int:
     summary.to_csv(summary_path, index=False)
     print(f"Wrote: {summary_path}")
 
+    best_summary_path = Path(f"{output_base}_best_configurations.csv")
+    best_summary.to_csv(best_summary_path, index=False)
+    print(f"Wrote: {best_summary_path}")
+
+    best_selection_path = Path(f"{output_base}_best_selection.csv")
+    best_selection.to_csv(best_selection_path, index=False)
+    print(f"Wrote: {best_selection_path}")
+
     write_exploration_outputs(df, summary, output_base, input_path.stem)
 
     if args.selection_csv:
         selection_summary = load_selection(Path(args.selection_csv), summary)
+    else:
+        selection_summary = automatic_selection_summary(best_summary)
+        if not selection_summary.empty:
+            print(
+                "No --selection-csv provided; using automatically selected best "
+                "configuration per comparison tool."
+            )
+
+    if not selection_summary.empty:
         write_selected_comparison_outputs(
             df,
             selection_summary,

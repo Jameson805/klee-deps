@@ -10,6 +10,7 @@ import subprocess
 from typing import Dict, List, Optional, Tuple
 
 from tools.shared.result_schema import (
+    KIND_BRANCH,
     STATUS_IDENTICAL_TRACE,
     STATUS_LOCATION_MISMATCH,
     STATUS_NOT_REPRODUCED,
@@ -20,8 +21,14 @@ from tools.shared.result_schema import (
     get_source_line,
     make_result_row,
 )
+from tools.shared.runtime_limits import configure_int_max_str_digits
 
 
+configure_int_max_str_digits()
+
+
+# Self-composition builds are currently instrumented only with `record_branch`, so
+# this converter intentionally treats every reported positive as a branch leak.
 _NON_CT_RE = re.compile(
     r"^\[(?P<ts>[0-9]+(?:\.[0-9]+)?)\]\s+\[NON-CT BRANCH\]\s+(?P<file>.+?):(?P<line>[0-9]+):(?P<col>[0-9]+)(?:\s+.*)?$"
 )
@@ -207,6 +214,8 @@ def parse_log_rows(log_path: str, code_root: Optional[str], library: str) -> Lis
             "filename": filename,
             "line": line_no,
             "column": col_no,
+            # Self-comp has no memory-side-channel instrumentation today.
+            "kind": KIND_BRANCH,
             "non_ct_time": non_ct_time,
         }
 
@@ -289,6 +298,7 @@ def convert_self_comp_log(
     pin_root: str | None = None,
     code_root: str | None = None,
     library: str,
+    metadata: Dict[str, object] | None = None,
 ) -> Dict[str, object]:
     if not os.path.isfile(log_path):
         raise FileNotFoundError(f"log not found: {log_path}")
@@ -385,9 +395,11 @@ def convert_self_comp_log(
     payload: Dict[str, object] = build_payload(
         normalized_data,
         optional_dtypes={
+            "kind": "object",
             "column": "Int64",
             "code": "object",
         },
+        metadata=metadata,
     )
 
     if output_path:

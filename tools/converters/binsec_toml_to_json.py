@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import subprocess
 
 from tools.shared.result_schema import (
+    KIND_BRANCH,
+    KIND_MEMORY,
     STATUS_IDENTICAL_TRACE,
     STATUS_LOCATION_MISMATCH,
     STATUS_NOT_REPRODUCED,
@@ -20,6 +22,10 @@ from tools.shared.result_schema import (
     get_source_line,
     make_result_row,
 )
+from tools.shared.runtime_limits import configure_int_max_str_digits
+
+
+configure_int_max_str_digits()
 
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -466,6 +472,8 @@ def build_rows(
         }
         if non_ct_time is not None:
             row["non_ct_time"] = non_ct_time
+        if leak is not None:
+            row["kind"] = KIND_BRANCH if leak.leak_type == "control flow" else KIND_MEMORY
         if code is not None:
             row["code"] = code
         if counterexamples is not None:
@@ -525,6 +533,7 @@ def convert_binsec_toml(
     title: str | None = None,
     code_path: str | None = None,
     library: str,
+    metadata: Dict[str, Any] | None = None,
 ) -> Dict[str, object]:
     if tomllib is None:
         raise RuntimeError("tomllib not available; use Python 3.11+")
@@ -584,7 +593,9 @@ def convert_binsec_toml(
         optional_dtypes={
             "column": "Int64",
             "code": "object",
+            "kind": "object",
         },
+        metadata=metadata,
     )
 
     if output_path:

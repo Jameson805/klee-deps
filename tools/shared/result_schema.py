@@ -8,6 +8,12 @@ STATUS_TIMEOUT = "timeout"
 STATUS_IDENTICAL_TRACE = "identical_trace"
 STATUS_LOCATION_MISMATCH = "location_mismatch"
 STATUS_NOT_REPRODUCED = "not_reproduced"
+KIND_BRANCH = "branch"
+KIND_MEMORY = "memory"
+RESULT_KINDS = {
+    KIND_BRANCH,
+    KIND_MEMORY,
+}
 
 REPRODUCED_STATUSES = {
     STATUS_SUCCESS,
@@ -40,6 +46,7 @@ PREFERRED_COLUMN_ORDER = [
     "filename",
     "line",
     "column",
+    "kind",
     "inst_id",
     "visit_count",
     "non_ct_count",
@@ -106,6 +113,16 @@ def get_source_line(library: str, filename: str, line: int) -> Optional[str]:
     return None
 
 
+def normalize_result_kind(kind: Any) -> str:
+    if not isinstance(kind, str):
+        raise TypeError("kind must be a str")
+
+    normalized_kind = kind.strip().lower()
+    if normalized_kind not in RESULT_KINDS:
+        raise ValueError(f"kind must be one of {sorted(RESULT_KINDS)}")
+    return normalized_kind
+
+
 def make_result_row(
     *,
     filename: Any,
@@ -160,6 +177,7 @@ def build_payload(
     rows: Iterable[Mapping[str, Any]],
     *,
     optional_dtypes: Optional[Mapping[str, str]] = None,
+    metadata: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     normalized = [dict(r) for r in rows]
 
@@ -184,8 +202,11 @@ def build_payload(
             )
         dtypes[key] = optional_dtypes[key]
 
-    return {
+    payload = {
         "columns": ordered,
         "data": normalized,
         "dtypes": dtypes,
     }
+    if metadata:
+        payload["metadata"] = dict(metadata)
+    return payload

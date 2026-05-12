@@ -21,6 +21,7 @@ from tools.shared.result_schema import (
     STATUS_NOT_REPRODUCED,
     STATUS_SUCCESS,
     STATUS_TIMEOUT,
+    normalize_result_kind,
 )
 
 try:
@@ -495,30 +496,13 @@ def extract_ktest_inputs(
     return secret_orig, secret_prime, public_values
 
 
-def resolve_ktest_file(klee_output: str, inst_id: int, preferred_kind: Optional[str]) -> str:
-    search_order: List[str] = []
-    if preferred_kind in {"branch", "memory"}:
-        search_order.append(preferred_kind)
-    for kind in ("branch", "memory"):
-        if kind not in search_order:
-            search_order.append(kind)
-
+def resolve_ktest_file(klee_output: str, inst_id: int, kind: str) -> str:
     klee_output_dir = os.path.abspath(klee_output)
-    for kind in search_order:
-        candidate = os.path.join(klee_output_dir, f"{kind}_counterexample_{inst_id}.ktest")
-        if os.path.isfile(candidate):
-            return candidate
+    candidate = os.path.join(klee_output_dir, f"{kind}_counterexample_{inst_id}.ktest")
+    if os.path.isfile(candidate):
+        return candidate
 
     raise FileNotFoundError(f"Missing KTest file for inst_id={inst_id} under {klee_output_dir}")
-
-
-def guess_json_ct_kind(input_json: str) -> Optional[str]:
-    basename = os.path.basename(input_json)
-    if "_memory" in basename:
-        return "memory"
-    if "_branch" in basename:
-        return "branch"
-    return None
 
 
 def print_replay_location(result: ReplayResult) -> None:
@@ -776,8 +760,6 @@ def mode_dataframe(
         df["library"] = df["library"].apply(lambda value: value if isinstance(value, str) and value.strip() else library)
 
     df["reproduced_status"] = STATUS_NOT_REPRODUCED
-    preferred_kind = guess_json_ct_kind(input_json)
-
     for idx, row in df[df["non_ct_count"] > 0].iterrows():
         inst_id = coerce_int(row.get("inst_id"))
         if inst_id is None:
@@ -786,7 +768,14 @@ def mode_dataframe(
             continue
 
         try:
-            ktest_file = resolve_ktest_file(klee_output, inst_id, preferred_kind)
+            row_kind = normalize_result_kind(row.get("kind"))
+        except (TypeError, ValueError) as err:
+            print(f"Reproducing {row.get('filename')}:{row.get('line')}:{row.get('column')} ... invalid kind ({err})")
+            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+            continue
+
+        try:
+            ktest_file = resolve_ktest_file(klee_output, inst_id, row_kind)
         except FileNotFoundError as err:
             print(f"Reproducing {row.get('filename')}:{row.get('line')}:{row.get('column')} ... {err}")
             df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH

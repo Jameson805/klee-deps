@@ -1,251 +1,279 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 import argparse
 import csv
 import json
 import math
 import os
 import sys
-from typing import Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+
+from tools.shared.configuration_metadata import (
+    build_column_metadata,
+    load_run_metadata,
+    write_column_metadata,
+)
 
 
-Location = Tuple[str, str, int, Optional[int]]  # (library, file, line, column)
+Location = Tuple[str, str, int, Optional[int], Optional[str]]
 
 
-def column_and_library_from_json_filename(name: str, run_name: str, sliced_only: bool) -> Optional[Tuple[str, str]]:
-	"""Return (column_name, library) for one top-level JSON file, or None if filtered out."""
-	lower = name.lower()
-	if not lower.endswith(".json"):
-		return None
-
-	stem = os.path.splitext(lower)[0]
-	is_sliced = "_sliced" in stem
-	if sliced_only != is_sliced:
-		return None
-
-	if stem.endswith("_branch"):
-		stem = stem[: -len("_branch")]
-	elif stem.endswith("_memory"):
-		stem = stem[: -len("_memory")]
-
-	if stem.endswith("_sliced"):
-		stem = stem[: -len("_sliced")]
-
-	if stem.startswith("openssl_"):
-		rest = stem[len("openssl_") :]
-		algos = ["mont_consttime", "mont_word", "recp", "mont"]
-		library = "openssl"
-		for algo in algos:
-			if rest == algo or rest.startswith(algo + "_"):
-				library = f"openssl_{algo}"
-				break
-	else:
-		library = stem.split("_", 1)[0]
-
-	if stem == library:
-		option = "all"
-	elif stem.startswith(library + "_"):
-		option = stem[len(library) + 1 :] or "all"
-	else:
-		parts = stem.split("_", 1)
-		option = parts[1] if len(parts) == 2 and parts[1] else "all"
-
-	prefix = f"{run_name}_sliced" if sliced_only else run_name
-	return f"{prefix}_{option}", library
-
-
-_column_and_library_from_json_filename = column_and_library_from_json_filename
-
-
-def _to_float(value) -> Optional[float]:
-	if value is None:
-		return None
-	try:
-		f = float(value)
-	except (TypeError, ValueError):
-		return None
-	if not math.isfinite(f):
-		return None
-	return f
+def _to_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(out):
+        return None
+    return out
 
 
 def _basename_only(path_value: str) -> str:
-	# Normalize both Unix and Windows-style separators, then keep only the last path part.
-	return os.path.basename(path_value.replace("\\", "/"))
+    return os.path.basename(path_value.replace("\\", "/"))
 
 
-def _load_violations_from_json(path: str, library: str) -> Dict[Location, float]:
-	"""Return mapping (library,file,line,column) -> non_ct_time.
-
-	If the same location appears multiple times in the file, keeps the maximum non_ct_time.
-	"""
-	with open(path, "r", encoding="utf-8") as f:
-		payload = json.load(f)
-	rows = payload.get("data")
-	if not isinstance(rows, list):
-		return {}
-
-	out: Dict[Location, float] = {}
-	for row in rows:
-		if not isinstance(row, dict):
-			continue
-		non_ct_time = _to_float(row.get("non_ct_time"))
-		if non_ct_time is None:
-			continue
-
-		filename = row.get("filename")
-		line = row.get("line")
-		column = row.get("column")
-		if not isinstance(filename, str) or filename == "":
-			continue
-		filename = _basename_only(filename)
-		if filename == "":
-			continue
-		try:
-			line_i = int(line)
-		except (TypeError, ValueError):
-			continue
-
-		col_i: Optional[int]
-		try:
-			col_i = int(column)
-		except (TypeError, ValueError):
-			# Missing/invalid column is treated as wildcard for this line.
-			col_i = None
-		key: Location = (library, filename, line_i, col_i)
-		prev = out.get(key)
-		out[key] = non_ct_time if prev is None else max(prev, non_ct_time)
-	return out
+def _normalize_kind(value: object) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    kind = value.strip()
+    return kind or None
 
 
-def merge_runs(root_dir: str, *, sliced_only: bool = False) -> Tuple[List[str], Dict[str, Dict[Location, float]]]:
-	"""Scan root_dir/* runs and return (ordered_columns, data_by_column).
+def _has_reproduced_success(status: object) -> bool:
+    if isinstance(status, str):
+        return status.strip() == "success"
+    if isinstance(status, dict):
+        value = status.get("success")
+        try:
+            return int(value) > 0
+        except (TypeError, ValueError):
+            return False
+    return False
 
-	If sliced_only is False (default), only non-sliced JSON files are considered.
-	If sliced_only is True, only sliced JSON files are considered.
 
-	Each selected JSON file contributes to a separate CSV column named:
-	- non-sliced:  <run>_<option>
-	- sliced:      <run>_sliced_<option>
-	where <option> is derived from the JSON filename stem.
-	"""
-	if not os.path.isdir(root_dir):
-		raise SystemExit(f"Input '{root_dir}' is not a directory")
+def _read_payload(path: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise SystemExit(f"{path}: expected a JSON object payload")
+    rows = payload.get("data")
+    metadata = payload.get("metadata")
+    if not isinstance(rows, list):
+        return [], {}
+    if metadata is not None and not isinstance(metadata, dict):
+        raise SystemExit(f"{path}: metadata must be a JSON object")
+    return [row for row in rows if isinstance(row, dict)], dict(metadata or {})
 
-	run_names = sorted(
-		[d for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d))]
-	)
 
-	ordered_columns: List[str] = []
-	by_col: Dict[str, Dict[Location, float]] = {}
+def _load_violations_from_json(
+    path: str,
+    *,
+    all_positives: bool = False,
+) -> tuple[dict[str, Any], Dict[Location, float]]:
+    rows, metadata = _read_payload(path)
+    if not metadata:
+        raise SystemExit(
+            f"{path}: payload metadata is missing; this output tree predates the metadata-aware experiment runners. "
+            "Regenerate the run outputs with the current campaign runners before running postprocess."
+        )
+    library_key = metadata.get("library_key")
+    if not isinstance(library_key, str) or not library_key:
+        raise SystemExit(
+            f"{path}: payload metadata is missing non-empty library_key; this output tree is stale or incomplete. "
+            "Regenerate the run outputs with the current campaign runners before running postprocess."
+        )
 
-	for run_name in run_names:
-		run_dir = os.path.join(root_dir, run_name)
-		for file in sorted(os.listdir(run_dir)):
-			path = os.path.join(run_dir, file)
-			if not os.path.isfile(path):
-				continue
+    out: Dict[Location, float] = {}
+    for row in rows:
+        non_ct_time = _to_float(row.get("non_ct_time"))
+        if non_ct_time is None:
+            continue
+        if not all_positives and not _has_reproduced_success(row.get("reproduced_status")):
+            continue
 
-			resolved = column_and_library_from_json_filename(file, run_name, sliced_only)
-			if resolved is None:
-				continue
-			col_name, library = resolved
+        filename = row.get("filename")
+        line = row.get("line")
+        column = row.get("column")
+        if not isinstance(filename, str) or filename == "":
+            continue
+        filename = _basename_only(filename)
+        if filename == "":
+            continue
+        try:
+            line_i = int(line)
+        except (TypeError, ValueError):
+            continue
 
-			if col_name not in by_col:
-				ordered_columns.append(col_name)
-				by_col[col_name] = {}
+        try:
+            col_i = int(column)
+        except (TypeError, ValueError):
+            col_i = None
+        key: Location = (library_key, filename, line_i, col_i, _normalize_kind(row.get("kind")))
+        previous = out.get(key)
+        out[key] = non_ct_time if previous is None else max(previous, non_ct_time)
 
-			violations = _load_violations_from_json(path, library)
-			if not violations:
-				continue
-			col_map = by_col[col_name]
-			for loc, t in violations.items():
-				prev = col_map.get(loc)
-				col_map[loc] = t if prev is None else max(prev, t)
+    return metadata, out
 
-	return ordered_columns, by_col
+
+def merge_runs(
+    root_dir: str,
+    *,
+    sliced_only: bool = False,
+    all_positives: bool = False,
+) -> tuple[List[str], Dict[str, Dict[Location, float]], Dict[str, dict[str, Any]]]:
+    if not os.path.isdir(root_dir):
+        raise SystemExit(f"Input '{root_dir}' is not a directory")
+
+    run_metadata_by_name = load_run_metadata(root_dir)
+    run_names = sorted(run_metadata_by_name)
+
+    ordered_columns: List[str] = []
+    by_col: Dict[str, Dict[Location, float]] = {}
+    column_metadata: Dict[str, dict[str, Any]] = {}
+
+    for run_name in run_names:
+        run_metadata = run_metadata_by_name[run_name]
+
+        run_dir = os.path.join(root_dir, run_name)
+        if not os.path.isdir(run_dir):
+            raise SystemExit(f"{root_dir}: run metadata references missing run directory {run_name!r}")
+        for file_name in sorted(os.listdir(run_dir)):
+            path = os.path.join(run_dir, file_name)
+            if not os.path.isfile(path) or not file_name.lower().endswith(".json"):
+                continue
+
+            case_metadata, violations = _load_violations_from_json(path, all_positives=all_positives)
+            case_sliced = bool(case_metadata.get("sliced"))
+            if case_sliced != sliced_only:
+                continue
+
+            metadata = build_column_metadata(run_metadata, case_metadata)
+            column_name = str(metadata["source_column"])
+            existing_metadata = column_metadata.get(column_name)
+            if existing_metadata is not None and existing_metadata != metadata:
+                raise SystemExit(f"{path}: conflicting metadata for column {column_name!r}")
+            if column_name not in by_col:
+                ordered_columns.append(column_name)
+                by_col[column_name] = {}
+                column_metadata[column_name] = metadata
+
+            if not violations:
+                continue
+            column_values = by_col[column_name]
+            for location, time_value in violations.items():
+                previous = column_values.get(location)
+                column_values[location] = time_value if previous is None else max(previous, time_value)
+
+    return ordered_columns, by_col, column_metadata
 
 
 def write_csv(
-	output_path: str,
-	ordered_columns: Sequence[str],
-	by_col: Dict[str, Dict[Location, float]],
+    output_path: str,
+    ordered_columns: Sequence[str],
+    by_col: Dict[str, Dict[Location, float]],
+    column_metadata: Dict[str, dict[str, Any]],
 ) -> int:
-	all_locations: Set[Location] = set()
-	wildcard_locations: Set[Tuple[str, str, int]] = set()
+    all_locations: Set[Location] = set()
+    wildcard_locations: Set[Tuple[str, str, int, Optional[str]]] = set()
 
-	for col in ordered_columns:
-		for library, filename, line, col_i in by_col.get(col, {}).keys():
-			if col_i is None:
-				wildcard_locations.add((library, filename, line))
-			else:
-				all_locations.add((library, filename, line, col_i))
+    for column in ordered_columns:
+        for library, filename, line, column_value, kind in by_col.get(column, {}).keys():
+            if column_value is None:
+                wildcard_locations.add((library, filename, line, kind))
+            else:
+                all_locations.add((library, filename, line, column_value, kind))
 
-	# If a line has only wildcard entries across all experiments, emit one synthetic row with column 0.
-	concrete_lines = {(lib, file, line) for lib, file, line, _ in all_locations}
-	for lib, file, line in wildcard_locations:
-		if (lib, file, line) not in concrete_lines:
-			all_locations.add((lib, file, line, 0))
+    concrete_lines = {(library, filename, line, kind) for library, filename, line, _, kind in all_locations}
+    for library, filename, line, kind in wildcard_locations:
+        if (library, filename, line, kind) not in concrete_lines:
+            all_locations.add((library, filename, line, 0, kind))
 
-	rows = sorted(all_locations, key=lambda x: (x[0], x[1], x[2], x[3] if x[3] is not None else -1))
+    rows = sorted(
+        all_locations,
+        key=lambda location: (
+            location[0],
+            location[1],
+            location[2],
+            location[3] if location[3] is not None else -1,
+            "" if location[4] is None else location[4],
+        ),
+    )
 
-	os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
-	with open(output_path, "w", newline="", encoding="utf-8") as f:
-		w = csv.writer(f)
-		w.writerow(["library", "file", "line", "column", *ordered_columns])
-		for library, filename, line, col in rows:
-			row_out: List[str] = [library, filename, str(line), str(col if col is not None else "")]
-			for exp in ordered_columns:
-				exp_map = by_col.get(exp, {})
-				val = exp_map.get((library, filename, line, col))
-				if val is None:
-					# Fallback to wildcard (missing-column) value for same line.
-					val = exp_map.get((library, filename, line, None))
-				row_out.append("" if val is None else f"{val:.2f}")
-			w.writerow(row_out)
-	return len(rows)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
+    with open(output_path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["library", "file", "line", "column", "kind", *ordered_columns])
+        for library, filename, line, column_value, kind in rows:
+            output_row: List[str] = [
+                library,
+                filename,
+                str(line),
+                str(column_value if column_value is not None else ""),
+                "" if kind is None else kind,
+            ]
+            for experiment_column in ordered_columns:
+                experiment_map = by_col.get(experiment_column, {})
+                value = experiment_map.get((library, filename, line, column_value, kind))
+                if value is None:
+                    value = experiment_map.get((library, filename, line, None, kind))
+                output_row.append("" if value is None else f"{value:.2f}")
+            writer.writerow(output_row)
+
+    write_column_metadata(output_path, ordered_columns, column_metadata)
+    return len(rows)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-	p = argparse.ArgumentParser(
-		description=(
-			"Merge per-run top-level JSON results into a single CSV keyed by (library,file,line,column). "
-			"A row is included iff at least one experiment reports non_ct_time != null."
-		)
-	)
-	p.add_argument(
-		"root_dir",
-		help=(
-			"Directory containing run subdirectories (e.g. all/a, all/b, ...). "
-			"Each run subdirectory should be a copied klee_*_results folder." 
-		),
-	)
-	p.add_argument(
-		"-o",
-		"--output",
-		default="merged_results.csv",
-		help="Output CSV path (default: merged_results.csv)",
-	)
-	p.add_argument(
-		"--sliced",
-		action="store_true",
-		help=(
-			"If set, merge ONLY sliced results (columns named <run>_sliced). "
-			"If not set, merge ONLY non-sliced results (columns named <run>)."
-		),
-	)
-	args = p.parse_args(argv)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Merge per-run top-level JSON results into a single CSV keyed by (library,file,line,column,kind). "
+            "By default, a row is included iff at least one experiment reports non_ct_time != null "
+            "and that positive reproduced successfully in at least one repetition."
+        )
+    )
+    parser.add_argument(
+        "root_dir",
+        help=(
+            "Directory containing run subdirectories (for example all/a, all/b, ...). "
+            "Each run subdirectory should be a copied tool results folder."
+        ),
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="merged_results.csv",
+        help="Output CSV path (default: merged_results.csv)",
+    )
+    parser.add_argument(
+        "--sliced",
+        action="store_true",
+        help="If set, merge only sliced results. If not set, merge only non-sliced results.",
+    )
+    parser.add_argument(
+        "--all-positives",
+        action="store_true",
+        help="Keep positives with non-null non_ct_time even if no repetition reproduced successfully.",
+    )
+    args = parser.parse_args(argv)
 
-	ordered_columns, by_col = merge_runs(args.root_dir, sliced_only=args.sliced)
-	if not ordered_columns:
-		mode = "sliced" if args.sliced else "non-sliced"
-		raise SystemExit(f"No {mode} top-level result JSON files found under '{args.root_dir}'")
+    ordered_columns, by_col, column_metadata = merge_runs(
+        args.root_dir,
+        sliced_only=args.sliced,
+        all_positives=args.all_positives,
+    )
+    if not ordered_columns:
+        mode = "sliced" if args.sliced else "non-sliced"
+        raise SystemExit(f"No {mode} top-level result JSON files found under '{args.root_dir}'")
 
-	row_count = write_csv(args.output, ordered_columns, by_col)
-	print(f"Wrote {row_count} rows to {args.output}")
-	print(f"Experiments: {', '.join(ordered_columns)}")
-	return 0
+    row_count = write_csv(args.output, ordered_columns, by_col, column_metadata)
+    print(f"Wrote {row_count} rows to {args.output}")
+    print(f"Experiments: {', '.join(ordered_columns)}")
+    return 0
 
 
 if __name__ == "__main__":
-	sys.exit(main())
+    sys.exit(main())

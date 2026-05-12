@@ -16,7 +16,9 @@ import os
 from pathlib import Path
 import signal
 import shlex
+import shutil
 import sys
+import time
 import tomllib
 
 if __package__ in (None, ""):
@@ -27,19 +29,25 @@ from scripts.experiments.common import (
     LaunchedProcess,
     REPO_ROOT,
     benchmark_csv_from_config,
+    cleanup_launched_process,
     duration_to_seconds,
     launch_prefixed_module,
     resolve_repo_path,
     terminate_processes,
-    wait_for_processes,
     worker_log_path,
 )
+from tools.postprocess.aggregate_experiment_groups import main as aggregate_experiment_groups_main
 from tools.postprocess.apply_sliced_map import main as apply_sliced_map_main
 from tools.postprocess.filter_merged_results import main as filter_merged_results_main
 from tools.postprocess.merge_csv_by_location import main as merge_csv_by_location_main
 from tools.postprocess.merge_json_runs_by_experiment import main as merge_json_runs_main
 from tools.postprocess.merge_results import main as merge_results_main
 from tools.postprocess.summarize_reproduction_status import main as summarize_reproduction_status_main
+from tools.shared.configuration_metadata import (
+    copy_column_metadata,
+    derive_run_configuration,
+    write_run_metadata,
+)
 from tools.shared.experiment_registry import available_campaign_tools, selected_benchmarks
 
 
@@ -52,6 +60,10 @@ class RunDefinition:
     args_template: tuple[str, ...]
 
 
+def default_best_selection_csv(aggregate_output_base: str) -> Path:
+    return Path(f"{aggregate_output_base}_best_selection.csv")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the main experiment campaign.")
     parser.add_argument("config", help="Path to campaign TOML config")
@@ -60,6 +72,14 @@ def main(argv: list[str] | None = None) -> int:
         "--verbose",
         action="store_true",
         help="Stream worker stdout/stderr to the terminal while also writing per-worker logs",
+    )
+    parser.add_argument(
+        "--all-positives",
+        action="store_true",
+        help=(
+            "Keep positives even when they were not reproduced in merge_results CSVs and downstream CSV-based "
+            "postprocessing; merged per-configuration JSON always retains all positives."
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -88,6 +108,13 @@ def main(argv: list[str] | None = None) -> int:
     num_copies = campaign.get("num_copies", 10)
     if not isinstance(num_copies, int) or num_copies <= 0:
         raise SystemExit("campaign.num_copies must be a positive integer")
+    max_parallel_workers_raw = campaign.get("max_parallel_workers")
+    if max_parallel_workers_raw is None:
+        max_parallel_workers: int | None = None
+    else:
+        if not isinstance(max_parallel_workers_raw, int) or max_parallel_workers_raw <= 0:
+            raise SystemExit("campaign.max_parallel_workers must be a positive integer when set")
+        max_parallel_workers = max_parallel_workers_raw
     temp_dir_raw = campaign.get("temp_dir", "/datapool/theta-lin-experiments/tmp")
     if not isinstance(temp_dir_raw, str) or not temp_dir_raw:
         raise SystemExit("campaign.temp_dir must be a non-empty string")
@@ -109,14 +136,21 @@ def main(argv: list[str] | None = None) -> int:
         run_time_seconds = run_time_seconds_raw
     sliced_map_raw = campaign.get("sliced_map_csv", "configs/postprocess/sliced_map.csv")
     filtered_locations_raw = campaign.get("filtered_locations_csv", "configs/postprocess/filtered_locations.csv")
-    ideal_selection_raw = campaign.get("ideal_config_selection_csv", "configs/postprocess/ideal_config_selection.csv")
+    ideal_selection_raw = campaign.get("ideal_config_selection_csv")
+    aggregate_output_prefix = campaign.get("aggregate_output_prefix", "aggregated")
     by_library_output_prefix = campaign.get("by_library_output_prefix", "filtered_reproduction_status_by_library")
     if not isinstance(sliced_map_raw, str) or not sliced_map_raw:
         raise SystemExit("campaign.sliced_map_csv must be a non-empty string")
     if not isinstance(filtered_locations_raw, str) or not filtered_locations_raw:
         raise SystemExit("campaign.filtered_locations_csv must be a non-empty string")
-    if not isinstance(ideal_selection_raw, str) or not ideal_selection_raw:
-        raise SystemExit("campaign.ideal_config_selection_csv must be a non-empty string")
+    if ideal_selection_raw is not None and (
+        not isinstance(ideal_selection_raw, str) or not ideal_selection_raw
+    ):
+        raise SystemExit(
+            "campaign.ideal_config_selection_csv must be a non-empty string when set"
+        )
+    if not isinstance(aggregate_output_prefix, str) or not aggregate_output_prefix:
+        raise SystemExit("campaign.aggregate_output_prefix must be a non-empty string")
     if not isinstance(by_library_output_prefix, str) or not by_library_output_prefix:
         raise SystemExit("campaign.by_library_output_prefix must be a non-empty string")
 
@@ -132,7 +166,11 @@ def main(argv: list[str] | None = None) -> int:
     output_dir = resolve_repo_path(output_raw)
     sliced_map_csv = resolve_repo_path(sliced_map_raw)
     filtered_locations_csv = resolve_repo_path(filtered_locations_raw)
-    ideal_config_selection_csv = resolve_repo_path(ideal_selection_raw)
+    ideal_config_selection_csv = (
+        resolve_repo_path(ideal_selection_raw)
+        if ideal_selection_raw is not None
+        else None
+    )
 
     try:
         config_benchmarks_all = benchmark_csv_from_config(benchmarks_section.get("all"), "benchmarks.all")
@@ -183,18 +221,46 @@ def main(argv: list[str] | None = None) -> int:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     run_targets: list[tuple[str, str]] = []
-    launched_runs: list[LaunchedProcess] = []
+    run_metadata_by_destination: dict[str, dict[str, object]] = {}
+    active_runs: list[LaunchedProcess] = []
     run_env = dict(os.environ)
+    launch_failures = 0
+
+    def reap_finished(*, block_until_one: bool) -> int:
+        overall = 0
+        while True:
+            finished: list[LaunchedProcess] = []
+            for launched in active_runs:
+                launched.process.join(timeout=0)
+                if launched.process.exitcode is not None:
+                    finished.append(launched)
+
+            if finished:
+                for launched in finished:
+                    return_code = launched.process.exitcode if launched.process.exitcode is not None else 1
+                    status = "done" if return_code == 0 else f"failed with exit code {return_code}"
+                    print(f"[{launched.tag}] {status}; log: {launched.log_path}")
+                    if return_code != 0:
+                        overall = 1
+                    launched.reader.join()
+                    cleanup_launched_process(launched)
+                    active_runs.remove(launched)
+                return overall
+
+            if not block_until_one:
+                return overall
+            time.sleep(0.2)
 
     def handle_signal(signum: int, _frame: object) -> None:
         print("interrupted, stopping experiment runs", file=sys.stderr)
-        terminate_processes(launched_runs)
+        terminate_processes(active_runs)
         raise SystemExit(130)
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
     def launch_run(tag: str, dst: str, tool: CampaignTool, base_args: list[str]) -> None:
+        nonlocal launch_failures
         # Preserve the destination root layout expected by the merge step:
         # destination/0, destination/1, ... each contain one worker's outputs.
         run_targets.append((tag, dst))
@@ -216,7 +282,9 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"[{worker_tag}] starting; results: {worker_destination}; log: {current_worker_log_path}"
             )
-            launched_runs.append(
+            while max_parallel_workers is not None and len(active_runs) >= max_parallel_workers:
+                launch_failures |= reap_finished(block_until_one=True)
+            active_runs.append(
                 launch_prefixed_module(
                     worker_tag,
                     tool.module_name,
@@ -232,78 +300,78 @@ def main(argv: list[str] | None = None) -> int:
         # Keep the postprocess flow aligned with the CLI tools users already know,
         # but call the Python entry points directly so the campaign fails fast on
         # argument or import errors without another subprocess layer.
-        for required_file in (sliced_map_csv, filtered_locations_csv, ideal_config_selection_csv):
+        required_files = [sliced_map_csv, filtered_locations_csv]
+        if ideal_config_selection_csv is not None:
+            required_files.append(ideal_config_selection_csv)
+
+        for required_file in required_files:
             if not required_file.is_file():
                 raise SystemExit(f"missing required file: {required_file}")
 
         output_str = str(output_dir)
+        merge_results_extra_args = ["--all-positives"] if args.all_positives else []
+
         for tag, destination in run_targets:
-            print(f"[{tag} MERGE JSON] merge_json_runs_by_experiment {shlex.join([destination])}")
-            if merge_json_runs_main([destination]) != 0:
+            merge_json_args = [destination]
+            print(f"[{tag} MERGE JSON] merge_json_runs_by_experiment {shlex.join(merge_json_args)}")
+            if merge_json_runs_main(merge_json_args) != 0:
                 raise SystemExit(1)
+        merged_results_args = [output_str, *merge_results_extra_args, "-o", f"{output_str}/merged_results.csv"]
         print(
-            f"[MERGE CSV ALL] merge_results {shlex.join([output_str, '-o', f'{output_str}/merged_results.csv'])}"
+            f"[MERGE CSV ALL] merge_results {shlex.join(merged_results_args)}"
         )
-        if merge_results_main([output_str, "-o", f"{output_str}/merged_results.csv"]) != 0:
+        if merge_results_main(merged_results_args) != 0:
             raise SystemExit(1)
+        sliced_merged_results_args = [
+            output_str,
+            "--sliced",
+            *merge_results_extra_args,
+            "-o",
+            f"{output_str}/sliced_merged_results.csv",
+        ]
         print(
-            f"[MERGE CSV SLICED] merge_results {shlex.join([output_str, '--sliced', '-o', f'{output_str}/sliced_merged_results.csv'])}"
+            f"[MERGE CSV SLICED] merge_results {shlex.join(sliced_merged_results_args)}"
         )
-        if merge_results_main([output_str, "--sliced", "-o", f"{output_str}/sliced_merged_results.csv"]) != 0:
-            raise SystemExit(1)
-        print(
-            "[RELABEL CSV SLICED] apply_sliced_map "
-            + shlex.join(
-                [
-                    f"{output_str}/sliced_merged_results.csv",
-                    "--map",
-                    str(sliced_map_csv),
-                    "--output",
-                    f"{output_str}/sliced_relabeled_merged_results.csv",
-                ]
+        sliced_merge_rc: int
+        try:
+            sliced_merge_rc = merge_results_main(sliced_merged_results_args)
+        except SystemExit as error:
+            code = error.code
+            if isinstance(code, str) and code.startswith("No sliced top-level result JSON files found"):
+                sliced_merge_rc = 1
+            else:
+                raise
+
+        if sliced_merge_rc != 0:
+            print("No sliced results found, proceeding without slicing.")
+            all_merged_results_path = f"{output_str}/all_merged_results.csv"
+            merged_results_path = f"{output_str}/merged_results.csv"
+            shutil.copyfile(merged_results_path, all_merged_results_path)
+            copy_column_metadata(merged_results_path, all_merged_results_path)
+        else:
+            print(
+                "[MERGE CSV BY LOCATION] merge_csv_by_location "
+                + shlex.join(
+                    [
+                        f"{output_str}/merged_results.csv",
+                        f"{output_str}/sliced_relabeled_merged_results.csv",
+                        "-o",
+                        f"{output_str}/all_merged_results.csv",
+                    ]
+                )
             )
-        )
-        if apply_sliced_map_main(
-            [
-                f"{output_str}/sliced_merged_results.csv",
-                "--map",
-                str(sliced_map_csv),
-                "--output",
-                f"{output_str}/sliced_relabeled_merged_results.csv",
-            ]
-        ) != 0:
-            raise SystemExit(1)
-        print(
-            "[MERGE CSV BY LOCATION] merge_csv_by_location "
-            + shlex.join(
+            if merge_csv_by_location_main(
                 [
                     f"{output_str}/merged_results.csv",
                     f"{output_str}/sliced_relabeled_merged_results.csv",
                     "-o",
                     f"{output_str}/all_merged_results.csv",
                 ]
-            )
-        )
-        if merge_csv_by_location_main(
-            [
-                f"{output_str}/merged_results.csv",
-                f"{output_str}/sliced_relabeled_merged_results.csv",
-                "-o",
-                f"{output_str}/all_merged_results.csv",
-            ]
-        ) != 0:
-            raise SystemExit(1)
+            ) != 0:
+                raise SystemExit(1)
+
         print(
-            "[FILTER CSV ALL] filter_merged_results "
-            + shlex.join(
-                [
-                    f"{output_str}/all_merged_results.csv",
-                    "--filter",
-                    str(filtered_locations_csv),
-                    "--output",
-                    f"{output_str}/filtered_merged_results.csv",
-                ]
-            )
+            f"[FILTER CSV ALL] filter_merged_results {shlex.join([f'{output_str}/all_merged_results.csv', '--filter', str(filtered_locations_csv), '--output', f'{output_str}/filtered_merged_results.csv'])}"
         )
         if filter_merged_results_main(
             [
@@ -315,41 +383,63 @@ def main(argv: list[str] | None = None) -> int:
             ]
         ) != 0:
             raise SystemExit(1)
+
+        aggregate_output_base = f"{output_str}/{aggregate_output_prefix}"
+        aggregate_args = [
+            f"{output_str}/filtered_merged_results.csv",
+            "--output",
+            aggregate_output_base,
+        ]
+        if ideal_config_selection_csv is not None:
+            aggregate_args.extend(["--selection-csv", str(ideal_config_selection_csv)])
+        print(
+            "[AGGREGATE CONFIGS] aggregate_experiment_groups "
+            + shlex.join(aggregate_args)
+        )
+        try:
+            if aggregate_experiment_groups_main(aggregate_args) != 0:
+                raise SystemExit(1)
+        except ValueError as error:
+            message = str(error)
+            if "Image size of" in message and "too large" in message:
+                print(
+                    "aggregate_experiment_groups plot output overflowed matplotlib limits; "
+                    "continuing without finishing aggregate plots."
+                )
+            else:
+                raise
+
+        selection_csv_for_reports = (
+            ideal_config_selection_csv
+            if ideal_config_selection_csv is not None
+            else default_best_selection_csv(aggregate_output_base)
+        )
+        summary_base_args = [
+            output_str,
+            "--filter",
+            str(filtered_locations_csv),
+            "--sliced-map",
+            str(sliced_map_csv),
+            "--output",
+            f"{output_str}/filtered_reproduction_status_summary.csv",
+        ]
+        summary_selection_args = [
+            *summary_base_args,
+            "--selection-csv",
+            str(selection_csv_for_reports),
+            "--selected-output",
+            f"{output_str}/filtered_reproduction_status_best_of.csv",
+            "--selected-latex-output",
+            f"{output_str}/filtered_reproduction_status_best_of.tex",
+            "--by-library-selection-tables",
+            "--by-library-output-prefix",
+            f"{output_str}/{by_library_output_prefix}",
+        ]
         print(
             "[SUMMARY REPRO STATUS] summarize_reproduction_status "
-            + shlex.join(
-                [
-                    output_str,
-                    "--filter",
-                    str(filtered_locations_csv),
-                    "--sliced-map",
-                    str(sliced_map_csv),
-                    "--selection-csv",
-                    str(ideal_config_selection_csv),
-                    "--by-library-selection-tables",
-                    "--by-library-output-prefix",
-                    f"{output_str}/{by_library_output_prefix}",
-                    "--output",
-                    f"{output_str}/filtered_reproduction_status_summary.csv",
-                ]
-            )
+            + shlex.join(summary_selection_args)
         )
-        if summarize_reproduction_status_main(
-            [
-                output_str,
-                "--filter",
-                str(filtered_locations_csv),
-                "--sliced-map",
-                str(sliced_map_csv),
-                "--selection-csv",
-                str(ideal_config_selection_csv),
-                "--by-library-selection-tables",
-                "--by-library-output-prefix",
-                f"{output_str}/{by_library_output_prefix}",
-                "--output",
-                f"{output_str}/filtered_reproduction_status_summary.csv",
-            ]
-        ) != 0:
+        if summarize_reproduction_status_main(summary_selection_args) != 0:
             raise SystemExit(1)
 
     template_values: dict[str, str] = {}
@@ -376,15 +466,28 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(
                 f"run_definitions.{run_definition.run_key}.args references unknown template key '{error.args[0]}'"
             ) from error
+        destination_name = run_definition.destination_name
+        if destination_name in run_metadata_by_destination:
+            raise SystemExit(f"duplicate run destination name {destination_name!r}")
+        run_metadata_by_destination[destination_name] = derive_run_configuration(
+            run_definition.tool_name,
+            destination_name,
+            run_args,
+        )
         launch_run(
             run_definition.tag,
-            str(output_dir / run_definition.destination_name),
+            str(output_dir / destination_name),
             tool,
             run_args,
         )
 
-    if not args.postprocess_only and wait_for_processes(launched_runs) != 0:
-        raise SystemExit(1)
+    write_run_metadata(output_dir, run_metadata_by_destination)
+
+    if not args.postprocess_only:
+        while active_runs:
+            launch_failures |= reap_finished(block_until_one=True)
+        if launch_failures != 0:
+            raise SystemExit(1)
     run_postprocess()
     return 0
 
