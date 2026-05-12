@@ -265,6 +265,31 @@ Current TODOs worth keeping in mind:
 
 CtChecker is handled as an external baseline rather than as a runner in this repository. Checked-in CtChecker outputs live under `ctchecker_results`, and helper scripts such as `python -m tools.converters.klee_log_to_json`, `python -m tools.postprocess.compare_with_ctchecker`, and `python -m tools.postprocess.make_report` join those baseline results with KLEE-derived outputs for reporting.
 
+## Local KLEE Fork Notes
+
+`klee-controlflow/` and `klee-eager/` carry repository-specific side-channel analysis behavior beyond upstream KLEE. The old `README-MODIFICATIONS.md` sidecars in those forks have been retired; the maintained local behavior notes now live here.
+
+Branch recording caveats:
+
+- branch-decision recording is currently centered on the executor's branching path, and the recorded `state->pc` can sometimes point past the machine-level branch instruction that caused the split
+- the current instrumentation records ordinary `Br` instructions; `IndirectBr`, `Switch`, and `Select` are not covered yet
+- `BothBranch` mode means one execution path can emit counterexamples for every feasible branch split along that path, not just the first divergence
+
+Secret-aware symbolic API:
+
+```cpp
+void klee_make_symbolic_sc(void *addr, size_t nbytes, const char *name, int is_secret);
+```
+
+This behaves like `klee_make_symbolic()`, but also marks whether the symbolic object is secret so the product-program side-channel checks can track original and `__prime` variants separately.
+
+Product-program behavior for secret-dependent branches:
+
+- secret arrays are tracked in the KLEE `Array` representation
+- executor constraints are mirrored across both the original secret objects and their `__prime` counterparts
+- when a secret-dependent branch is analyzed, the fork constraints are built from `condition` together with `not(condition')`, where `condition'` is the same expression with secret objects replaced by their `__prime` versions
+- generated branch counterexamples therefore store paired secret values as `<name>` and `<name>__prime`
+
 ## Directory Guide
 
 - `benchmarks/`: vendored benchmark code plus benchmark-local wrappers and build scripts
