@@ -9,6 +9,7 @@ easy to follow without chasing abstractions across files.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import errno
 import importlib
 import multiprocessing
 import os
@@ -23,7 +24,7 @@ import tempfile
 import threading
 import traceback
 from types import TracebackType
-from typing import TextIO
+from typing import Callable, TextIO
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -112,17 +113,24 @@ class LaunchedProcess:
     process: multiprocessing.Process
     reader: threading.Thread
     log_path: Path
+    output_queue: object | None = None
 
 
 class _QueueWriter:
     encoding = "utf-8"
 
-    def __init__(self, output_queue: object) -> None:
-        self.output_queue = output_queue
+    def __init__(self, queue_handle: object) -> None:
+        self.queue_handle = queue_handle
 
     def write(self, text: str) -> int:
         if text:
-            self.output_queue.put(text)
+            try:
+                if hasattr(self.queue_handle, "put"):
+                    self.queue_handle.put(text)
+                else:
+                    self.queue_handle.send(text)
+            except (BrokenPipeError, OSError):
+                return len(text)
         return len(text)
 
     def flush(self) -> None:
@@ -132,6 +140,77 @@ class _QueueWriter:
         return False
 
 
+def redirect_output_to_queue(output_queue: object) -> None:
+    writer = _QueueWriter(output_queue)
+    sys.stdout = writer
+    sys.stderr = writer
+
+
+def restore_output_streams(stdout: TextIO, stderr: TextIO) -> None:
+    sys.stdout = stdout
+    sys.stderr = stderr
+
+
+def forward_worker_output(
+    process: multiprocessing.Process,
+    tag: str,
+    log_path: Path,
+    output_queue: object,
+    *,
+    verbose: bool = False,
+) -> None:
+    def receive_with_timeout(timeout: float) -> tuple[bool, str | None]:
+        if hasattr(output_queue, "get"):
+            try:
+                return True, output_queue.get(timeout=timeout)
+            except queue.Empty:
+                return False, None
+
+        if not output_queue.poll(timeout):
+            return False, None
+        try:
+            return True, output_queue.recv()
+        except EOFError:
+            return True, None
+
+    def receive_nowait() -> tuple[bool, str | None]:
+        if hasattr(output_queue, "get_nowait"):
+            try:
+                return True, output_queue.get_nowait()
+            except queue.Empty:
+                return False, None
+
+        if not output_queue.poll(0):
+            return False, None
+        try:
+            return True, output_queue.recv()
+        except EOFError:
+            return False, None
+
+    with log_path.open("w", encoding="utf-8", buffering=1) as log_handle:
+        while True:
+            has_chunk, chunk = receive_with_timeout(0.1)
+            if not has_chunk:
+                if process.exitcode is not None:
+                    break
+                continue
+            if chunk is None:
+                break
+            log_handle.write(chunk)
+            if verbose:
+                print(f"[{tag}] {chunk}", end="")
+
+        while True:
+            has_chunk, chunk = receive_nowait()
+            if not has_chunk:
+                break
+            if chunk is None:
+                continue
+            log_handle.write(chunk)
+            if verbose:
+                print(f"[{tag}] {chunk}", end="")
+
+
 def _run_module_worker(
     module_name: str,
     argv: list[str],
@@ -139,9 +218,9 @@ def _run_module_worker(
     cwd: str,
     output_queue: object,
 ) -> None:
-    writer = _QueueWriter(output_queue)
-    sys.stdout = writer
-    sys.stderr = writer
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    redirect_output_to_queue(output_queue)
     exit_code = 0
     try:
         os.environ.clear()
@@ -170,47 +249,111 @@ def _run_module_worker(
         else:
             print(error.code, file=sys.stderr)
             exit_code = 1
+    except KeyboardInterrupt:
+        exit_code = 130
     except BaseException:
         traceback.print_exc()
         exit_code = 1
     finally:
-        output_queue.put(None)
+        restore_output_streams(original_stdout, original_stderr)
+        try:
+            if hasattr(output_queue, "put"):
+                output_queue.put(None)
+            else:
+                output_queue.send(None)
+        except Exception:
+            pass
+        try:
+            output_queue.close()
+        except Exception:
+            pass
 
     raise SystemExit(exit_code)
 
 
-def _forward_worker_output(
-    process: multiprocessing.Process,
+def launch_output_captured_process(
     tag: str,
-    log_path: Path,
-    output_queue: object,
+    target: Callable[..., None],
+    target_args: tuple[object, ...],
     *,
-    verbose: bool,
-) -> None:
-    with log_path.open("w", encoding="utf-8", buffering=1) as log_handle:
-        while True:
-            try:
-                chunk = output_queue.get(timeout=0.1)
-            except queue.Empty:
-                if process.exitcode is not None:
-                    break
-                continue
-            if chunk is None:
-                break
-            log_handle.write(chunk)
-            if verbose:
-                print(f"[{tag}] {chunk}", end="")
+    log_path: Path,
+    verbose: bool = False,
+) -> LaunchedProcess:
+    ctx = multiprocessing.get_context("spawn")
+    output_queue, child_output_queue = ctx.Pipe(duplex=False)
+    process = ctx.Process(
+        target=target,
+        args=(*target_args, child_output_queue),
+        name=tag,
+    )
+    process.start()
+    child_output_queue.close()
+    reader = threading.Thread(
+        target=forward_worker_output,
+        args=(process, tag, log_path, output_queue),
+        kwargs={"verbose": verbose},
+        daemon=True,
+    )
+    reader.start()
+    return LaunchedProcess(
+        tag=tag,
+        process=process,
+        reader=reader,
+        log_path=log_path,
+        output_queue=output_queue,
+    )
 
-        while True:
-            try:
-                chunk = output_queue.get_nowait()
-            except queue.Empty:
-                break
-            if chunk is None:
-                continue
-            log_handle.write(chunk)
-            if verbose:
-                print(f"[{tag}] {chunk}", end="")
+
+def execute_output_captured_worker(
+    output_queue: object | None,
+    worker: Callable[[], object | None],
+) -> None:
+    if output_queue is None:
+        worker()
+        return
+
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    redirect_output_to_queue(output_queue)
+    exit_code = 0
+    try:
+        result = worker()
+        if result is None:
+            exit_code = 0
+        elif isinstance(result, int):
+            exit_code = result
+        else:
+            raise TypeError(
+                f"worker returned unsupported exit code type {type(result).__name__}"
+            )
+    except SystemExit as error:
+        if error.code is None:
+            exit_code = 0
+        elif isinstance(error.code, int):
+            exit_code = error.code
+        else:
+            print(error.code, file=sys.stderr)
+            exit_code = 1
+    except KeyboardInterrupt:
+        exit_code = 130
+    except BaseException:
+        traceback.print_exc()
+        exit_code = 1
+    finally:
+        restore_output_streams(original_stdout, original_stderr)
+        try:
+            if hasattr(output_queue, "put"):
+                output_queue.put(None)
+            else:
+                output_queue.send(None)
+        except Exception:
+            pass
+        try:
+            output_queue.close()
+        except Exception:
+            pass
+
+    raise SystemExit(exit_code)
 
 
 def launch_prefixed_module(
@@ -224,16 +367,17 @@ def launch_prefixed_module(
     verbose: bool = False,
 ) -> LaunchedProcess:
     ctx = multiprocessing.get_context("spawn")
-    output_queue = ctx.Queue()
+    output_queue, child_output_queue = ctx.Pipe(duplex=False)
     effective_log_path = log_path or cwd / f"{tag.replace('/', '_').replace(' ', '_')}.log"
     process = ctx.Process(
         target=_run_module_worker,
-        args=(module_name, argv, dict(env or os.environ), str(cwd), output_queue),
+        args=(module_name, argv, dict(env or os.environ), str(cwd), child_output_queue),
         name=tag,
     )
     process.start()
+    child_output_queue.close()
     reader = threading.Thread(
-        target=_forward_worker_output,
+        target=forward_worker_output,
         args=(process, tag, effective_log_path, output_queue),
         kwargs={"verbose": verbose},
         daemon=True,
@@ -244,7 +388,26 @@ def launch_prefixed_module(
         process=process,
         reader=reader,
         log_path=effective_log_path,
+        output_queue=output_queue,
     )
+
+
+def cleanup_launched_process(launched: LaunchedProcess, *, close_queue: bool = True) -> None:
+    """Release multiprocessing IPC/process handles to avoid resource leaks."""
+    if close_queue and launched.output_queue is not None:
+        try:
+            launched.output_queue.close()
+        except Exception:
+            pass
+        if hasattr(launched.output_queue, "join_thread"):
+            try:
+                launched.output_queue.join_thread()
+            except Exception:
+                pass
+    try:
+        launched.process.close()
+    except Exception:
+        pass
 
 
 def worker_log_path(destination_root: Path, copy_index: int) -> Path:
@@ -253,33 +416,66 @@ def worker_log_path(destination_root: Path, copy_index: int) -> Path:
     return log_root / f"{copy_index}.log"
 
 
+def _process_is_alive(process: multiprocessing.Process) -> bool:
+    try:
+        return process.is_alive()
+    except ValueError:
+        # multiprocessing.Process raises when the handle has already been closed.
+        return False
+
+
+def _process_join(process: multiprocessing.Process, timeout: float | None = None) -> None:
+    try:
+        if timeout is None:
+            process.join()
+        else:
+            process.join(timeout=timeout)
+    except ValueError:
+        return None
+
+
+def _process_exitcode(process: multiprocessing.Process) -> int:
+    try:
+        code = process.exitcode
+    except ValueError:
+        code = None
+    return code if code is not None else 1
+
+
 def wait_for_processes(processes: list[LaunchedProcess]) -> int:
     overall = 0
     for launched in processes:
-        launched.process.join()
-        return_code = launched.process.exitcode if launched.process.exitcode is not None else 1
+        _process_join(launched.process)
+        return_code = _process_exitcode(launched.process)
         status = "done" if return_code == 0 else f"failed with exit code {return_code}"
         print(f"[{launched.tag}] {status}; log: {launched.log_path}")
         if return_code != 0:
             overall = 1
     for launched in processes:
         launched.reader.join()
+        cleanup_launched_process(launched)
     return overall
 
 
 def terminate_processes(processes: list[LaunchedProcess]) -> None:
     for launched in processes:
-        if launched.process.is_alive():
+        if _process_is_alive(launched.process):
             print(f"[{launched.tag}] stopping; log: {launched.log_path}", file=sys.stderr)
             launched.process.terminate()
     for launched in processes:
-        if launched.process.is_alive():
-            launched.process.join(timeout=2)
-            if launched.process.is_alive():
+        if _process_is_alive(launched.process):
+            _process_join(launched.process, timeout=2)
+            if _process_is_alive(launched.process):
                 print(f"[{launched.tag}] killing after timeout; log: {launched.log_path}", file=sys.stderr)
                 launched.process.kill()
     for launched in processes:
+        if _process_is_alive(launched.process):
+            _process_join(launched.process, timeout=2)
+    for launched in processes:
         launched.reader.join(timeout=1)
+        # Closing Queue semaphores before a spawned child is fully dead can
+        # make that child fail in SemLock._rebuild during interpreter startup.
+        cleanup_launched_process(launched, close_queue=not _process_is_alive(launched.process))
 
 
 def resolve_repo_path(path: str | Path) -> Path:
@@ -300,9 +496,17 @@ def prepare_benchmark_workspace(benchmark_root: str | Path, tmp_dir: str | Path 
 
     temp_root = Path(tmp_dir).expanduser().resolve()
     temp_root.mkdir(parents=True, exist_ok=True)
-    workspace_root = Path(
-        tempfile.mkdtemp(prefix=f"benchmark-{benchmark_source.name}.", dir=str(temp_root))
-    )
+    try:
+        workspace_root = Path(
+            tempfile.mkdtemp(prefix=f"benchmark-{benchmark_source.name}.", dir=str(temp_root))
+        )
+    except OSError as error:
+        if error.errno == errno.ENOSPC:
+            raise OSError(
+                errno.ENOSPC,
+                f"no space left in temporary workspace root {temp_root}; rerun with --tmp-dir on a filesystem with more free space",
+            ) from error
+        raise
 
     current_source = REPO_ROOT
     current_workspace = workspace_root
@@ -323,8 +527,16 @@ def prepare_benchmark_workspace(benchmark_root: str | Path, tmp_dir: str | Path 
             current_source = source_child
             current_workspace = workspace_child
             continue
-
-        shutil.copytree(source_child, workspace_child, symlinks=True)
+        try:
+            shutil.copytree(source_child, workspace_child, symlinks=True)
+        except OSError as error:
+            shutil.rmtree(workspace_root, ignore_errors=True)
+            if error.errno == errno.ENOSPC:
+                raise OSError(
+                    errno.ENOSPC,
+                    f"no space left while copying benchmark workspace into {workspace_root}; rerun with --tmp-dir on a filesystem with more free space",
+                ) from error
+            raise
         return BenchmarkWorkspace(
             root=workspace_root,
             benchmark_root=workspace_child,
@@ -433,6 +645,28 @@ class ExperimentContext:
 
     output_handle: TextIO | None = None
 
+    @staticmethod
+    def _stop_streamed_process(process: subprocess.Popen[str]) -> None:
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            return
+        except Exception:
+            return
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                return
+            except Exception:
+                return
+            try:
+                process.wait(timeout=2)
+            except Exception:
+                return
+
     def log(self, message: str = "") -> None:
         """Write a message to stdout and mirror it to the shared output log."""
         print(message)
@@ -464,12 +698,16 @@ class ExperimentContext:
             bufsize=1,
         )
         assert process.stdout is not None
-        for line in process.stdout:
-            rendered = line.rstrip("\n")
-            print(rendered)
-            if self.output_handle is not None:
-                self.output_handle.write(f"{rendered}\n")
-                self.output_handle.flush()
+        try:
+            for line in process.stdout:
+                rendered = line.rstrip("\n")
+                print(rendered)
+                if self.output_handle is not None:
+                    self.output_handle.write(f"{rendered}\n")
+                    self.output_handle.flush()
+        except KeyboardInterrupt:
+            self._stop_streamed_process(process)
+            raise
         return_code = process.wait()
         if check and return_code != 0:
             raise SystemExit(return_code)
@@ -505,16 +743,20 @@ class ExperimentContext:
                 bufsize=1,
             )
             assert process.stdout is not None
-            for line in process.stdout:
-                rendered = line.rstrip("\n")
-                if prefix:
-                    rendered = f"{prefix}{rendered}"
-                print(rendered)
-                if self.output_handle is not None:
-                    self.output_handle.write(f"{rendered}\n")
-                    self.output_handle.flush()
-                handle.write(line)
-                handle.flush()
+            try:
+                for line in process.stdout:
+                    rendered = line.rstrip("\n")
+                    if prefix:
+                        rendered = f"{prefix}{rendered}"
+                    print(rendered)
+                    if self.output_handle is not None:
+                        self.output_handle.write(f"{rendered}\n")
+                        self.output_handle.flush()
+                    handle.write(line)
+                    handle.flush()
+            except KeyboardInterrupt:
+                self._stop_streamed_process(process)
+                raise
             return_code = process.wait()
 
         if check and return_code != 0:
