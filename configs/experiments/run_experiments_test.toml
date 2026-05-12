@@ -1,8 +1,9 @@
 [campaign]
 num_copies = 3
+max_parallel_workers = 80
 temp_dir = "/datapool/theta-lin-experiments/tmp"
 output = "/datapool/theta-lin-experiments/test"
-run_time = "2m"
+run_time = "1m"
 klee_root = "/home/theta-lin/klee/build/bin"
 pin_root = "/datapool/theta-lin/pin-external-4.2-99776-g21d818fa2-gcc-linux"
 sliced_map_csv = "configs/postprocess/sliced_map.csv"
@@ -11,7 +12,7 @@ ideal_config_selection_csv = "configs/postprocess/ideal_config_selection.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-all = ["mbedtls"]
+all = ["mbedtls", "libgcrypt"]
 
 [runs]
 klee_cf_default_4 = true

@@ -32,7 +32,7 @@ At a high level, the workflow is:
 2. Build the benchmark in the mode needed by that engine.
 3. Run the engine-specific experiment script.
 4. Convert raw logs or output directories into a shared JSON schema.
-5. Merge repeated runs and configurations into CSV or JSON tables keyed by source location.
+5. Merge repeated runs and configurations into per-configuration JSON plus comparison CSV tables keyed by source location.
 6. Optionally replay reported positives under Intel Pin to check whether they reproduce.
 7. Compare the resulting locations against CtChecker or other baselines.
 
@@ -130,7 +130,7 @@ python -m scripts.experiments.run_experiments --postprocess-only configs/experim
 
 `python -m scripts.experiments.run_experiments <config.toml>` reads four top-level sections from the campaign TOML:
 
-- `[campaign]`: global paths and timeouts used by the whole batch, including `output`, `run_time`, `run_time_seconds`, `klee_root`, and the checked-in postprocess CSV inputs
+- `[campaign]`: global paths and timeouts used by the whole batch, including `output`, `run_time`, `run_time_seconds`, `klee_root`, the checked-in postprocess CSV inputs, and optional postprocess output prefixes such as `aggregate_output_prefix` and `by_library_output_prefix`
 - `[benchmarks]`: optional per-tool benchmark filters; empty arrays mean "use that tool's default benchmark set"
 - `[runs]`: booleans that turn individual named campaign entries on or off
 - `[run_definitions.<name>]`: the command template and output routing for each named run; these usually stay checked in and you mostly customize `[campaign]`, `[benchmarks]`, and `[runs]`
@@ -157,6 +157,7 @@ klee_root = "/home/theta-lin/klee/build/bin"
 sliced_map_csv = "configs/postprocess/sliced_map.csv"
 filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 ideal_config_selection_csv = "configs/postprocess/ideal_config_selection.csv"
+aggregate_output_prefix = "aggregated"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
@@ -197,18 +198,70 @@ python -m scripts.experiments.run_experiments path/to/your_mbedtls_1m.toml
 
 If you want the same benchmark restriction across every enabled tool, set `all = ["mbedtls"]` instead of per-tool arrays under `[benchmarks]`.
 
+### Configuring Benchmark Descriptors
+
+Benchmark descriptors live under `configs/benchmarks/` and are loaded through `tools/shared/experiment_registry.py`.
+
+For benchmarks that repeat the same case structure across `fix_pub` and `var_pub`, prefer the compact matrix form:
+
+```toml
+[benchmarks.mode_case_templates]
+abacus_executable = "benchmarks/example/abacus_{public_mode}_{artifact_suffix}"
+self_comp_bitcode = "benchmarks/example/self_comp_{public_mode}_{artifact_suffix}.bc"
+self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
+binsec_sse_script = "benchmarks/example/generated/{artifact_suffix}/binsec_{public_mode}.cfg"
+binsec_executable = "benchmarks/example/binsec_{public_mode}_{artifact_suffix}"
+klee_bitcode = "benchmarks/example/klee_{public_mode}_{artifact_suffix}.bc"
+klee_replay_script = "benchmarks/example/klee_{public_mode}_replay_{artifact_suffix}"
+
+[[benchmarks.mode_cases]]
+display_name = "Example"
+artifact_suffix = "example"
+output_stem = "example_case"
+replay_opts = "--secret key,data"
+ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
+memory_flag = true
+secret_layout = "key:16,data:16"
+secret_inputs = ["key:16:key_buf", "data:16:data_buf"]
+runner_config = "configs/runner/example_runner_config.toml"
+preset_name = "default"
+```
+
+The registry expands each `mode_cases` entry into the concrete `abacus_cases`, `self_comp_cases`, `binsec_cases`, and `klee_cases` at load time. Use explicit per-tool case arrays only when one benchmark variant really does not follow the shared pattern.
+
 ## Results, Conversion, And Comparison
 
 Each engine writes raw outputs into its own subdirectory under `results`. Those raw artifacts are then normalized into a shared schema defined in `tools/shared/result_schema.py`, which is what allows cross-tool and cross-run comparison.
 
+Campaign runs now also emit explicit metadata alongside the raw data:
+
+- each campaign output root contains `_run_metadata.json`, which records the configuration for each run directory
+- each merged CSV can carry a `*.metadata.json` sidecar that records the exact metadata for every result column
+
+The postprocess pipeline now expects those metadata files when it is operating on campaign-generated outputs. Helper steps such as filtering, sliced relabeling, and CSV merges preserve the sidecars when they are present.
+
+The shared JSON rows now use one canonical side-channel field: `kind`, whose value is always either `branch` or `memory`. No converter or postprocess step should rely on legacy field names or JSON filename suffixes to recover this information.
+
+Two caveats are worth knowing when reading those normalized JSON files:
+
+- `self_comp` is currently branch-only. The benchmark build scripts instrument self-composition bitcode with `record_branch`, and `tools/converters/self_comp_log_to_json.py` only parses `NON-CT BRANCH` log records, so every self-comp positive is emitted with `kind = "branch"`.
+- `abacus` does not report branch-vs-memory explicitly in its raw logs. `tools/converters/abacus_log_to_json.py` infers `kind` from the divergent instruction by disassembling the executable with `objdump`; if that instruction cannot be classified cleanly as branch or memory, conversion fails.
+
 The processing stack is split by responsibility:
 
 - `tools/converters`: turns raw KLEE, self-comp, BINSEC, or ABACUS outputs into the shared JSON format; invoke converter CLIs as `python -m tools.converters.<name>`
-- `python -m tools.postprocess.merge_json_runs_by_experiment`: merges repeated runs for one experiment configuration
-- `python -m tools.postprocess.merge_results`: combines many per-run JSON files into comparison CSVs keyed by source location
-- `python -m tools.postprocess.apply_sliced_map`, `python -m tools.postprocess.merge_csv_by_location`, and `python -m tools.postprocess.filter_merged_results`: relabel sliced benchmarks, combine tables, and filter locations
+- `python -m tools.postprocess.merge_json_runs_by_experiment`: merges repeated runs for one experiment configuration and retains all positives with non-null `non_ct_time`, aggregating `reproduced_status` as status-count maps
+- `python -m tools.postprocess.merge_results`: combines many per-run JSON files into comparison CSVs keyed by source location; by default it keeps only locations whose merged `reproduced_status` includes at least one success, and `--all-positives` widens that to every positive with non-null `non_ct_time`
+- `python -m tools.postprocess.apply_sliced_map`, `python -m tools.postprocess.merge_csv_by_location`, and `python -m tools.postprocess.filter_merged_results`: relabel sliced benchmarks, combine tables, and filter locations; libraries absent from `filtered_locations.csv` pass through unchanged, while listed libraries are restricted to the configured line ranges
+- `python -m tools.postprocess.aggregate_experiment_groups`: writes aggregate configuration summaries, exploration cactus plots, a generated one-best-configuration-per-tool selection based on `insecure_locations_found` then `max_time`, and selected-configuration comparison plots; `--selection-csv` still overrides the automatic choice
 - `python -m tools.postprocess.summarize_reproduction_status`: summarizes whether reported positives reproduced; with `--selection-csv` it writes selected best-of status tables, and with `--by-library-selection-tables` it also writes a per-library success-count matrix ordered as `KLEE-CF | other KLEE-based | external`
 - `python -m tools.postprocess.reproduce_positives`: replays positive findings with the repository's Intel Pin tracer in `pin-tracer`
+
+Current TODOs worth keeping in mind:
+
+- finish converting the remaining verbose benchmark descriptor TOMLs onto `mode_cases` / `mode_case_templates`
+- add a broader end-to-end campaign smoke test that exercises `_run_metadata.json` and CSV sidecar propagation together
+- clean incidental local artifacts such as stray `pinos.log.*` files before landing large experiment-runner changes
 
 CtChecker is handled as an external baseline rather than as a runner in this repository. Checked-in CtChecker outputs live under `ctchecker_results`, and helper scripts such as `python -m tools.converters.klee_log_to_json`, `python -m tools.postprocess.compare_with_ctchecker`, and `python -m tools.postprocess.make_report` join those baseline results with KLEE-derived outputs for reporting.
 
