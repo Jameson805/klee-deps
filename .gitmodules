@@ -8,3 +8,7 @@
 	path = klee-orig
 	url = https://github.com/Jameson805/klee-controlflow/
 	branch = orig
+[submodule "klee-self-comp"]
+	path = klee-self-comp
+	url = https://github.com/Jameson805/klee-controlflow/
+	branch = self-comp
