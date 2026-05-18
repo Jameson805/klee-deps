@@ -14,8 +14,8 @@ by_library_output_prefix = "filtered_reproduction_status_by_library"
 [benchmarks]
 # Leave arrays empty to keep each tool's default benchmark set.
 # Set `all = ["mbedtls:default"]` to run only Mbed TLS everywhere unless a tool-specific override is set.
-all = ["libgcrypt:default", "mbedtls:default", "openssl:normal"]
-klee_cf = ["libgcrypt:default", "libgcrypt:sliced", "mbedtls:default", "mbedtls:sliced", "openssl:normal", "openssl:sliced"]
+all = ["libgcrypt:default", "mbedtls:default", "openssl:default"]
+klee_cf = ["libgcrypt:default", "libgcrypt:sliced", "mbedtls:default", "mbedtls:sliced", "openssl:default", "openssl:sliced"]
 
 [runs]
 klee_cf_default_4 = true

@@ -44,7 +44,7 @@ arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul
 [benchmarks.preprocess_profiles.lim_loop_break]
 arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "{output}", "{input}"]
 
-[benchmarks.variants.normal]
+[benchmarks.variants.default]
 
 [benchmarks.variants.sliced]
 tools = ["klee_cf"]
