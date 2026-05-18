@@ -37,7 +37,6 @@ from tools.shared.configuration_metadata import load_column_metadata_bundle
 
 METADATA_COLS = ["library", "file", "line", "column", "kind"]
 MULTI_TOKEN_TOOL_PREFIXES = ["klee_cf", "klee_eager", "self_comp"]
-KLEE_LIKE_TOOLS = {"klee_cf", "klee_eager", "self_comp"}
 LINESTYLES = ("-", ":", "--")
 CURVE_ID_LABEL_PLOT_EXTENSION = 1.14
 CURVE_ID_LABEL_X_OFFSET_POINTS = 30.0
@@ -55,12 +54,6 @@ PLOT_DIMENSIONS: OrderedDict[str, str] = OrderedDict(
         ("concretization_policy", "public-input concretization"),
     ]
 )
-FIELD_VALUE_ORDER: dict[str, list[str]] = {
-    "searcher": ["default", "dfs", "rand_path_dfs"],
-    "sym_size": ["4", "8", "16", "all"],
-    "public_mode": ["fix_pub", "var_pub", "var_pub_lim_loop_break", "all"],
-    "concretization_policy": ["default", "no_conc", "all"],
-}
 STYLE_CHANNELS_BY_FOCAL_FIELD: dict[str, dict[str, str]] = {
     "searcher": {
         "color": "searcher",
@@ -200,6 +193,12 @@ def summarize_configurations(
     df: pd.DataFrame,
     column_metadata_by_source: Mapping[str, Mapping[str, Any]],
 ) -> pd.DataFrame:
+    """Aggregate exact input columns into one row per exact configuration.
+
+    This intentionally does not take row-wise minima across configurations.
+    The repository now treats each input column as one exact experiment setting
+    and performs "best" selection only as an explicit later step.
+    """
     rows: list[dict[str, Any]] = []
     for column in metric_columns(df):
         try:
@@ -273,6 +272,7 @@ def configuration_metadata(summary: pd.DataFrame) -> pd.DataFrame:
 
 
 def select_best_configurations(summary: pd.DataFrame) -> pd.DataFrame:
+    """Choose one default best configuration per comparison tool."""
     if summary.empty:
         return summary.copy()
 
@@ -352,13 +352,13 @@ def format_dimension_value(field: str, value: Any) -> str:
 
 def ordered_dimension_values(field: str, values: list[Any]) -> list[str]:
     unique_values = list(OrderedDict.fromkeys(str(value) for value in values))
-    preferred_order = FIELD_VALUE_ORDER.get(field, [])
-    preferred_rank = {value: idx for idx, value in enumerate(preferred_order)}
 
     def sort_key(value: str) -> tuple[int, Any]:
+        if value == "all":
+            return (2, value)
         if field == "sym_size" and value.isdigit():
-            return (preferred_rank.get(value, len(preferred_order)), int(value))
-        return (preferred_rank.get(value, len(preferred_order)), value)
+            return (0, int(value))
+        return (1, value)
 
     return sorted(unique_values, key=sort_key)
 
@@ -477,15 +477,19 @@ def build_legend_group(
 def filter_tool_summary_for_plot(
     tool_summary: pd.DataFrame, focal_field: str
 ) -> pd.DataFrame:
-    if focal_field == "concretization_policy":
-        return tool_summary.loc[
-            (tool_summary["searcher"] == "default")
-            & (tool_summary["sym_size"] == "4")
-        ].reset_index(drop=True)
-
-    return tool_summary.loc[
-        tool_summary["concretization_policy"] != "no_conc"
-    ].reset_index(drop=True)
+    filtered = tool_summary.copy()
+    for field_name in PLOT_DIMENSIONS:
+        if field_name == focal_field:
+            continue
+        distinct_values = ordered_dimension_values(
+            field_name,
+            filtered[field_name].dropna().astype(str).tolist(),
+        )
+        if len(distinct_values) > 1:
+            filtered = filtered.loc[
+                filtered[field_name].astype(str) == distinct_values[0]
+            ]
+    return filtered.reset_index(drop=True)
 
 
 def centered_lane_centers(level: int, lane_count: int) -> list[float]:
@@ -991,63 +995,10 @@ def build_simple_comparison_curves(
     return curves
 
 
-def write_klee_cf_simple_outputs(
-    df: pd.DataFrame, tool_summary: pd.DataFrame, tool_dir: Path, input_stem: str
-) -> None:
-    rand_path_summary = tool_summary.loc[
-        (tool_summary["searcher"] == "rand_path_dfs")
-        & (tool_summary["concretization_policy"] == "default")
-        & (tool_summary["public_mode"] != "all")
-        & (tool_summary["sym_size"] != "all")
-    ].reset_index(drop=True)
-    if (
-        rand_path_summary["public_mode"].nunique() > 1
-        and rand_path_summary["sym_size"].nunique() > 1
-    ):
-        rand_path_curves = build_simple_comparison_curves(
-            df,
-            rand_path_summary,
-            legend_fields=["public_mode", "sym_size"],
-            color_field="public_mode",
-            linestyle_field="sym_size",
-        )
-        rand_path_plot_path = tool_dir / "rand_path_dfs_by_public_mode_and_sym_size.png"
-        make_log_cactus_plot(
-            rand_path_curves,
-            rand_path_plot_path,
-            title=(
-                f"{input_stem} klee_cf rand_path_dfs by public input mode and "
-                "symbolic input size"
-            ),
-            show_full_legend=True,
-        )
-        print(f"Wrote: {rand_path_plot_path}")
-
-    searcher_summary = tool_summary.loc[
-        (tool_summary["public_mode"] == "fix_pub")
-        & (tool_summary["sym_size"] == "4")
-        & (tool_summary["concretization_policy"] == "default")
-    ].reset_index(drop=True)
-    if searcher_summary["searcher"].nunique() > 1:
-        searcher_curves = build_simple_comparison_curves(
-            df,
-            searcher_summary,
-            legend_fields=["searcher"],
-            color_field="searcher",
-        )
-        searcher_plot_path = tool_dir / "fix_pub_sym_size_4_by_searcher.png"
-        make_log_cactus_plot(
-            searcher_curves,
-            searcher_plot_path,
-            title=f"{input_stem} klee_cf fix_pub, sym_size=4 by searcher",
-            show_full_legend=True,
-        )
-        print(f"Wrote: {searcher_plot_path}")
-
-
 def write_exploration_outputs(
     df: pd.DataFrame, summary: pd.DataFrame, output_base: str, input_stem: str
 ) -> None:
+    """Write the per-tool exploration CSVs and cactus plots."""
     exploration_dir = Path(f"{output_base}_exploration")
 
     for comparison_tool, tool_summary in summary.groupby("comparison_tool", sort=False):
@@ -1080,9 +1031,6 @@ def write_exploration_outputs(
                 show_curve_ids=True,
             )
             print(f"Wrote: {plot_path}")
-
-        if comparison_tool == "klee_cf":
-            write_klee_cf_simple_outputs(df, tool_summary, tool_dir, input_stem)
 
 
 def normalize_plot_groups(plot_groups: Any) -> str:
@@ -1235,6 +1183,7 @@ def automatic_selection_summary(best_summary: pd.DataFrame) -> pd.DataFrame:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint for configuration exploration and best-of selection."""
     parser = argparse.ArgumentParser(
         description=(
             "Explore experiment configurations from merged CSVs without row-wise "

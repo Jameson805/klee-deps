@@ -12,7 +12,7 @@ ideal_config_selection_csv = "configs/postprocess/ideal_config_selection.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-all = ["mbedtls", "libgcrypt"]
+all = ["mbedtls:default", "libgcrypt:default"]
 
 [runs]
 klee_cf_default_4 = true

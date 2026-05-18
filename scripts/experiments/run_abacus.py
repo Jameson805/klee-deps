@@ -6,14 +6,13 @@ invoke the Pin-based ABACUS trace collection, and convert the resulting log
 into the repository's shared JSON schema for later merging.
 """
 
-from __future__ import annotations
-
 import argparse
 from pathlib import Path
 import signal
 import shlex
 import shutil
 import sys
+from typing import Dict, List, Optional, Set, Union
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -23,6 +22,7 @@ from scripts.experiments.common import (
     ExperimentContext,
     LaunchedProcess,
     REPO_ROOT,
+    expand_benchmark_cases,
     execute_output_captured_worker,
     expect_array,
     expect_string,
@@ -30,6 +30,7 @@ from scripts.experiments.common import (
     launch_output_captured_process,
     optional_string,
     prepare_benchmark_workspace,
+    resolve_case_template,
     resolve_repo_path,
     terminate_processes,
     wait_for_processes,
@@ -37,9 +38,12 @@ from scripts.experiments.common import (
 from tools.converters.abacus_log_to_json import convert_abacus_log
 from tools.shared.experiment_registry import (
     build_for_tool,
+    canonical_case_id,
     definition,
     definition_for_path,
+    format_benchmark_selector,
     normalized_case_output_metadata,
+    runner_profile_for_definition,
     selected_benchmarks,
 )
 
@@ -47,7 +51,50 @@ from tools.shared.experiment_registry import (
 CAMPAIGN_TOOL = CampaignTool(tool_id="abacus", module_name=__name__)
 
 
-def main(argv: list[str] | None = None) -> int:
+def _load_abacus_cases(benchmark_definition) -> list[dict[str, object]]:
+    """Load ABACUS cases, preferring explicit per-tool overrides when present."""
+    raw_cases = benchmark_definition.extra_config.get("abacus_cases")
+    if raw_cases is not None:
+        return list(expect_array(raw_cases, f"{benchmark_definition.config_location}.abacus_cases"))
+
+    cases: list[dict[str, object]] = []
+    for expanded_case in expand_benchmark_cases(benchmark_definition, "abacus"):
+        case = {
+            "executable": resolve_case_template(
+                benchmark_definition,
+                expanded_case,
+                "abacus_executable",
+                f"{benchmark_definition.code_path}/abacus_{expanded_case.config_id}{expanded_case.target_suffix}",
+            ),
+            "outfile": f"{canonical_case_id(benchmark_definition.library_id, benchmark_definition.variant_id, expanded_case.target_id, expanded_case.config_id)}.txt",
+            "source_column_suffix": expanded_case.public_mode,
+            "public_mode": expanded_case.public_mode,
+            "sliced": expanded_case.variant_id == "sliced",
+        }
+        runner_profile = optional_string(
+            expanded_case.config_table,
+            "runner_profile",
+            expanded_case.config_location,
+        ) or optional_string(
+            expanded_case.target_table,
+            "runner_profile",
+            expanded_case.target_location,
+        )
+        if isinstance(runner_profile, str) and runner_profile:
+            case["runner_profile"] = runner_profile
+        cases.append(case)
+    return cases
+
+
+def remove_suffix(value, suffix):
+    """Drop ``suffix`` from ``value`` when it is present."""
+    if value.endswith(suffix):
+        return value[:-len(suffix)]
+    return value
+
+
+def main(argv=None):
+    """CLI entrypoint for direct ABACUS runs across selected benchmarks."""
     parser = argparse.ArgumentParser(description="Run the ABACUS prototype over the configured benchmark set.")
     parser.add_argument("abacus_root", help="Path to the ABACUS checkout")
     parser.add_argument("--sym-size", type=int, default=4, help="Symbol size in bytes")
@@ -60,7 +107,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--results-dir", default="results/abacus_results", help="Directory where run outputs are written")
     parser.add_argument(
         "--benchmarks",
-        help=f"Comma-separated benchmark groups to run. Valid: {','.join(selected_benchmarks('abacus', None))}",
+        help=(
+            "Comma-separated benchmark groups to run. Valid: "
+            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in selected_benchmarks("abacus", None))
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -90,9 +140,12 @@ def main(argv: list[str] | None = None) -> int:
         context.log(f"verbose={'true' if args.verbose else 'false'}")
         context.log(f"tmp_dir={args.tmp_dir}")
         context.log(f"results_dir={results_dir}")
-        context.log(f"benchmarks={','.join(benchmarks)}")
+        context.log(
+            "benchmarks="
+            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in benchmarks)
+        )
         context.log("##########")
-        launched_runs: list[LaunchedProcess] = []
+        launched_runs = []  # type: List[LaunchedProcess]
 
         def handle_signal(signum: int, _frame: object) -> None:
             print("interrupted, stopping ABACUS case workers", file=sys.stderr)
@@ -102,16 +155,13 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(signal.SIGINT, handle_signal)
         signal.signal(signal.SIGTERM, handle_signal)
 
-        seen_case_outputs: set[str] = set()
+        seen_case_outputs = set()  # type: Set[str]
         try:
-            for benchmark in benchmarks:
-                benchmark_definition = definition(benchmark)
-                raw_cases = benchmark_definition.extra_config.get("abacus_cases")
-                if raw_cases is None:
+            for library_id, variant_id in benchmarks:
+                benchmark_definition = definition(library_id, variant_id)
+                case_entries = _load_abacus_cases(benchmark_definition)
+                if not case_entries:
                     continue
-                if "abacus" not in benchmark_definition.tools:
-                    raise ValueError(f"{benchmark_definition.config_location}.abacus_cases requires 'abacus' in tools")
-                case_entries = expect_array(raw_cases, f"{benchmark_definition.config_location}.abacus_cases")
                 # The parent only enumerates benchmark/case pairs and launches one
                 # worker per case. Each child creates its own temporary workspace
                 # inside run_benchmark and executes exactly one case there.
@@ -124,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
                     if output_stem in seen_case_outputs:
                         raise SystemExit(f"duplicate ABACUS output stem across selected cases: {output_stem}")
                     seen_case_outputs.add(output_stem)
-                    worker_tag = f"{benchmark_definition.display_name} ({Path(executable).name})"
+                    worker_tag = f"{format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.variant_id)} ({Path(executable).name})"
                     worker_log_path = results_dir / "_worker_logs" / f"{output_stem}.log"
                     worker_log_path.parent.mkdir(parents=True, exist_ok=True)
                     context.log(
@@ -134,7 +184,7 @@ def main(argv: list[str] | None = None) -> int:
                         launch_output_captured_process(
                             worker_tag,
                             run_benchmark,
-                            (None, str(results_dir), args, benchmark, index),
+                            (None, str(results_dir), args, library_id, variant_id, index),
                             log_path=worker_log_path,
                             verbose=args.verbose,
                         )
@@ -148,45 +198,53 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def run_benchmark(
-    context: ExperimentContext | None,
-    results_dir: Path | str,
-    args: argparse.Namespace,
-    benchmark_id: str,
-    case_index: int,
-    output_queue: object | None = None,
-) -> None:
+    context,
+    results_dir,
+    args,
+    library_id,
+    variant_id,
+    case_index,
+    output_queue=None,
+):
+    """Build one benchmark variant and execute exactly one selected ABACUS case."""
     def worker_main() -> None:
         local_context = context or ExperimentContext()
         local_results_dir = Path(results_dir)
         abacus_root = Path(args.abacus_root)
-        benchmark_definition = definition(benchmark_id)
-        build = build_for_tool(benchmark_id, "abacus")
+        benchmark_definition = definition(library_id, variant_id)
+        build = build_for_tool(benchmark_definition, "abacus")
+        selector_text = format_benchmark_selector(library_id, variant_id)
         local_context.log("##########")
-        local_context.log(f"Begin experiments for {benchmark_definition.display_name}")
+        local_context.log(f"Begin experiments for {selector_text}")
         local_context.log("##########")
         with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
             local_context.log(f"temporary_workspace={workspace.root}")
             build_command = [build.script, build.tool_flag]
-            if build.preset:
-                build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
+            build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
             local_context.run(build_command, cwd=workspace.root)
 
-            raw_cases = benchmark_definition.extra_config.get("abacus_cases")
-            if raw_cases is None:
-                raise SystemExit(f"benchmark {benchmark_id!r} does not define ABACUS cases")
-            if "abacus" not in benchmark_definition.tools:
-                raise ValueError(f"{benchmark_definition.config_location}.abacus_cases requires 'abacus' in tools")
-            case_entries = expect_array(raw_cases, f"{benchmark_definition.config_location}.abacus_cases")
+            case_entries = _load_abacus_cases(benchmark_definition)
+            if not case_entries:
+                raise SystemExit(f"benchmark {selector_text!r} does not define ABACUS cases")
             if case_index < 0 or case_index >= len(case_entries):
                 raise SystemExit(
-                    f"internal worker case index {case_index} is out of range for benchmark {benchmark_id!r}"
+                    f"internal worker case index {case_index} is out of range for benchmark {selector_text!r}"
                 )
             case_location = f"{benchmark_definition.config_location}.abacus_cases[{case_index}]"
             case_table = expect_table(case_entries[case_index], case_location)
-            runner_config = optional_string(case_table, "runner_config", case_location)
+            runner_profile_id = optional_string(case_table, "runner_profile", case_location)
+            resolved_runner_config = None  # type: Optional[str]
+            resolved_preset_name = None  # type: Optional[str]
+            if runner_profile_id is not None:
+                _resolved_profile_id, runner_profile = runner_profile_for_definition(
+                    benchmark_definition,
+                    runner_profile_id,
+                )
+                resolved_runner_config = str(resolve_repo_path(runner_profile.config))
+                resolved_preset_name = runner_profile.preset.format(sym_size=args.sym_size)
             output_metadata = {
                 **normalized_case_output_metadata(case_table, case_location),
-                "library_key": benchmark_definition.benchmark_id.removesuffix("_sliced"),
+                "library_key": benchmark_definition.library_id,
             }
             run_case(
                 local_context,
@@ -197,26 +255,27 @@ def run_benchmark(
                 expect_string(case_table, "executable", case_location),
                 expect_string(case_table, "outfile", case_location),
                 metadata=output_metadata,
-                runner_config=(str(resolve_repo_path(runner_config)) if runner_config else None),
-                preset_name=optional_string(case_table, "preset_name", case_location),
+                runner_config=resolved_runner_config,
+                preset_name=resolved_preset_name,
             )
 
     execute_output_captured_worker(output_queue, worker_main)
 
 
 def run_case(
-    context: ExperimentContext,
+    context,
     workspace,
-    abacus_root: Path,
-    results_dir: Path,
-    sym_size: int,
-    executable: str,
-    outfile: str,
+    abacus_root,
+    results_dir,
+    sym_size,
+    executable,
+    outfile,
     *,
-    metadata: dict[str, object],
-    runner_config: str | None = None,
-    preset_name: str | None = None,
-) -> None:
+    metadata,
+    runner_config=None,
+    preset_name=None
+):
+    """Run one ABACUS case and convert its output to the shared JSON schema."""
     executable_path = workspace.resolve_repo_path(executable)
     benchmark_definition = definition_for_path(str(executable_path))
     if benchmark_definition is None:

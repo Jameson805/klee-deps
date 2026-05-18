@@ -1,7 +1,5 @@
 [[benchmarks]]
-benchmark_id = "bearssl"
-display_name = "BearSSL 0.6"
-library_id = "bearssl"
+library = "bearssl"
 code_path = "benchmarks/bearssl"
 path_prefixes = ["benchmarks/bearssl/"]
 tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
@@ -30,35 +28,46 @@ preset = "default"
 klee_cf = "klee"
 klee_eager = "klee"
 
-[benchmarks.mode_case_templates]
-abacus_executable = "benchmarks/bearssl/abacus_{public_mode}_{artifact_suffix}"
-self_comp_bitcode = "benchmarks/bearssl/self_comp_{public_mode}_{artifact_suffix}.bc"
-self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
-binsec_sse_script = "benchmarks/bearssl/generated/{artifact_suffix}/binsec_{public_mode}.cfg"
-binsec_executable = "benchmarks/bearssl/binsec_{public_mode}_{artifact_suffix}"
-klee_bitcode = "benchmarks/bearssl/klee_{public_mode}_{artifact_suffix}.bc"
-klee_replay_script = "benchmarks/bearssl/klee_{public_mode}_replay_{artifact_suffix}"
+[benchmarks.runner_profiles.aes_big]
+config = "configs/runner/bearssl_aes_big_runner_config.toml"
+preset = "default"
 
-[[benchmarks.mode_cases]]
-display_name = "aes_big"
+[benchmarks.runner_profiles.des_tab]
+config = "configs/runner/bearssl_des_tab_runner_config.toml"
+preset = "default"
+
+[benchmarks.path_templates]
+abacus_executable = "{code_path}/abacus_{public_mode}_{artifact_suffix}"
+self_comp_bitcode = "{code_path}/self_comp_{public_mode}_{artifact_suffix}.bc"
+self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
+binsec_sse_script = "{code_path}/generated/{artifact_suffix}/binsec_{public_mode}.cfg"
+binsec_executable = "{code_path}/binsec_{public_mode}_{artifact_suffix}"
+klee_bitcode = "{code_path}/klee_{public_mode}_{artifact_suffix}.bc"
+klee_replay_script = "{code_path}/klee_{public_mode}_replay_{artifact_suffix}"
+
+[benchmarks.variants.default]
+
+[[benchmarks.targets]]
+target = "aes_big"
 artifact_suffix = "binsec_aes_big"
-output_stem = "bearssl_aes_big"
-replay_opts = "--secret skey,data"
-ct_json = "ctchecker_results/BearSSL0.6/empty.json"
-memory_flag = true
+runner_profile = "aes_big"
 secret_layout = "skey:48,data:32"
 secret_inputs = ["skey:48:skey_buf", "data:32:data_buf"]
-runner_config = "configs/runner/bearssl_aes_big_runner_config.toml"
-preset_name = "default"
+klee_secret_inputs = ["skey", "data"]
 
-[[benchmarks.mode_cases]]
-display_name = "des_tab"
+[[benchmarks.targets]]
+target = "des_tab"
 artifact_suffix = "appliedcryp_des"
-output_stem = "bearssl_des_tab"
-replay_opts = "--secret skey,data"
-ct_json = "ctchecker_results/BearSSL0.6/empty.json"
-memory_flag = true
+runner_profile = "des_tab"
 secret_layout = "skey:256,data:16"
 secret_inputs = ["skey:256:skey_buf", "data:16:data_buf"]
-runner_config = "configs/runner/bearssl_des_tab_runner_config.toml"
-preset_name = "default"
+klee_secret_inputs = ["skey", "data"]
+
+[[benchmarks.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "self_comp", "binsec"]

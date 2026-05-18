@@ -15,6 +15,7 @@ from scripts.experiments.common import ExperimentContext, REPO_ROOT
 
 
 def main() -> int:
+    """Run the historical one-off Mbed TLS test_mod experiment."""
     argparse.ArgumentParser(description="Run the ad hoc test_mod KLEE experiment.").parse_args()
     limit_bytes = 70_000_000 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))

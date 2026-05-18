@@ -1,7 +1,5 @@
 [[benchmarks]]
-benchmark_id = "openssl_almeida"
-display_name = "OpenSSL Almeida"
-library_id = "openssl"
+library = "openssl_almeida"
 code_path = "benchmarks/openssl_almeida"
 path_prefixes = ["benchmarks/openssl_almeida/"]
 tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
@@ -30,42 +28,30 @@ preset = "default"
 klee_cf = "klee"
 klee_eager = "klee"
 
-[[benchmarks.abacus_cases]]
-executable = "benchmarks/openssl_almeida/abacus_fix_pub_tls_rempad_luk13"
-outfile = "openssl_almeida_tls_rempad_luk13_fix_pub.txt"
-runner_config = "configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml"
-preset_name = "default"
+[benchmarks.runner_profiles.default]
+config = "configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml"
+preset = "default"
 
-[[benchmarks.self_comp_cases]]
-title = "OpenSSL Almeida tls-rempad-luk13 (Fix Pub Self-Comp)"
-bitcode = "benchmarks/openssl_almeida/self_comp_fix_pub_tls_rempad_luk13.bc"
-result_name = "openssl_almeida_tls_rempad_luk13_self_comp_fix_pub"
-json_name = "openssl_almeida_tls_rempad_luk13_fix_pub.json"
-replay_executable = "klee_fix_pub_replay_tls_rempad_luk13"
-secret_layout = "data:63"
+[benchmarks.variants.default]
 
-[[benchmarks.self_comp_cases]]
-title = "OpenSSL Almeida tls-rempad-luk13 (Var Pub Self-Comp)"
-bitcode = "benchmarks/openssl_almeida/self_comp_var_pub_tls_rempad_luk13.bc"
-result_name = "openssl_almeida_tls_rempad_luk13_self_comp_var_pub"
-json_name = "openssl_almeida_tls_rempad_luk13_var_pub.json"
-replay_executable = "klee_var_pub_replay_tls_rempad_luk13"
+[[benchmarks.targets]]
+target = "tls_rempad_luk13"
+runner_profile = "default"
 secret_layout = "data:63"
+secret_inputs = ["data:63:data_buf"]
+klee_secret_inputs = ["data"]
+
+[[benchmarks.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+runner_profile = "default"
+
+[[benchmarks.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "self_comp", "binsec"]
+use_public_inputs = true
 public_layout = "options:4,s3_flags:4,flags:4,slicing_cheat:4,block_size:4,mac_size:4"
-
-[[benchmarks.binsec_cases]]
-title = "OpenSSL Almeida tls-rempad-luk13 (Fix Pub)"
-sse_script = "benchmarks/openssl_almeida/generated/binsec_fix_pub.cfg"
-stats_file = "openssl_almeida_tls_rempad_luk13_fix_pub.toml"
-executable = "benchmarks/openssl_almeida/binsec_fix_pub_tls_rempad_luk13"
-secret_inputs = ["data:63:data_buf"]
-
-[[benchmarks.binsec_cases]]
-title = "OpenSSL Almeida tls-rempad-luk13 (Var Pub)"
-sse_script = "benchmarks/openssl_almeida/generated/binsec_var_pub.cfg"
-stats_file = "openssl_almeida_tls_rempad_luk13_var_pub.toml"
-executable = "benchmarks/openssl_almeida/binsec_var_pub_tls_rempad_luk13"
-secret_inputs = ["data:63:data_buf"]
 public_inputs = [
     "options:4:options_buf",
     "s3_flags:4:s3_flags_buf",
@@ -74,23 +60,4 @@ public_inputs = [
     "block_size:4:block_size_buf",
     "mac_size:4:mac_size_buf",
 ]
-
-[[benchmarks.klee_cases]]
-title = "OpenSSL Almeida tls-rempad-luk13 (Fix Pub)"
-bitcode = "benchmarks/openssl_almeida/klee_fix_pub_tls_rempad_luk13.bc"
-result_name = "openssl_almeida_tls_rempad_luk13_fix_pub"
-replay_script = "benchmarks/openssl_almeida/klee_fix_pub_replay_tls_rempad_luk13"
-replay_opts = "--secret data"
-ct_json = "ctchecker_results/OpenSSLAlmeida/empty.json"
-code_path = "benchmarks/openssl_almeida"
-memory_flag = true
-
-[[benchmarks.klee_cases]]
-title = "OpenSSL Almeida tls-rempad-luk13 (Var Pub)"
-bitcode = "benchmarks/openssl_almeida/klee_var_pub_tls_rempad_luk13.bc"
-result_name = "openssl_almeida_tls_rempad_luk13_var_pub"
-replay_script = "benchmarks/openssl_almeida/klee_var_pub_replay_tls_rempad_luk13"
-replay_opts = "--secret data --public options,s3_flags,flags,slicing_cheat,block_size,mac_size"
-ct_json = "ctchecker_results/OpenSSLAlmeida/empty.json"
-code_path = "benchmarks/openssl_almeida"
-memory_flag = true
+klee_public_inputs = ["options", "s3_flags", "flags", "slicing_cheat", "block_size", "mac_size"]

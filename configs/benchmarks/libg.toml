@@ -1,7 +1,5 @@
 [[benchmarks]]
-benchmark_id = "libg"
-display_name = "libg"
-library_id = "unknown"
+library = "libg"
 code_path = "benchmarks/libg"
 path_prefixes = ["benchmarks/libg/"]
 tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
@@ -30,23 +28,34 @@ preset = "default"
 klee_cf = "klee"
 klee_eager = "klee"
 
-[benchmarks.mode_case_templates]
-abacus_executable = "benchmarks/libg/abacus_{public_mode}_{artifact_suffix}"
-self_comp_bitcode = "benchmarks/libg/self_comp_{public_mode}_{artifact_suffix}.bc"
-self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
-binsec_sse_script = "benchmarks/libg/generated/binsec_{public_mode}.cfg"
-binsec_executable = "benchmarks/libg/binsec_{public_mode}_{artifact_suffix}"
-klee_bitcode = "benchmarks/libg/klee_{public_mode}_{artifact_suffix}.bc"
-klee_replay_script = "benchmarks/libg/klee_{public_mode}_replay_{artifact_suffix}"
+[benchmarks.runner_profiles.default]
+config = "configs/runner/libg_des_runner_config.toml"
+preset = "default"
 
-[[benchmarks.mode_cases]]
-display_name = "DES"
+[benchmarks.path_templates]
+abacus_executable = "{code_path}/abacus_{public_mode}_{artifact_suffix}"
+self_comp_bitcode = "{code_path}/self_comp_{public_mode}_{artifact_suffix}.bc"
+self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
+binsec_sse_script = "{code_path}/generated/binsec_{public_mode}.cfg"
+binsec_executable = "{code_path}/binsec_{public_mode}_{artifact_suffix}"
+klee_bitcode = "{code_path}/klee_{public_mode}_{artifact_suffix}.bc"
+klee_replay_script = "{code_path}/klee_{public_mode}_replay_{artifact_suffix}"
+
+[benchmarks.variants.default]
+
+[[benchmarks.targets]]
+target = "des"
 artifact_suffix = "des"
-output_stem = "libg_des"
-replay_opts = "--secret key,data"
-ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
-memory_flag = true
+runner_profile = "default"
 secret_layout = "key:24,data:64"
 secret_inputs = ["key:24:key_buf", "data:64:data_buf"]
-runner_config = "configs/runner/libg_des_runner_config.toml"
-preset_name = "default"
+klee_secret_inputs = ["key", "data"]
+
+[[benchmarks.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "self_comp", "binsec"]

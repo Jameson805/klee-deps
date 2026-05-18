@@ -7,6 +7,13 @@ cd "$script_dir"
 
 KLEE_PATH="../../klee-controlflow"
 
+resolve_runner_config_path() {
+    python "$repo_root/tools/resolve_runner_profile.py" \
+    --library "libg" \
+    --variant "default" \
+        --field config
+}
+
 usage() {
     cat <<EOF
 Usage: $0 (--klee | --self-comp | --binsec | --abacus) [--preset NAME]
@@ -88,9 +95,9 @@ if command -v wllvm >/dev/null 2>&1 && [[ -z "${LLVM_COMPILER:-}" ]]; then
     export LLVM_COMPILER=clang
 fi
 
-generated_dir="$script_dir/generated"
+generated_dir="$script_dir/generated/des"
 wrapper_source="des_wrapper.c"
-config_path="$repo_root/configs/runner/libg_des_runner_config.toml"
+config_path="$(resolve_runner_config_path)"
 
 common_flags=(
     -g

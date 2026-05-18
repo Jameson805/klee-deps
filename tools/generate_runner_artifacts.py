@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Generate benchmark-local runner artifacts from one runner-config preset.
+
+Benchmark build scripts call this helper to materialize the shared generated
+header and, when needed, Binsec cfg files. Keeping that logic here avoids
+duplicating preset parsing rules across many shell scripts.
+"""
 import argparse
 import os
 from pathlib import Path
@@ -15,6 +21,7 @@ IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def load_runner_config(config_path: str | Path) -> dict[str, object]:
+    """Load and validate the top-level TOML object for one runner config."""
     path = Path(config_path)
 
     try:
@@ -81,6 +88,7 @@ def _normalize_preset_bytes(label: str, resolved_size: int, value: object) -> li
 
 
 def _load_resolved_config(config_path: str, selected_preset_name: str | None) -> dict[str, object]:
+    """Resolve one config/preset pair into concrete byte-oriented values."""
     try:
         cfg = load_runner_config(config_path)
     except ValueError as exc:
@@ -264,6 +272,7 @@ def _load_resolved_config(config_path: str, selected_preset_name: str | None) ->
 
 
 def _render_header(resolved: dict[str, object]) -> list[str]:
+    """Render the generated C header consumed by benchmark wrappers."""
     input_specs = resolved["input_specs"]
     input_order = resolved["input_order"]
     secret_input_ids = resolved["secret_input_ids"]
@@ -455,6 +464,7 @@ def _render_header(resolved: dict[str, object]) -> list[str]:
 
 
 def _render_binsec_config(resolved: dict[str, object], base_path: str, mode_name: str) -> list[str]:
+    """Render one Binsec cfg file for the requested public-input mode."""
     mode_policy = resolved["mode_policy"]
     secret_input_ids = resolved["secret_input_ids"]
     public_input_ids = resolved["public_input_ids"]
@@ -489,6 +499,7 @@ def _write_lines(out_path: str, lines: list[str]) -> None:
 
 
 def main() -> int:
+    """CLI entrypoint used by benchmark build scripts."""
     args = _parse_args()
     resolved = _load_resolved_config(args.config, args.preset)
 

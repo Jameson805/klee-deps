@@ -1,4 +1,7 @@
 [campaign]
+# Used for direct runs without --docker. Docker mode builds from the
+# CLI-provided ABACUS repo path and uses --container-abacus-root inside the
+# container.
 abacus_root = "/path/to/abacus"
 num_copies = 10
 tmp_dir = "/tmp"

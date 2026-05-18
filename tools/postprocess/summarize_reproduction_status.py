@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""Summarize reproduction outcomes across merged campaign outputs.
+
+The tables produced here collapse many raw positives into status counts per
+exact configuration, with optional best-of and by-library reporting layers.
+"""
 
 from __future__ import annotations
 
@@ -261,6 +266,7 @@ def collect_reproduction_status_counts(
     dict[str, dict[str, dict[str, dict[str, int]]]],
     dict[str, dict[str, Any]],
 ]:
+    """Collect reproduction-status counts for each exact configuration column."""
     if not root_dir.is_dir():
         raise SystemExit(f"Input '{root_dir}' is not a directory")
 
@@ -387,6 +393,7 @@ def summarize_reproduction_statuses(
     sliced_map_path: Optional[Path],
     keep_unmapped: bool,
 ) -> tuple[int, int]:
+    """Write the main reproduction-status summary CSV."""
     (
         ordered_configurations,
         counts_by_configuration,
@@ -510,6 +517,7 @@ def write_selected_outputs(
     selected_output_path: Path,
     selected_latex_output_path: Path,
 ) -> tuple[Path, Path]:
+    """Write CSV and LaTeX outputs for one selected configuration per tool."""
     selected_rows = _load_selection_rows(selection_csv, summary_rows)
     csv_path = _write_selected_csv(selected_rows, selected_output_path)
     latex_path = _write_selected_latex(selected_rows, selected_latex_output_path)

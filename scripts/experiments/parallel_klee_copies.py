@@ -28,6 +28,8 @@ from scripts.experiments.common import REPO_ROOT
 
 @dataclass
 class Worker:
+    """Track one temporary repository copy and the command running inside it."""
+
     index: int
     copy_dir: Path
     stdout_log: Path
@@ -47,6 +49,7 @@ class Worker:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint for running one command across multiple checkout copies."""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
     if hasattr(sys.stderr, "reconfigure"):
@@ -165,10 +168,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def emit(message: str, *, error: bool = False) -> None:
+    """Print one line immediately to stdout or stderr."""
     print(message, file=sys.stderr if error else sys.stdout, flush=True)
 
 
 def sleep_briefly(selector: selectors.BaseSelector) -> None:
+    """Yield briefly while waiting for copy or worker I/O progress."""
     if selector.get_map():
         selector.select(timeout=0.1)
     else:
@@ -176,10 +181,12 @@ def sleep_briefly(selector: selectors.BaseSelector) -> None:
 
 
 def worker_prefix(worker: Worker) -> str:
+    """Return the standard log prefix for one worker."""
     return f"[worker {worker.index}]"
 
 
 def start_copy(worker: Worker) -> None:
+    """Start copying the repository into one worker-local temporary directory."""
     emit(f"{worker_prefix(worker)} preparing workspace in: {worker.copy_dir}")
     worker.copy_dir.mkdir(parents=True, exist_ok=True)
     try:
@@ -205,6 +212,7 @@ def poll_copy_processes(
     worker_env: dict[str, str],
     selector: selectors.BaseSelector,
 ) -> bool:
+    """Advance completed workspace-copy processes and start ready workers."""
     made_progress = False
     for worker in workers:
         if worker.finalized or worker.copy_process is None or worker.copy_succeeded:
@@ -241,6 +249,7 @@ def start_worker_process(
     worker_env: dict[str, str],
     selector: selectors.BaseSelector,
 ) -> None:
+    """Launch the configured command inside one prepared workspace copy."""
     emit(f"{worker_prefix(worker)} starting in: {worker.copy_dir}")
     worker.stdout_handle = worker.stdout_log.open("w", encoding="utf-8")
     worker.stderr_handle = worker.stderr_log.open("w", encoding="utf-8")
@@ -273,6 +282,7 @@ def start_worker_process(
 
 
 def drain_worker_streams(selector: selectors.BaseSelector) -> bool:
+    """Drain any ready worker stdout/stderr streams into logs and the terminal."""
     made_progress = False
     for key, _mask in selector.select(timeout=0):
         worker, stream_name = key.data
@@ -286,6 +296,7 @@ def drain_worker_streams(selector: selectors.BaseSelector) -> bool:
 
 
 def write_worker_output(worker: Worker, stream_name: str, chunk: bytes) -> None:
+    """Append one worker output chunk to disk and emit completed lines live."""
     decoded = chunk.decode("utf-8", errors="replace")
     handle = worker.stdout_handle if stream_name == "stdout" else worker.stderr_handle
     assert handle is not None
@@ -305,6 +316,7 @@ def close_worker_stream(
     stream_name: str,
     fileobj: object,
 ) -> None:
+    """Finalize one worker output stream after EOF."""
     try:
         selector.unregister(fileobj)
     except KeyError:
@@ -320,6 +332,7 @@ def close_worker_stream(
 
 
 def finalize_exited_workers(workers: list[Worker]) -> bool:
+    """Finalize workers whose process has exited and whose streams are drained."""
     made_progress = False
     for worker in workers:
         if worker.finalized or worker.process is None:
@@ -332,6 +345,7 @@ def finalize_exited_workers(workers: list[Worker]) -> bool:
 
 
 def finalize_worker(worker: Worker) -> None:
+    """Close one worker's resources and persist its final return code."""
     if worker.finalized:
         return
     if worker.stdout_handle is not None:
@@ -354,6 +368,7 @@ def finalize_worker(worker: Worker) -> None:
 
 
 def terminate_workers(workers: list[Worker]) -> None:
+    """Terminate all active copy and worker process groups."""
     for worker in workers:
         terminate_process_group(worker.process)
         terminate_process_group(worker.copy_process)

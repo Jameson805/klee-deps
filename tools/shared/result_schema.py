@@ -1,3 +1,9 @@
+"""Shared JSON result schema used by converters and postprocessing.
+
+All tool outputs are normalized into this schema so downstream code can compare
+results without knowing each tool's raw log format.
+"""
+
 from __future__ import annotations
 
 import os
@@ -62,6 +68,7 @@ _SOURCE_LINE_CACHE: Dict[tuple[str, int], Optional[str]] = {}
 
 
 def format_location(file: Optional[str], line: Optional[int], col: Optional[int]) -> str:
+    """Render a compact ``file:line:column`` string for diagnostics."""
     if not file or line is None or col is None:
         return "<unknown>"
     return f"{file}:{line}:{col}"
@@ -80,6 +87,7 @@ def _library_root(library: str) -> Optional[str]:
 
 
 def get_source_line(library: str, filename: str, line: int) -> Optional[str]:
+    """Return a source line when the benchmark-relative path can be resolved."""
     if not isinstance(filename, str) or not filename or not isinstance(line, int) or line <= 0:
         return None
 
@@ -114,6 +122,7 @@ def get_source_line(library: str, filename: str, line: int) -> Optional[str]:
 
 
 def normalize_result_kind(kind: Any) -> str:
+    """Normalize a side-channel kind to the canonical schema token."""
     if not isinstance(kind, str):
         raise TypeError("kind must be a str")
 
@@ -133,6 +142,7 @@ def make_result_row(
     library: Any,
     optional_fields: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
+    """Validate and build one normalized result row."""
     if not isinstance(filename, str) or not filename:
         raise TypeError("filename must be a non-empty str")
     if not isinstance(line, int) or isinstance(line, bool):
@@ -179,6 +189,11 @@ def build_payload(
     optional_dtypes: Optional[Mapping[str, str]] = None,
     metadata: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
+    """Build a complete payload with explicit column ordering and dtypes.
+
+    Requiring explicit dtypes for optional fields keeps converters honest about
+    schema changes and makes downstream loading deterministic.
+    """
     normalized = [dict(r) for r in rows]
 
     observed = set()

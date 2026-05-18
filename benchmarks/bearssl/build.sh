@@ -7,6 +7,15 @@ cd "$script_dir"
 
 KLEE_PATH="../../klee-controlflow"
 
+resolve_runner_config_path() {
+    local profile_id="$1"
+    python "$repo_root/tools/resolve_runner_profile.py" \
+    --library "bearssl" \
+    --variant "default" \
+        --profile "$profile_id" \
+        --field config
+}
+
 usage() {
     cat <<EOF
 Usage: $0 (--klee | --self-comp | --binsec | --abacus) [--preset NAME]
@@ -134,10 +143,10 @@ bench_config_for_id() {
     local id="$1"
     case "$id" in
         binsec_aes_big)
-            printf '%s\n' "$repo_root/configs/runner/bearssl_aes_big_runner_config.toml"
+            resolve_runner_config_path "aes_big"
             ;;
         appliedcryp_des)
-            printf '%s\n' "$repo_root/configs/runner/bearssl_des_tab_runner_config.toml"
+            resolve_runner_config_path "des_tab"
             ;;
         *)
             return 1

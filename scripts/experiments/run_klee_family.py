@@ -22,13 +22,16 @@ from scripts.experiments.common import (
     ExperimentContext,
     LaunchedProcess,
     REPO_ROOT,
+    expand_benchmark_cases,
     execute_output_captured_worker,
     expect_array,
     expect_string,
     expect_table,
     launch_output_captured_process,
+    optional_string,
     optional_string_list,
     prepare_benchmark_workspace,
+    resolve_case_template,
     resolve_repo_path,
     terminate_processes,
     wait_for_processes,
@@ -37,8 +40,11 @@ from tools.converters.klee_log_to_json import KLEE_OPTIONAL_DTYPES, convert_klee
 from tools.postprocess.reproduce_positives import reproduce_json_positives
 from tools.shared.experiment_registry import (
     build_for_tool,
+    canonical_case_id,
+    canonical_case_title,
     definition,
     definition_for_path,
+    format_benchmark_selector,
     normalized_case_output_metadata,
     selected_benchmarks,
 )
@@ -49,7 +55,135 @@ SOLVER_BACKENDS = ("stp", "metasmt", "dummy", "z3")
 OPTIMIZE_ARRAY_VALUES = ("false", "all", "index", "value")
 
 
+def _format_replay_opts(secret_inputs: list[str], public_inputs: list[str], public_mode: str) -> str:
+    """Build replay CLI options for the selected secret/public input layout."""
+    options: list[str] = []
+    if secret_inputs:
+        options.extend(["--secret", ",".join(secret_inputs)])
+    if public_mode != "fix_pub" and public_inputs:
+        options.extend(["--public", ",".join(public_inputs)])
+    return " ".join(options)
+
+
+def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, object]]:
+    """Load KLEE-family cases, preferring explicit per-tool overrides when present."""
+    raw_cases = benchmark_definition.extra_config.get("klee_cases")
+    if raw_cases is not None:
+        return list(expect_array(raw_cases, f"{benchmark_definition.config_location}.klee_cases"))
+
+    location = benchmark_definition.config_location
+    tool_defaults = expect_table(benchmark_definition.extra_config.get("tool_defaults") or {}, f"{location}.tool_defaults")
+    klee_defaults = expect_table(tool_defaults.get("klee") or {}, f"{location}.tool_defaults.klee")
+    default_secret_inputs = optional_string_list(klee_defaults, "secret_inputs", f"{location}.tool_defaults.klee")
+    default_public_inputs = optional_string_list(klee_defaults, "public_inputs", f"{location}.tool_defaults.klee")
+    code_path = optional_string(klee_defaults, "code_path", f"{location}.tool_defaults.klee") or benchmark_definition.code_path
+    extra_args = optional_string_list(klee_defaults, "extra_args", f"{location}.tool_defaults.klee")
+    mod_exp_extra_args = optional_string_list(klee_defaults, "mod_exp_extra_args", f"{location}.tool_defaults.klee")
+
+    cases: list[dict[str, object]] = []
+    for expanded_case in expand_benchmark_cases(benchmark_definition, tool_id):
+        secret_inputs = list(
+            tuple(optional_string_list(expanded_case.config_table, "klee_secret_inputs", expanded_case.config_location))
+            or tuple(optional_string_list(expanded_case.target_table, "klee_secret_inputs", expanded_case.target_location))
+            or default_secret_inputs
+        )
+        public_inputs = list(
+            tuple(optional_string_list(expanded_case.config_table, "klee_public_inputs", expanded_case.config_location))
+            or tuple(optional_string_list(expanded_case.target_table, "klee_public_inputs", expanded_case.target_location))
+            or default_public_inputs
+        )
+        case = {
+            "title": canonical_case_title(
+                benchmark_definition.library_id,
+                benchmark_definition.variant_id,
+                expanded_case.target_id,
+                expanded_case.config_id,
+            ),
+            "bitcode": resolve_case_template(
+                benchmark_definition,
+                expanded_case,
+                "klee_bitcode",
+                f"{benchmark_definition.code_path}/klee_{expanded_case.config_id}{expanded_case.target_suffix}.bc",
+            ),
+            "result_name": canonical_case_id(
+                benchmark_definition.library_id,
+                benchmark_definition.variant_id,
+                expanded_case.target_id,
+                expanded_case.config_id,
+            ),
+            "replay_script": resolve_case_template(
+                benchmark_definition,
+                expanded_case,
+                "klee_replay_script",
+                f"{benchmark_definition.code_path}/klee_{expanded_case.public_mode}_replay{expanded_case.target_suffix}",
+            ),
+            "code_path": code_path,
+            "replay_opts": _format_replay_opts(secret_inputs, public_inputs, expanded_case.public_mode),
+            "source_column_suffix": expanded_case.public_mode,
+            "public_mode": expanded_case.public_mode,
+            "sliced": expanded_case.variant_id == "sliced",
+        }
+        raw_use_public_inputs = expanded_case.config_table.get("use_public_inputs")
+        if raw_use_public_inputs is not None and not isinstance(raw_use_public_inputs, bool):
+            raise ValueError(f"{expanded_case.config_location}.use_public_inputs must be a boolean")
+        if raw_use_public_inputs and public_inputs:
+            case["public_inputs"] = public_inputs
+        if secret_inputs:
+            case["secret_inputs"] = secret_inputs
+        if extra_args:
+            case["extra_args"] = list(extra_args)
+        if mod_exp_extra_args:
+            case["mod_exp_extra_args"] = list(mod_exp_extra_args)
+        cases.append(case)
+    return cases
+
+
+def _load_klee_preprocess_steps(benchmark_definition, tool_id: str) -> list[dict[str, object]]:
+    """Load optional preprocessing steps for KLEE-family cases."""
+    raw_steps = benchmark_definition.extra_config.get("klee_preprocess_steps")
+    if raw_steps is not None:
+        return list(expect_array(raw_steps, f"{benchmark_definition.config_location}.klee_preprocess_steps"))
+
+    location = benchmark_definition.config_location
+    preprocess_profiles = expect_table(benchmark_definition.extra_config.get("preprocess_profiles") or {}, f"{location}.preprocess_profiles")
+    steps: list[dict[str, object]] = []
+
+    for expanded_case in expand_benchmark_cases(benchmark_definition, tool_id):
+        preprocess_profile_id = optional_string(
+            expanded_case.config_table,
+            "preprocess",
+            expanded_case.config_location,
+        )
+        if not preprocess_profile_id:
+            continue
+        preprocess_location = f"{location}.preprocess_profiles.{preprocess_profile_id}"
+        preprocess_table = expect_table(preprocess_profiles.get(preprocess_profile_id), preprocess_location)
+        arguments = optional_string_list(preprocess_table, "arguments", preprocess_location)
+        if not arguments:
+            raise ValueError(f"{preprocess_location}.arguments must not be empty")
+        base_bitcode = resolve_case_template(
+            benchmark_definition,
+            expanded_case,
+            "klee_bitcode",
+            f"{benchmark_definition.code_path}/klee_{expanded_case.public_mode}{expanded_case.target_suffix}.bc",
+            config_id=expanded_case.public_mode,
+        )
+        output_bitcode = resolve_case_template(
+            benchmark_definition,
+            expanded_case,
+            "klee_bitcode",
+            f"{benchmark_definition.code_path}/klee_{expanded_case.config_id}{expanded_case.target_suffix}.bc",
+        )
+        steps.append(
+            {
+                "arguments": [argument.format(input=base_bitcode, output=output_bitcode) for argument in arguments]
+            }
+        )
+    return steps
+
+
 def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
+    """CLI entrypoint shared by the KLEE-CF and KLEE-Eager wrappers."""
     parser = argparse.ArgumentParser(description="Run one of the KLEE-based experiment configurations.")
     parser.add_argument("max_time", help="Overall timeout for each KLEE run")
     parser.add_argument("--sym-size", type=int, default=4)
@@ -79,7 +213,10 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--benchmarks",
-        help=f"Comma-separated benchmark groups to run. Valid: {','.join(selected_benchmarks(mode, None))}",
+        help=(
+            "Comma-separated benchmark groups to run. Valid: "
+            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in selected_benchmarks(mode, None))
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -133,7 +270,10 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         context.log(f"verbose={'true' if args.verbose else 'false'}")
         context.log(f"tmp_dir={Path(args.tmp_dir).expanduser().resolve()}")
         context.log(f"results_dir={results_dir}")
-        context.log(f"benchmarks={','.join(benchmarks)}")
+        context.log(
+            "benchmarks="
+            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in benchmarks)
+        )
         context.log("##########")
 
         launched_runs: list[LaunchedProcess] = []
@@ -148,16 +288,15 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
 
         seen_result_names: set[str] = set()
         try:
-            for benchmark in benchmarks:
-                benchmark_definition = definition(benchmark)
-                raw_cases = benchmark_definition.extra_config.get("klee_cases")
-                if raw_cases is None:
+            for library_id, variant_id in benchmarks:
+                benchmark_definition = definition(library_id, variant_id)
+                case_entries = _load_klee_cases(benchmark_definition, mode)
+                if not case_entries:
                     continue
                 if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
                     raise ValueError(
                         f"{benchmark_definition.config_location}.klee_cases requires a KLEE tool in tools"
                     )
-                case_entries = expect_array(raw_cases, f"{benchmark_definition.config_location}.klee_cases")
                 # The parent process only enumerates benchmark/case pairs. Each
                 # spawned child below creates its own temporary workspace inside
                 # run_benchmark and executes exactly one selected case there.
@@ -178,7 +317,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
                         launch_output_captured_process(
                             worker_tag,
                             run_benchmark,
-                            (None, None, str(results_dir), args, mode, benchmark, index),
+                            (None, None, str(results_dir), args, mode, library_id, variant_id, index),
                             log_path=worker_log_path,
                             verbose=args.verbose,
                         )
@@ -197,38 +336,40 @@ def run_benchmark(
     results_dir: Path | str,
     args: argparse.Namespace,
     mode: str,
-    benchmark_id: str,
+    library_id: str,
+    variant_id: str,
     case_index: int | None = None,
     output_queue: object | None = None,
 ) -> None:
+    """Build one benchmark variant and execute one or more selected KLEE cases."""
     def worker_main() -> None:
         local_context = context or ExperimentContext()
         local_env = env or dict(os.environ)
         local_results_dir = Path(results_dir)
 
-        benchmark_definition = definition(benchmark_id)
-        build = build_for_tool(benchmark_id, mode)
+        benchmark_definition = definition(library_id, variant_id)
+        build = build_for_tool(benchmark_definition, mode)
+        selector_text = format_benchmark_selector(library_id, variant_id)
         local_context.log("##########")
-        local_context.log(f"Begin experiments for {benchmark_definition.display_name}")
+        local_context.log(f"Begin experiments for {selector_text}")
         local_context.log("##########")
         # Each worker creates its own benchmark-local workspace only after the
         # parent has already chosen one benchmark/case pair for this process.
         with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
             local_context.log(f"temporary_workspace={workspace.root}")
             build_command = [build.script, build.tool_flag]
-            if build.preset:
-                build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
+            build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
             build_command.extend(build.extra_args)
             local_context.run(build_command, env=local_env, cwd=workspace.root)
-            raw_steps = benchmark_definition.extra_config.get("klee_preprocess_steps")
-            if raw_steps is not None:
+            step_entries = _load_klee_preprocess_steps(benchmark_definition, mode)
+            if step_entries:
                 if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
                     raise ValueError(f"{benchmark_definition.config_location}.klee_preprocess_steps requires a KLEE tool in tools")
                 loop_limiter = REPO_ROOT / "loop-limiter/build/libLoopLimiter.so"
                 # Preprocessing stays explicit in the benchmark TOML because only a
                 # subset of cases need loop bounding and each benchmark blacklists a
                 # different set of helper routines.
-                for index, raw_step in enumerate(expect_array(raw_steps, f"{benchmark_definition.config_location}.klee_preprocess_steps")):
+                for index, raw_step in enumerate(step_entries):
                     step_table = expect_table(raw_step, f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}]")
                     arguments = optional_string_list(
                         step_table,
@@ -253,20 +394,19 @@ def run_benchmark(
                         cwd=workspace.root,
                     )
 
-            raw_cases = benchmark_definition.extra_config.get("klee_cases")
-            if raw_cases is None:
+            case_entries = _load_klee_cases(benchmark_definition, mode)
+            if not case_entries:
                 if case_index is None:
                     return
-                raise SystemExit(f"benchmark {benchmark_id!r} does not define KLEE cases")
+                raise SystemExit(f"benchmark {selector_text!r} does not define KLEE cases")
             if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
                 raise ValueError(f"{benchmark_definition.config_location}.klee_cases requires a KLEE tool in tools")
-            case_entries = expect_array(raw_cases, f"{benchmark_definition.config_location}.klee_cases")
             if case_index is None:
                 selected_case_indexes = range(len(case_entries))
             else:
                 if case_index < 0 or case_index >= len(case_entries):
                     raise SystemExit(
-                        f"internal worker case index {case_index} is out of range for benchmark {benchmark_id!r}"
+                        f"internal worker case index {case_index} is out of range for benchmark {selector_text!r}"
                     )
                 selected_case_indexes = [case_index]
             # Parallel KLEE workers always arrive here with one concrete index,
@@ -284,18 +424,14 @@ def run_benchmark(
                             case_location,
                         )
                     )
-                memory_flag = case_table.get("memory_flag")
-                if not isinstance(memory_flag, bool):
-                    raise ValueError(f"{case_location}.memory_flag must be a boolean")
                 title = expect_string(case_table, "title", case_location)
                 bitcode = expect_string(case_table, "bitcode", case_location)
                 result_name = expect_string(case_table, "result_name", case_location)
                 replay_script = expect_string(case_table, "replay_script", case_location)
-                replay_opts = expect_string(case_table, "replay_opts", case_location)
                 code_path = expect_string(case_table, "code_path", case_location)
                 output_metadata = {
                     **normalized_case_output_metadata(case_table, case_location),
-                    "library_key": benchmark_definition.benchmark_id.removesuffix("_sliced"),
+                    "library_key": benchmark_definition.library_id,
                 }
 
                 bitcode_path = workspace.resolve_repo_path(bitcode)
@@ -306,23 +442,34 @@ def run_benchmark(
                 if case_owner_definition is None:
                     raise SystemExit(f"Error: cannot infer library from path '{bitcode}'")
                 library = case_owner_definition.library_id
-                replay_args = shlex.split(replay_opts) if replay_opts else []
                 replay_secret = ""
                 replay_public = ""
-                replay_arg_index = 0
-                while replay_arg_index < len(replay_args):
-                    option_name = replay_args[replay_arg_index]
-                    if option_name not in ("--secret", "--public"):
-                        raise SystemExit(f"Error: unsupported KLEE replay option '{option_name}'")
-                    if replay_arg_index + 1 >= len(replay_args):
-                        raise SystemExit(f"Error: missing value for {option_name}")
-                    if option_name == "--secret":
-                        replay_secret = replay_args[replay_arg_index + 1]
-                    else:
-                        replay_public = replay_args[replay_arg_index + 1]
-                    replay_arg_index += 2
+                replay_args: list[str] = []
+                replay_secret_inputs = optional_string_list(case_table, "secret_inputs", case_location)
+                replay_public_inputs = optional_string_list(case_table, "public_inputs", case_location)
+                if replay_secret_inputs:
+                    replay_secret = ",".join(replay_secret_inputs)
+                    replay_args.extend(["--secret", replay_secret])
+                    if replay_public_inputs:
+                        replay_public = ",".join(replay_public_inputs)
+                        replay_args.extend(["--public", replay_public])
+                else:
+                    replay_opts = expect_string(case_table, "replay_opts", case_location)
+                    replay_args = shlex.split(replay_opts) if replay_opts else []
+                    replay_arg_index = 0
+                    while replay_arg_index < len(replay_args):
+                        option_name = replay_args[replay_arg_index]
+                        if option_name not in ("--secret", "--public"):
+                            raise SystemExit(f"Error: unsupported KLEE replay option '{option_name}'")
+                        if replay_arg_index + 1 >= len(replay_args):
+                            raise SystemExit(f"Error: missing value for {option_name}")
+                        if option_name == "--secret":
+                            replay_secret = replay_args[replay_arg_index + 1]
+                        else:
+                            replay_public = replay_args[replay_arg_index + 1]
+                        replay_arg_index += 2
                 if not replay_secret:
-                    raise SystemExit("Error: replay_opts must provide --secret for reproduce_positives")
+                    raise SystemExit("Error: KLEE case must define secret_inputs or replay_opts with --secret")
 
                 def cleanup_outputs() -> None:
                     # Always clear benchmark-local KLEE output before and after a case so a
@@ -411,9 +558,7 @@ def run_benchmark(
                     converter_options[option_name[2:].replace("-", "_")] = combined_args[option_index + 1]
                     option_index += 2
 
-                analysis_kinds = [KIND_BRANCH]
-                if memory_flag:
-                    analysis_kinds.append(KIND_MEMORY)
+                analysis_kinds = [KIND_BRANCH, KIND_MEMORY]
 
                 case_json = local_results_dir / f"{result_name}.json"
                 combined_rows: list[dict[str, object]] = []

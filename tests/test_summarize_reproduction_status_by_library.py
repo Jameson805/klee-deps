@@ -226,7 +226,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                 [
                     {
                         "configuration": "binsec_var_pub",
-                        "configuration_label": "mode=var_pub",
+                        "configuration_label": "searcher=default, public_mode=var_pub, concretization_policy=default",
                         "comparison_tool": "binsec",
                         "tool_family": "binsec",
                         "sliced": "False",
@@ -244,7 +244,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                     },
                     {
                         "configuration": "klee_cf_fix_pub",
-                        "configuration_label": "search=default, mode=fix_pub",
+                        "configuration_label": "searcher=default, public_mode=fix_pub, concretization_policy=default",
                         "comparison_tool": "klee_cf",
                         "tool_family": "klee_cf",
                         "sliced": "False",
@@ -262,7 +262,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                     },
                     {
                         "configuration": "klee_eager_fix_pub",
-                        "configuration_label": "search=default, mode=fix_pub",
+                        "configuration_label": "searcher=default, public_mode=fix_pub, concretization_policy=default",
                         "comparison_tool": "klee_eager",
                         "tool_family": "klee_eager",
                         "sliced": "False",

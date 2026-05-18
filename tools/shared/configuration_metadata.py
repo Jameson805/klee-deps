@@ -1,3 +1,10 @@
+"""Shared metadata helpers for campaign-generated outputs.
+
+This module records raw configuration values rather than tool-specific display
+labels. Downstream reporting can decide how to present those values, while the
+stored metadata remains stable and lossless across tools.
+"""
+
 from __future__ import annotations
 
 import json
@@ -6,28 +13,17 @@ from typing import Any, Mapping, Sequence
 
 
 RUN_METADATA_FILENAME = "_run_metadata.json"
-MODE_SUFFIXES = (
-    "var_pub_lim_loop_break",
-    "var_pub",
-    "fix_pub",
+LABEL_FIELDS = (
+    "searcher",
+    "sym_size",
+    "public_mode",
+    "concretization_policy",
 )
-KLEE_LIKE_TOOLS = {"klee_cf", "klee_eager", "self_comp"}
 
 
 def column_metadata_path(csv_path: str | Path) -> Path:
+    """Return the JSON sidecar path used for per-column metadata."""
     return Path(csv_path).with_suffix(".metadata.json")
-
-
-def normalize_searcher(raw_searcher: str | None, *, tool_name: str) -> str:
-    if tool_name not in KLEE_LIKE_TOOLS:
-        return "default"
-    if not raw_searcher or raw_searcher == "random-path,nurs:covnew":
-        return "default"
-    if raw_searcher == "dfs":
-        return "dfs"
-    if raw_searcher == "random-path,dfs":
-        return "rand_path_dfs"
-    return raw_searcher.replace(":", "_").replace(",", "_").replace("-", "_")
 
 
 def _option_value(args: Sequence[str], option_name: str) -> str | None:
@@ -42,38 +38,23 @@ def derive_run_configuration(
     destination_name: str,
     args_template: Sequence[str],
 ) -> dict[str, Any]:
-    sym_size = _option_value(args_template, "--sym-size") or "all"
-    concretization_policy = "default"
-    if tool_name == "klee_cf" and _option_value(args_template, "--concretize-on-solver-timeout") == "false":
-        concretization_policy = "no_conc"
+    """Extract raw run-level metadata from one campaign run definition."""
     return {
         "source_column_prefix": destination_name,
         "tool_family": tool_name,
-        "searcher": normalize_searcher(_option_value(args_template, "--search"), tool_name=tool_name),
-        "sym_size": str(sym_size),
-        "concretization_policy": concretization_policy,
+        "searcher": _option_value(args_template, "--search") or "all",
+        "sym_size": _option_value(args_template, "--sym-size") or "all",
+        "concretization_policy": _option_value(args_template, "--concretize-on-solver-timeout") or "all",
     }
 
 
-def _candidate_case_names(case_table: Mapping[str, Any]) -> list[str]:
-    candidates: list[str] = []
-    for key in ("source_column_suffix", "result_name", "json_name", "stats_file", "outfile"):
-        value = case_table.get(key)
-        if isinstance(value, str) and value.strip():
-            candidates.append(Path(value).stem)
-    return candidates
-
-
-def _derive_suffix_from_name(name: str) -> str | None:
-    cleaned = name.replace("_self_comp", "").replace("_sliced", "")
-    for suffix in MODE_SUFFIXES:
-        tail = f"_{suffix}"
-        if cleaned == suffix or cleaned.endswith(tail):
-            return suffix
-    return None
-
-
 def case_output_metadata(case_table: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize the case-level metadata required by postprocessing.
+
+    Runners must provide either ``source_column_suffix`` or ``public_mode``.
+    The helper mirrors one to the other, but intentionally does not infer them
+    from filenames or tool-specific naming conventions.
+    """
     explicit_suffix = case_table.get("source_column_suffix")
     explicit_public_mode = case_table.get("public_mode")
     explicit_sliced = case_table.get("sliced")
@@ -81,29 +62,26 @@ def case_output_metadata(case_table: Mapping[str, Any]) -> dict[str, Any]:
     if explicit_sliced is not None and not isinstance(explicit_sliced, bool):
         raise ValueError("case metadata field 'sliced' must be a boolean")
 
-    candidate_names = _candidate_case_names(case_table)
     sliced = bool(explicit_sliced)
-    for candidate in candidate_names:
-        if "_sliced" in candidate:
-            sliced = True
+    source_column_suffix = (
+        explicit_suffix.strip()
+        if isinstance(explicit_suffix, str) and explicit_suffix.strip()
+        else None
+    )
+    public_mode = (
+        explicit_public_mode.strip()
+        if isinstance(explicit_public_mode, str) and explicit_public_mode.strip()
+        else None
+    )
 
-    if isinstance(explicit_suffix, str) and explicit_suffix.strip():
-        source_column_suffix = explicit_suffix.strip()
-    else:
-        source_column_suffix = None
-        for candidate in candidate_names:
-            source_column_suffix = _derive_suffix_from_name(candidate)
-            if source_column_suffix is not None:
-                break
-
-    if isinstance(explicit_public_mode, str) and explicit_public_mode.strip():
-        public_mode = explicit_public_mode.strip()
-    else:
+    if source_column_suffix is None:
+        source_column_suffix = public_mode
+    if public_mode is None:
         public_mode = source_column_suffix
 
     if source_column_suffix is None or public_mode is None:
         raise ValueError(
-            "case metadata must define source_column_suffix/public_mode explicitly or via result_name/json_name/stats_file/outfile"
+            "case metadata must define source_column_suffix or public_mode explicitly"
         )
 
     return {
@@ -114,25 +92,17 @@ def case_output_metadata(case_table: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def configuration_label(metadata: Mapping[str, Any]) -> str:
-    tool_family = str(metadata["tool_family"])
-    searcher = str(metadata["searcher"])
-    sym_size = str(metadata["sym_size"])
-    public_mode = str(metadata["public_mode"])
-    concretization_policy = str(metadata["concretization_policy"])
-
+    """Build a generic label from stored raw metadata fields."""
     label_parts: list[str] = []
-    if tool_family in KLEE_LIKE_TOOLS:
-        label_parts.append(f"search={searcher}")
-    if sym_size != "all":
-        label_parts.append(f"sym={sym_size}")
-    if public_mode != "all":
-        label_parts.append(f"mode={public_mode}")
-    if concretization_policy != "default":
-        label_parts.append(f"conc={concretization_policy}")
-    return ", ".join(label_parts) or "default"
+    for field_name in LABEL_FIELDS:
+        field_value = str(metadata.get(field_name, "")).strip()
+        if field_value and field_value != "all":
+            label_parts.append(f"{field_name}={field_value}")
+    return ", ".join(label_parts) or "all"
 
 
 def build_source_column(run_metadata: Mapping[str, Any], case_metadata: Mapping[str, Any]) -> str:
+    """Build the merged-CSV source column for one run/case combination."""
     prefix = str(run_metadata["source_column_prefix"])
     suffix = str(case_metadata["source_column_suffix"])
     if bool(case_metadata.get("sliced")):
@@ -144,6 +114,7 @@ def build_column_metadata(
     run_metadata: Mapping[str, Any],
     case_metadata: Mapping[str, Any],
 ) -> dict[str, Any]:
+    """Combine run metadata and case metadata into one column record."""
     tool_family = str(run_metadata["tool_family"])
     sliced = bool(case_metadata.get("sliced"))
     metadata = {
@@ -163,12 +134,14 @@ def build_column_metadata(
 
 
 def write_run_metadata(root_dir: str | Path, by_run: Mapping[str, Mapping[str, Any]]) -> Path:
+    """Write ``_run_metadata.json`` into a campaign output root."""
     output_path = Path(root_dir) / RUN_METADATA_FILENAME
     output_path.write_text(json.dumps({"runs": by_run}, indent=2) + "\n", encoding="utf-8")
     return output_path
 
 
 def load_run_metadata(root_dir: str | Path) -> dict[str, dict[str, Any]]:
+    """Load the campaign run metadata written by :func:`write_run_metadata`."""
     input_path = Path(root_dir) / RUN_METADATA_FILENAME
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or not isinstance(payload.get("runs"), dict):
@@ -181,6 +154,7 @@ def write_column_metadata(
     ordered_columns: Sequence[str],
     by_column: Mapping[str, Mapping[str, Any]],
 ) -> Path:
+    """Write the metadata sidecar for one merged CSV."""
     output_path = column_metadata_path(csv_path)
     payload = {
         "columns": list(ordered_columns),
@@ -191,6 +165,7 @@ def write_column_metadata(
 
 
 def load_column_metadata_bundle(csv_path: str | Path) -> tuple[list[str], dict[str, dict[str, Any]]]:
+    """Load column order and metadata from a CSV sidecar."""
     input_path = column_metadata_path(csv_path)
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     columns = payload.get("columns")
@@ -201,6 +176,7 @@ def load_column_metadata_bundle(csv_path: str | Path) -> tuple[list[str], dict[s
 
 
 def copy_column_metadata(input_csv: str | Path, output_csv: str | Path) -> Path:
+    """Copy metadata to a new CSV path when the input already has a sidecar."""
     if not column_metadata_path(input_csv).is_file():
         return column_metadata_path(output_csv)
     ordered_columns, by_column = load_column_metadata_bundle(input_csv)
@@ -208,6 +184,11 @@ def copy_column_metadata(input_csv: str | Path, output_csv: str | Path) -> Path:
 
 
 def merge_column_metadata(output_csv: str | Path, input_csvs: Sequence[str | Path]) -> Path:
+    """Merge multiple metadata sidecars into one output sidecar.
+
+    Conflicting definitions for the same column are treated as a hard error so
+    downstream reports never silently combine columns with different meaning.
+    """
     ordered_columns: list[str] = []
     by_column: dict[str, dict[str, Any]] = {}
     for input_csv in input_csvs:

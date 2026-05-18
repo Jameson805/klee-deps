@@ -7,6 +7,13 @@ cd "$script_dir"
 
 KLEE_PATH="../../klee-controlflow"
 
+resolve_runner_config_path() {
+    python "$repo_root/tools/resolve_runner_profile.py" \
+    --library "openssl_almeida" \
+    --variant "default" \
+        --field config
+}
+
 usage() {
     cat <<EOF
 Usage: $0 (--klee | --self-comp | --binsec | --abacus) [--preset NAME]
@@ -88,8 +95,8 @@ if command -v wllvm >/dev/null 2>&1 && [[ -z "${LLVM_COMPILER:-}" ]]; then
     export LLVM_COMPILER=clang
 fi
 
-config_path="$repo_root/configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml"
-generated_dir="$script_dir/generated"
+config_path="$(resolve_runner_config_path)"
+generated_dir="$script_dir/generated/tls_rempad_luk13"
 wrapper_source="tls_rempad_luk13_wrapper.c"
 
 common_flags=(

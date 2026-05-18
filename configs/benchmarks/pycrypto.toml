@@ -1,7 +1,5 @@
 [[benchmarks]]
-benchmark_id = "pycrypto"
-display_name = "PyCrypto"
-library_id = "unknown"
+library = "pycrypto"
 code_path = "benchmarks/pycrypto"
 path_prefixes = ["benchmarks/pycrypto/"]
 tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
@@ -30,23 +28,34 @@ preset = "default"
 klee_cf = "klee"
 klee_eager = "klee"
 
-[benchmarks.mode_case_templates]
-abacus_executable = "benchmarks/pycrypto/abacus_{public_mode}_{artifact_suffix}"
-self_comp_bitcode = "benchmarks/pycrypto/self_comp_{public_mode}_{artifact_suffix}.bc"
-self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
-binsec_sse_script = "benchmarks/pycrypto/generated/binsec_{public_mode}.cfg"
-binsec_executable = "benchmarks/pycrypto/binsec_{public_mode}_{artifact_suffix}"
-klee_bitcode = "benchmarks/pycrypto/klee_{public_mode}_{artifact_suffix}.bc"
-klee_replay_script = "benchmarks/pycrypto/klee_{public_mode}_replay_{artifact_suffix}"
+[benchmarks.runner_profiles.default]
+config = "configs/runner/pycrypto_arc4_runner_config.toml"
+preset = "default"
 
-[[benchmarks.mode_cases]]
-display_name = "ARC4"
+[benchmarks.path_templates]
+abacus_executable = "{code_path}/abacus_{public_mode}_{artifact_suffix}"
+self_comp_bitcode = "{code_path}/self_comp_{public_mode}_{artifact_suffix}.bc"
+self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
+binsec_sse_script = "{code_path}/generated/binsec_{public_mode}.cfg"
+binsec_executable = "{code_path}/binsec_{public_mode}_{artifact_suffix}"
+klee_bitcode = "{code_path}/klee_{public_mode}_{artifact_suffix}.bc"
+klee_replay_script = "{code_path}/klee_{public_mode}_replay_{artifact_suffix}"
+
+[benchmarks.variants.default]
+
+[[benchmarks.targets]]
+target = "arc4"
 artifact_suffix = "arc4"
-output_stem = "pycrypto_arc4"
-replay_opts = "--secret key"
-ct_json = "ctchecker_results/OriginalBenchmarks/empty.json"
-memory_flag = true
+runner_profile = "default"
 secret_layout = "key:32"
 secret_inputs = ["key:32:key_buf"]
-runner_config = "configs/runner/pycrypto_arc4_runner_config.toml"
-preset_name = "default"
+klee_secret_inputs = ["key"]
+
+[[benchmarks.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "self_comp", "binsec"]

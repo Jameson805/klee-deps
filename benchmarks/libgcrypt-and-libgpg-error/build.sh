@@ -10,6 +10,17 @@ export LLVM_COMPILER=clang
 
 KLEE_PATH="../../klee-controlflow"
 
+resolve_runner_config_path() {
+    local variant="default"
+    if [[ "$SLICED" -eq 1 ]]; then
+        variant="sliced"
+    fi
+    python "$repo_root/tools/resolve_runner_profile.py" \
+        --library "libgcrypt" \
+        --variant "$variant" \
+        --field config
+}
+
 usage() {
     echo "Usage: $0 [--skip-deps] [--sliced] (--klee | --binsec | --abacus | --self-comp) --preset NAME"
     echo "  --skip-deps    Skip building libgpg-error and libgcrypt"
@@ -98,18 +109,21 @@ fi
 
 mkdir -p generated
 generator_args=(
-    --config "$repo_root/configs/runner/modexp_runner_config.toml"
-    --header-out "$script_dir/generated/runner_config.generated.h"
+    --config "$(resolve_runner_config_path)"
+    --header-out "$script_dir/generated/modexp/runner_config.generated.h"
     --preset "$PRESET"
 )
 
 if [[ "$MODE" == "binsec" ]]; then
+    mkdir -p "$script_dir/generated/modexp"
     generator_args+=(
         --binsec-base "$repo_root/configs/binsec/binsec_base.cfg"
-        --binsec-fix-pub-out "$script_dir/generated/binsec_fix_pub.cfg"
-        --binsec-var-pub-out "$script_dir/generated/binsec_var_pub.cfg"
+        --binsec-fix-pub-out "$script_dir/generated/modexp/binsec_fix_pub.cfg"
+        --binsec-var-pub-out "$script_dir/generated/modexp/binsec_var_pub.cfg"
     )
 fi
+
+mkdir -p "$script_dir/generated/modexp"
 
 python "$repo_root/tools/generate_runner_artifacts.py" "${generator_args[@]}"
 
@@ -172,49 +186,49 @@ else
 fi
 
 # Flags and libraries
-flags=( -g -O0 -I"$repo_root/include" -Igenerated -isystem "${install_root}/include" )
+flags=( -g -O0 -I"$repo_root/include" -Igenerated/modexp -isystem "${install_root}/include" )
 klee_flags=( -I"$KLEE_PATH/include" -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" -lkleeRuntest )
 libs=( "${install_root}/lib/libgcrypt.a" "${install_root}/lib/libgpg-error.a" )
 
 if [[ "$MODE" == "klee" ]]; then
     # KLEE bitcode builds
-    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF klee_main.c "${libs[@]}" -o klee_var_pub
-    extract-bc klee_var_pub
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF klee_main.c "${libs[@]}" -o klee_var_pub_modexp
+    extract-bc klee_var_pub_modexp
 
-    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub
-    extract-bc klee_fix_pub
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DKLEE_CF -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_modexp
+    extract-bc klee_fix_pub_modexp
 
-    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DKLEE_CF klee_main.c powm_sliced.c "${libs[@]}" -o klee_var_pub_sliced
-    extract-bc klee_var_pub_sliced
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DKLEE_CF klee_main.c powm_sliced.c "${libs[@]}" -o klee_var_pub_modexp_sliced
+    extract-bc klee_var_pub_modexp_sliced
 
-    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DKLEE_CF -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o klee_fix_pub_sliced
-    extract-bc klee_fix_pub_sliced
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DKLEE_CF -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o klee_fix_pub_modexp_sliced
+    extract-bc klee_fix_pub_modexp_sliced
 
     # Replay builds
-    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay
-    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY klee_main.c "${libs[@]}" -o klee_var_pub_replay_modexp
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o klee_fix_pub_replay_modexp
 
-    # clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DREPLAY klee_main.c powm_sliced.c "${libs[@]}" -o klee_var_pub_sliced_replay
-    # clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DREPLAY -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o klee_fix_pub_sliced_replay
+    # clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DREPLAY klee_main.c powm_sliced.c "${libs[@]}" -o klee_var_pub_replay_modexp_sliced
+    # clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DUSE_SLICED -DREPLAY -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o klee_fix_pub_replay_modexp_sliced
 fi
 
 if [[ "$MODE" == "binsec" ]]; then
     # BINSEC builds
-    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub
-    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub
+    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub_modexp
+    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_modexp
 
     # Replay binaries for BINSEC (built separately; REPLAY and BINSEC are mutually exclusive)
-    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY klee_main.c "${libs[@]}" -o binsec_var_pub_replay
-    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_replay
+    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY klee_main.c "${libs[@]}" -o binsec_var_pub_replay_modexp
+    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_replay_modexp
 
-    # clang "${flags[@]}" -static -DUSE_SLICED -DBINSEC klee_main.c powm_sliced.c "${libs[@]}" -o binsec_var_pub_sliced
-    # clang "${flags[@]}" -static -DUSE_SLICED -DBINSEC -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o binsec_fix_pub_sliced
+    # clang "${flags[@]}" -static -DUSE_SLICED -DBINSEC klee_main.c powm_sliced.c "${libs[@]}" -o binsec_var_pub_modexp_sliced
+    # clang "${flags[@]}" -static -DUSE_SLICED -DBINSEC -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o binsec_fix_pub_modexp_sliced
 fi
 
 if [[ "$MODE" == "abacus" ]]; then
     # Abacus builds
-    gcc "${flags[@]}" -m32 "${NOIND_EXE_FLAGS[@]}" -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub
-    # clang "${flags[@]}" -m32 -DUSE_SLICED -DABACUS klee_main.c powm_sliced.c "${libs[@]}" -o abacus_fix_pub_sliced
+    gcc "${flags[@]}" -m32 "${NOIND_EXE_FLAGS[@]}" -DABACUS klee_main.c "${libs[@]}" -o abacus_fix_pub_modexp
+    # clang "${flags[@]}" -m32 -DUSE_SLICED -DABACUS klee_main.c powm_sliced.c "${libs[@]}" -o abacus_fix_pub_modexp_sliced
 fi
 
 record_branch() {
@@ -226,11 +240,11 @@ record_branch() {
 }
 
 if [[ "$MODE" == "self_comp" ]]; then
-    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP klee_main.c "${libs[@]}" -o self_comp_var_pub
-    extract-bc self_comp_var_pub
-    record_branch self_comp_var_pub.bc
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP klee_main.c "${libs[@]}" -o self_comp_var_pub_modexp
+    extract-bc self_comp_var_pub_modexp
+    record_branch self_comp_var_pub_modexp.bc
 
-    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o self_comp_fix_pub
-    extract-bc self_comp_fix_pub
-    record_branch self_comp_fix_pub.bc
+    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o self_comp_fix_pub_modexp
+    extract-bc self_comp_fix_pub_modexp
+    record_branch self_comp_fix_pub_modexp.bc
 fi

@@ -25,14 +25,17 @@ from scripts.experiments.common import (
     ExperimentContext,
     LaunchedProcess,
     REPO_ROOT,
+    expand_benchmark_cases,
     duration_to_seconds,
     execute_output_captured_worker,
     expect_array,
     expect_string,
     expect_table,
     launch_output_captured_process,
+    optional_string,
     optional_string_list,
     prepare_benchmark_workspace,
+    resolve_case_template,
     resolve_repo_path,
     terminate_processes,
     wait_for_processes,
@@ -40,8 +43,11 @@ from scripts.experiments.common import (
 from tools.converters.binsec_toml_to_json import convert_binsec_toml
 from tools.shared.experiment_registry import (
     build_for_tool,
+    canonical_case_id,
+    canonical_case_title,
     definition,
     definition_for_path,
+    format_benchmark_selector,
     normalized_case_output_metadata,
     selected_benchmarks,
 )
@@ -50,7 +56,59 @@ from tools.shared.experiment_registry import (
 CAMPAIGN_TOOL = CampaignTool(tool_id="binsec", module_name=__name__)
 
 
+def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
+    """Load BINSEC cases, preferring explicit per-tool overrides when present."""
+    raw_cases = benchmark_definition.extra_config.get("binsec_cases")
+    if raw_cases is not None:
+        return list(expect_array(raw_cases, f"{benchmark_definition.config_location}.binsec_cases"))
+
+    cases: list[dict[str, object]] = []
+    for expanded_case in expand_benchmark_cases(benchmark_definition, "binsec"):
+        secret_inputs = tuple(
+            optional_string_list(expanded_case.config_table, "secret_inputs", expanded_case.config_location)
+        ) or tuple(
+            optional_string_list(expanded_case.target_table, "secret_inputs", expanded_case.target_location)
+        )
+        public_inputs = tuple(
+            optional_string_list(expanded_case.config_table, "public_inputs", expanded_case.config_location)
+        ) or tuple(
+            optional_string_list(expanded_case.target_table, "public_inputs", expanded_case.target_location)
+        )
+        cases.append(
+            {
+                "title": canonical_case_title(
+                    benchmark_definition.library_id,
+                    benchmark_definition.variant_id,
+                    expanded_case.target_id,
+                    expanded_case.config_id,
+                ),
+                "sse_script": resolve_case_template(
+                    benchmark_definition,
+                    expanded_case,
+                    "binsec_sse_script",
+                    f"{benchmark_definition.code_path}/generated/binsec_{expanded_case.public_mode}.cfg",
+                ),
+                "stats_file": f"{canonical_case_id(benchmark_definition.library_id, benchmark_definition.variant_id, expanded_case.target_id, expanded_case.config_id)}.toml",
+                "executable": resolve_case_template(
+                    benchmark_definition,
+                    expanded_case,
+                    "binsec_executable",
+                    f"{benchmark_definition.code_path}/binsec_{expanded_case.config_id}{expanded_case.target_suffix}",
+                ),
+                "source_column_suffix": expanded_case.public_mode,
+                "public_mode": expanded_case.public_mode,
+                "sliced": expanded_case.variant_id == "sliced",
+            }
+        )
+        if secret_inputs:
+            cases[-1]["secret_inputs"] = list(secret_inputs)
+        if bool(expanded_case.config_table.get("use_public_inputs", False)) and public_inputs:
+            cases[-1]["public_inputs"] = list(public_inputs)
+    return cases
+
+
 def resolve_binsec_executable() -> str:
+    """Find the BINSEC executable and raise a clear CLI error if missing."""
     executable = shutil.which("binsec")
     if executable is None:
         raise SystemExit(
@@ -61,6 +119,7 @@ def resolve_binsec_executable() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint for direct BINSEC runs across selected benchmarks."""
     parser = argparse.ArgumentParser(description="Run BINSEC over the configured benchmark set.")
     parser.add_argument("max_time", help="Timeout for BINSEC (for example: 60, 1m, 4h, 2h30m)")
     parser.add_argument("--sym-size", type=int, default=4)
@@ -78,7 +137,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--results-dir", default="results/binsec_results", help="Directory where run outputs are written")
     parser.add_argument(
         "--benchmarks",
-        help=f"Comma-separated benchmark groups to run. Valid: {','.join(selected_benchmarks('binsec', None))}",
+        help=(
+            "Comma-separated benchmark groups to run. Valid: "
+            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in selected_benchmarks("binsec", None))
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -122,7 +184,10 @@ def main(argv: list[str] | None = None) -> int:
         context.log(f"verbose={'true' if args.verbose else 'false'}")
         context.log(f"tmp_dir={args.tmp_dir}")
         context.log(f"results_dir={results_dir}")
-        context.log(f"benchmarks={','.join(benchmarks)}")
+        context.log(
+            "benchmarks="
+            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in benchmarks)
+        )
         context.log("##########")
 
         launched_runs: list[LaunchedProcess] = []
@@ -137,14 +202,13 @@ def main(argv: list[str] | None = None) -> int:
 
         seen_stats_stems: set[str] = set()
         try:
-            for benchmark in benchmarks:
-                benchmark_definition = definition(benchmark)
-                raw_cases = benchmark_definition.extra_config.get("binsec_cases")
-                if raw_cases is None:
+            for library_id, variant_id in benchmarks:
+                benchmark_definition = definition(library_id, variant_id)
+                case_entries = _load_binsec_cases(benchmark_definition)
+                if not case_entries:
                     continue
                 if "binsec" not in benchmark_definition.tools:
                     raise ValueError(f"{benchmark_definition.config_location}.binsec_cases requires 'binsec' in tools")
-                case_entries = expect_array(raw_cases, f"{benchmark_definition.config_location}.binsec_cases")
                 # The parent only enumerates benchmark/case pairs and launches one
                 # worker per case. Each child creates its own temporary workspace
                 # inside run_benchmark and executes exactly one selected case there.
@@ -166,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
                         launch_output_captured_process(
                             title,
                             run_benchmark,
-                            (None, str(results_dir), args, benchmark, index),
+                            (None, str(results_dir), args, library_id, variant_id, index),
                             log_path=worker_log_path,
                             verbose=args.verbose,
                         )
@@ -183,34 +247,35 @@ def run_benchmark(
     context: ExperimentContext | None,
     results_dir: Path | str,
     args: argparse.Namespace,
-    benchmark_id: str,
+    library_id: str,
+    variant_id: str,
     case_index: int,
     output_queue: object | None = None,
 ) -> None:
+    """Build one benchmark variant and execute exactly one selected BINSEC case."""
     def worker_main() -> None:
         local_context = context or ExperimentContext()
         local_results_dir = Path(results_dir)
-        benchmark_definition = definition(benchmark_id)
-        build = build_for_tool(benchmark_id, "binsec")
+        benchmark_definition = definition(library_id, variant_id)
+        build = build_for_tool(benchmark_definition, "binsec")
+        selector_text = format_benchmark_selector(library_id, variant_id)
         local_context.log("##########")
-        local_context.log(f"Begin experiments for {benchmark_definition.display_name}")
+        local_context.log(f"Begin experiments for {selector_text}")
         local_context.log("##########")
         with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
             local_context.log(f"temporary_workspace={workspace.root}")
             build_command = [build.script, build.tool_flag]
-            if build.preset:
-                build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
+            build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
             local_context.run(build_command, cwd=workspace.root)
 
-            raw_cases = benchmark_definition.extra_config.get("binsec_cases")
-            if raw_cases is None:
-                raise SystemExit(f"benchmark {benchmark_id!r} does not define BINSEC cases")
+            case_entries = _load_binsec_cases(benchmark_definition)
+            if not case_entries:
+                raise SystemExit(f"benchmark {selector_text!r} does not define BINSEC cases")
             if "binsec" not in benchmark_definition.tools:
                 raise ValueError(f"{benchmark_definition.config_location}.binsec_cases requires 'binsec' in tools")
-            case_entries = expect_array(raw_cases, f"{benchmark_definition.config_location}.binsec_cases")
             if case_index < 0 or case_index >= len(case_entries):
                 raise ValueError(
-                    f"internal worker case index {case_index} is out of range for benchmark {benchmark_id!r}"
+                    f"internal worker case index {case_index} is out of range for benchmark {selector_text!r}"
                 )
             case_location = f"{benchmark_definition.config_location}.binsec_cases[{case_index}]"
             case_table = expect_table(case_entries[case_index], case_location)
@@ -221,7 +286,7 @@ def run_benchmark(
                 converter_args.extend(["--public-input", public_input])
             output_metadata = {
                 **normalized_case_output_metadata(case_table, case_location),
-                "library_key": benchmark_definition.benchmark_id.removesuffix("_sliced"),
+                "library_key": benchmark_definition.library_id,
             }
             run_case(
                 local_context,
@@ -251,6 +316,7 @@ def run_case(
     metadata: dict[str, object],
     *converter_args: str,
 ) -> None:
+    """Run one BINSEC case and convert its stats file into shared JSON."""
     executable_path = workspace.resolve_repo_path(executable)
     sse_script_path = workspace.resolve_repo_path(sse_script)
     context.log(f"Running case: {title}")

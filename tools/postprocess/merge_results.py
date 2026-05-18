@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""Merge campaign JSON outputs into a wide CSV keyed by source location.
+
+This script is the bridge between per-run JSON payloads and the wide CSV shape
+used by later filtering, summarization, and plotting steps.
+"""
 
 from __future__ import annotations
 
@@ -125,6 +130,7 @@ def merge_runs(
     sliced_only: bool = False,
     all_positives: bool = False,
 ) -> tuple[List[str], Dict[str, Dict[Location, float]], Dict[str, dict[str, Any]]]:
+    """Merge all run directories under ``root_dir`` into exact result columns."""
     if not os.path.isdir(root_dir):
         raise SystemExit(f"Input '{root_dir}' is not a directory")
 
@@ -177,6 +183,7 @@ def write_csv(
     by_col: Dict[str, Dict[Location, float]],
     column_metadata: Dict[str, dict[str, Any]],
 ) -> int:
+    """Write the merged CSV and its metadata sidecar."""
     all_locations: Set[Location] = set()
     wildcard_locations: Set[Tuple[str, str, int, Optional[str]]] = set()
 
@@ -228,6 +235,7 @@ def write_csv(
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    """CLI entrypoint for wide-CSV generation from campaign output trees."""
     parser = argparse.ArgumentParser(
         description=(
             "Merge per-run top-level JSON results into a single CSV keyed by (library,file,line,column,kind). "

@@ -7,6 +7,15 @@ cd "$script_dir"
 
 KLEE_PATH="../../klee-controlflow"
 
+resolve_runner_config_path() {
+    local profile_id="$1"
+    python "$repo_root/tools/resolve_runner_profile.py" \
+    --library "ghostrider" \
+    --variant "default" \
+        --profile "$profile_id" \
+        --field config
+}
+
 usage() {
     cat <<EOF
 Usage: $0 (--klee | --self-comp | --binsec | --abacus) [--preset NAME]
@@ -124,10 +133,10 @@ bench_config_for_id() {
     local id="$1"
     case "$id" in
         findmax)
-            printf '%s\n' "$repo_root/configs/runner/ghostrider_findmax_runner_config.toml"
+            resolve_runner_config_path "findmax"
             ;;
         matmul)
-            printf '%s\n' "$repo_root/configs/runner/ghostrider_matmul_runner_config.toml"
+            resolve_runner_config_path "matmul"
             ;;
         *)
             return 1

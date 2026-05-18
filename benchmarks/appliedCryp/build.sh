@@ -7,6 +7,15 @@ cd "$script_dir"
 
 KLEE_PATH="../../klee-controlflow"
 
+resolve_runner_config_path() {
+    local profile_id="$1"
+    python "$repo_root/tools/resolve_runner_profile.py" \
+    --library "appliedcryp" \
+    --variant "default" \
+        --profile "$profile_id" \
+        --field config
+}
+
 usage() {
     cat <<EOF
 Usage: $0 (--klee | --self-comp | --binsec | --abacus) [--preset NAME]
@@ -129,13 +138,13 @@ bench_config_for_id() {
     local id="$1"
     case "$id" in
         3way)
-            printf '%s\n' "$repo_root/configs/runner/appliedcryp_3way_runner_config.toml"
+            resolve_runner_config_path "3way"
             ;;
         des)
-            printf '%s\n' "$repo_root/configs/runner/appliedcryp_des_runner_config.toml"
+            resolve_runner_config_path "des"
             ;;
         loki91)
-            printf '%s\n' "$repo_root/configs/runner/appliedcryp_loki91_runner_config.toml"
+            resolve_runner_config_path "loki91"
             ;;
         *)
             return 1

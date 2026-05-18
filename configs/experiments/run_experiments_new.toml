@@ -13,8 +13,8 @@ by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
 # Leave arrays empty to keep each tool's default benchmark set.
-# Set `all = ["mbedtls"]` to run only Mbed TLS everywhere unless a tool-specific override is set.
-all = ["appliedcryp", "bearssl", "ghostrider", "libg", "openssl_almeida", "pycrypto"]
+# Set `all = ["mbedtls:default"]` to run only Mbed TLS everywhere unless a tool-specific override is set.
+all = ["appliedcryp:default", "bearssl:default", "ghostrider:default", "libg:default", "openssl_almeida:default", "pycrypto:default"]
 
 [runs]
 klee_cf_default_4 = true

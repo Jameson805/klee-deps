@@ -83,6 +83,13 @@ class BenchmarkWorkspace:
 
 @dataclass(frozen=True)
 class CampaignTool:
+    """Describe how the campaign layer launches one runner module.
+
+    The campaign orchestrator treats runners as black-box CLIs with a small set
+    of conventional arguments. Keeping that contract explicit here avoids hard-
+    coding per-tool argument wiring inside the campaign scripts.
+    """
+
     tool_id: str
     module_name: str
     benchmark_arg: str | None = "--benchmarks"
@@ -97,6 +104,7 @@ class CampaignTool:
         results_dir: Path,
         tmp_dir: str,
     ) -> list[str]:
+        """Append the standard campaign-managed CLI arguments for one worker."""
         argv = list(base_args)
         if self.tmp_dir_arg is not None:
             argv.extend([self.tmp_dir_arg, tmp_dir])
@@ -109,6 +117,8 @@ class CampaignTool:
 
 @dataclass
 class LaunchedProcess:
+    """Track one spawned worker process plus its output-forwarding thread."""
+
     tag: str
     process: multiprocessing.Process
     reader: threading.Thread
@@ -141,12 +151,14 @@ class _QueueWriter:
 
 
 def redirect_output_to_queue(output_queue: object) -> None:
+    """Redirect stdout and stderr into a multiprocessing queue or pipe."""
     writer = _QueueWriter(output_queue)
     sys.stdout = writer
     sys.stderr = writer
 
 
 def restore_output_streams(stdout: TextIO, stderr: TextIO) -> None:
+    """Restore stdout and stderr after queue redirection."""
     sys.stdout = stdout
     sys.stderr = stderr
 
@@ -279,6 +291,7 @@ def launch_output_captured_process(
     log_path: Path,
     verbose: bool = False,
 ) -> LaunchedProcess:
+    """Spawn a worker process and stream its combined output into ``log_path``."""
     ctx = multiprocessing.get_context("spawn")
     output_queue, child_output_queue = ctx.Pipe(duplex=False)
     process = ctx.Process(
@@ -308,6 +321,7 @@ def execute_output_captured_worker(
     output_queue: object | None,
     worker: Callable[[], object | None],
 ) -> None:
+    """Run one worker body while mirroring its output into the parent queue."""
     if output_queue is None:
         worker()
         return
@@ -366,6 +380,7 @@ def launch_prefixed_module(
     log_path: Path | None = None,
     verbose: bool = False,
 ) -> LaunchedProcess:
+    """Run another Python module in a spawned worker with captured output."""
     ctx = multiprocessing.get_context("spawn")
     output_queue, child_output_queue = ctx.Pipe(duplex=False)
     effective_log_path = log_path or cwd / f"{tag.replace('/', '_').replace(' ', '_')}.log"
@@ -411,6 +426,7 @@ def cleanup_launched_process(launched: LaunchedProcess, *, close_queue: bool = T
 
 
 def worker_log_path(destination_root: Path, copy_index: int) -> Path:
+    """Return the standard per-worker log path for one destination root."""
     log_root = destination_root / "_worker_logs"
     log_root.mkdir(parents=True, exist_ok=True)
     return log_root / f"{copy_index}.log"
@@ -443,6 +459,7 @@ def _process_exitcode(process: multiprocessing.Process) -> int:
 
 
 def wait_for_processes(processes: list[LaunchedProcess]) -> int:
+    """Wait for all launched workers and return a combined exit status."""
     overall = 0
     for launched in processes:
         _process_join(launched.process)
@@ -458,6 +475,7 @@ def wait_for_processes(processes: list[LaunchedProcess]) -> int:
 
 
 def terminate_processes(processes: list[LaunchedProcess]) -> None:
+    """Stop all active worker processes, escalating from terminate to kill."""
     for launched in processes:
         if _process_is_alive(launched.process):
             print(f"[{launched.tag}] stopping; log: {launched.log_path}", file=sys.stderr)
@@ -479,6 +497,7 @@ def terminate_processes(processes: list[LaunchedProcess]) -> None:
 
 
 def resolve_repo_path(path: str | Path) -> Path:
+    """Resolve a repository-relative path against ``REPO_ROOT``."""
     candidate = Path(path)
     if candidate.is_absolute():
         return candidate
@@ -486,6 +505,12 @@ def resolve_repo_path(path: str | Path) -> Path:
 
 
 def prepare_benchmark_workspace(benchmark_root: str | Path, tmp_dir: str | Path = "/tmp") -> BenchmarkWorkspace:
+    """Create an isolated temporary workspace for one benchmark subtree.
+
+    Benchmarks derive paths from their location in the repository, so runners
+    cannot simply point them at arbitrary build directories. This helper copies
+    the selected benchmark subtree and symlinks the rest of the repository.
+    """
     benchmark_source = resolve_repo_path(benchmark_root).resolve()
     if not benchmark_source.is_dir():
         raise ValueError(f"benchmark root does not exist: {benchmark_source}")
@@ -546,6 +571,7 @@ def prepare_benchmark_workspace(benchmark_root: str | Path, tmp_dir: str | Path 
 
 
 def benchmark_csv_from_config(value: object, label: str) -> str | None:
+    """Normalize a TOML benchmark selection value to the runner CSV format."""
     if value is None or value == "":
         return None
     if isinstance(value, str):
@@ -560,6 +586,7 @@ def benchmark_csv_from_config(value: object, label: str) -> str | None:
 
 
 def duration_to_seconds(value: str | int, location: str) -> int:
+    """Parse the short duration syntax used by campaign and runner CLIs."""
     if isinstance(value, bool):
         raise ValueError(f"{location} must be a positive duration")
     if isinstance(value, int):
@@ -596,18 +623,21 @@ def duration_to_seconds(value: str | int, location: str) -> int:
 
 
 def expect_table(value: object, location: str) -> dict[str, object]:
+    """Require a TOML table-like value and return it as a dictionary."""
     if not isinstance(value, dict):
         raise ValueError(f"{location} must be a TOML table")
     return value
 
 
 def expect_array(value: object, location: str) -> list[object]:
+    """Require a TOML array-like value and return it as a list."""
     if not isinstance(value, list):
         raise ValueError(f"{location} must be an array")
     return value
 
 
 def expect_string(table: dict[str, object], key: str, location: str) -> str:
+    """Read one required non-empty string field from a TOML table."""
     value = table.get(key)
     if not isinstance(value, str) or not value:
         raise ValueError(f"{location}.{key} must be a non-empty string")
@@ -615,6 +645,7 @@ def expect_string(table: dict[str, object], key: str, location: str) -> str:
 
 
 def optional_string(table: dict[str, object], key: str, location: str) -> str | None:
+    """Read one optional non-empty string field from a TOML table."""
     value = table.get(key)
     if value is None:
         return None
@@ -624,6 +655,7 @@ def optional_string(table: dict[str, object], key: str, location: str) -> str | 
 
 
 def optional_string_list(table: dict[str, object], key: str, location: str) -> tuple[str, ...]:
+    """Read one optional array of non-empty strings from a TOML table."""
     value = table.get(key)
     if value is None:
         return ()
@@ -631,6 +663,171 @@ def optional_string_list(table: dict[str, object], key: str, location: str) -> t
     if not all(isinstance(item, str) and item for item in values):
         raise ValueError(f"{location}.{key} must contain only non-empty strings")
     return tuple(values)
+
+
+@dataclass(frozen=True)
+class ExpandedBenchmarkCase:
+    """One generic benchmark case produced from targets, configs, and filters."""
+
+    variant_id: str
+    tool_id: str
+    target_id: str
+    config_id: str
+    public_mode: str
+    artifact_suffix: str
+    target_location: str
+    config_location: str
+    target_table: dict[str, object]
+    config_table: dict[str, object]
+    path_templates: dict[str, object]
+
+    @property
+    def target_suffix(self) -> str:
+        return f"_{self.target_id}" if self.target_id else ""
+
+
+def matches_case_exclusion(
+    exclusion_table: dict[str, object],
+    *,
+    variant_id: str,
+    target_id: str,
+    config_id: str,
+    tool_id: str,
+    location: str,
+) -> bool:
+    """Return whether one exclusion entry suppresses a candidate case."""
+    exclusion_variant = optional_string(exclusion_table, "variant", location)
+    exclusion_target = optional_string(exclusion_table, "target", location)
+    exclusion_config = optional_string(exclusion_table, "config", location)
+    exclusion_tool = optional_string(exclusion_table, "tool", location)
+    if all(value is None for value in (exclusion_variant, exclusion_target, exclusion_config, exclusion_tool)):
+        raise ValueError(f"{location} must constrain at least one of variant/target/config/tool")
+    if exclusion_variant not in (None, variant_id):
+        return False
+    if exclusion_target not in (None, target_id):
+        return False
+    if exclusion_config not in (None, config_id):
+        return False
+    if exclusion_tool not in (None, tool_id):
+        return False
+    return True
+
+
+def expand_benchmark_cases(benchmark_definition, tool_id: str) -> list[ExpandedBenchmarkCase]:
+    """Expand the shared benchmark matrix into tool-filtered case candidates.
+
+    This centralizes the repeated ``targets x configs x tools x exclusions``
+    expansion logic so new runners only need to map an expanded case into their
+    own tool-specific inputs and outputs.
+    """
+    if "configs" not in benchmark_definition.extra_config:
+        return []
+
+    location = benchmark_definition.config_location
+    variant_id = benchmark_definition.variant_id
+    raw_target_entries = benchmark_definition.extra_config.get("targets")
+    configs = expect_array(benchmark_definition.extra_config.get("configs"), f"{location}.configs")
+    exclusions = expect_array(benchmark_definition.extra_config.get("exclusions") or [], f"{location}.exclusions")
+    path_templates = expect_table(
+        benchmark_definition.extra_config.get("path_templates") or {},
+        f"{location}.path_templates",
+    )
+
+    parsed_targets: list[tuple[str, str, set[str], str, dict[str, object]]] = []
+    if raw_target_entries is None:
+        parsed_targets.append(
+            (
+                "",
+                "",
+                set(benchmark_definition.tools),
+                f"{location}.targets[default]",
+                {},
+            )
+        )
+    else:
+        for target_index, raw_target in enumerate(expect_array(raw_target_entries, f"{location}.targets")):
+            target_location = f"{location}.targets[{target_index}]"
+            target_table = expect_table(raw_target, target_location)
+            target_id = expect_string(target_table, "target", target_location)
+            parsed_targets.append(
+                (
+                    target_id,
+                    optional_string(target_table, "artifact_suffix", target_location) or target_id,
+                    set(optional_string_list(target_table, "tools", target_location) or benchmark_definition.tools),
+                    target_location,
+                    target_table,
+                )
+            )
+
+    cases: list[ExpandedBenchmarkCase] = []
+    benchmark_tools = set(benchmark_definition.tools)
+    for target_id, artifact_suffix, target_tools, target_location, target_table in parsed_targets:
+        for config_index, raw_config in enumerate(configs):
+            config_location = f"{location}.configs[{config_index}]"
+            config_table = expect_table(raw_config, config_location)
+            config_id = expect_string(config_table, "config", config_location)
+            config_tools = set(optional_string_list(config_table, "tools", config_location) or benchmark_definition.tools)
+            case_tools = target_tools & config_tools & benchmark_tools
+            if tool_id not in case_tools:
+                continue
+            if any(
+                matches_case_exclusion(
+                    expect_table(raw_exclusion, f"{location}.exclusions[{index}]"),
+                    variant_id=variant_id,
+                    target_id=target_id,
+                    config_id=config_id,
+                    tool_id=tool_id,
+                    location=f"{location}.exclusions[{index}]",
+                )
+                for index, raw_exclusion in enumerate(exclusions)
+            ):
+                continue
+            cases.append(
+                ExpandedBenchmarkCase(
+                    variant_id=variant_id,
+                    tool_id=tool_id,
+                    target_id=target_id,
+                    config_id=config_id,
+                    public_mode=expect_string(config_table, "public_mode", config_location),
+                    artifact_suffix=artifact_suffix,
+                    target_location=target_location,
+                    config_location=config_location,
+                    target_table=target_table,
+                    config_table=config_table,
+                    path_templates=path_templates,
+                )
+            )
+    return cases
+
+
+def resolve_case_template(
+    benchmark_definition,
+    expanded_case: ExpandedBenchmarkCase,
+    template_key: str,
+    default_value: str,
+    *,
+    code_path: str | None = None,
+    config_id: str | None = None,
+    public_mode: str | None = None,
+) -> str:
+    """Resolve one benchmark path template for an expanded case."""
+    raw_template = optional_string(
+        expanded_case.path_templates,
+        template_key,
+        f"{benchmark_definition.config_location}.path_templates",
+    )
+    if not raw_template:
+        return default_value
+    return raw_template.format(
+        code_path=code_path or benchmark_definition.code_path,
+        selector=f"{benchmark_definition.library_id}:{benchmark_definition.variant_id}",
+        library=benchmark_definition.library_id,
+        variant=expanded_case.variant_id,
+        target=expanded_case.target_id,
+        config=config_id or expanded_case.config_id,
+        public_mode=public_mode or expanded_case.public_mode,
+        artifact_suffix=expanded_case.artifact_suffix,
+    )
 
 
 @dataclass

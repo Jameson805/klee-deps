@@ -48,11 +48,14 @@ from tools.shared.configuration_metadata import (
     derive_run_configuration,
     write_run_metadata,
 )
-from tools.shared.experiment_registry import available_campaign_tools, selected_benchmarks
+from tools.shared.campaign_tools import available_campaign_tools
+from tools.shared.experiment_registry import format_benchmark_selector, selected_benchmarks
 
 
 @dataclass(frozen=True)
 class RunDefinition:
+    """One configured campaign run before worker expansion."""
+
     run_key: str
     tag: str
     tool_name: str
@@ -61,10 +64,12 @@ class RunDefinition:
 
 
 def default_best_selection_csv(aggregate_output_base: str) -> Path:
+    """Return the default location of the generated best-selection CSV."""
     return Path(f"{aggregate_output_base}_best_selection.csv")
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint for the main multi-tool campaign orchestrator."""
     parser = argparse.ArgumentParser(description="Run the main experiment campaign.")
     parser.add_argument("config", help="Path to campaign TOML config")
     parser.add_argument("--postprocess-only", action="store_true", help="Run only merge and postprocess steps")
@@ -189,7 +194,14 @@ def main(argv: list[str] | None = None) -> int:
             normalized = selected_benchmarks(tool_name, benchmark_csv)
         except ValueError as error:
             raise SystemExit(str(error)) from error
-        benchmark_csv_by_tool[tool_name] = None if benchmark_csv is None else ",".join(normalized)
+        benchmark_csv_by_tool[tool_name] = (
+            None
+            if benchmark_csv is None
+            else ",".join(
+                format_benchmark_selector(library_id, variant_id)
+                for library_id, variant_id in normalized
+            )
+        )
 
     run_definitions: list[RunDefinition] = []
     for run_key, raw_definition in run_definitions_section.items():
