@@ -99,6 +99,7 @@ def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, objec
                 expanded_case.target_id,
                 expanded_case.config_id,
             ),
+            "config_id": expanded_case.config_id,
             "bitcode": resolve_case_template(
                 benchmark_definition,
                 expanded_case,
@@ -136,6 +137,24 @@ def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, objec
             case["mod_exp_extra_args"] = list(mod_exp_extra_args)
         cases.append(case)
     return cases
+
+
+def _filter_klee_cases(
+    case_entries: list[dict[str, object]],
+    config_filter: str | None,
+    case_list_location: str,
+) -> list[dict[str, object]]:
+    """Optionally restrict KLEE cases to one explicit benchmark config id."""
+    if not config_filter:
+        return case_entries
+
+    filtered_cases: list[dict[str, object]] = []
+    for index, raw_case in enumerate(case_entries):
+        case_location = f"{case_list_location}[{index}]"
+        case_table = expect_table(raw_case, case_location)
+        if expect_string(case_table, "config_id", case_location) == config_filter:
+            filtered_cases.append(case_table)
+    return filtered_cases
 
 
 def _load_klee_preprocess_steps(benchmark_definition, tool_id: str) -> list[dict[str, object]]:
@@ -191,6 +210,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--max-solver-time", default="30s")
     parser.add_argument("--kill-after", default="1800s")
     parser.add_argument("--max-memory", type=int, default=10000)
+    parser.add_argument("--config", help="Run only KLEE cases whose config id matches this value")
     parser.add_argument("--mod-exp-only", action="store_true")
     parser.add_argument("--search", default="random-path,nurs:covnew")
     if mode == "klee_cf":
@@ -256,6 +276,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         context.log(f"max_solver_time={args.max_solver_time}")
         context.log(f"kill_after={args.kill_after}")
         context.log(f"max_memory={args.max_memory}")
+        context.log(f"config={args.config or '<all>'}")
         context.log(f"mod_exp_only={'true' if args.mod_exp_only else 'false'}")
         context.log(f"search_strategies={args.search}")
         if mode == "klee_cf":
@@ -290,7 +311,11 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         try:
             for library_id, variant_id in benchmarks:
                 benchmark_definition = definition(library_id, variant_id)
-                case_entries = _load_klee_cases(benchmark_definition, mode)
+                case_entries = _filter_klee_cases(
+                    _load_klee_cases(benchmark_definition, mode),
+                    args.config,
+                    f"{benchmark_definition.config_location}.klee_cases",
+                )
                 if not case_entries:
                     continue
                 if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
@@ -394,10 +419,18 @@ def run_benchmark(
                         cwd=workspace.root,
                     )
 
-            case_entries = _load_klee_cases(benchmark_definition, mode)
+            case_entries = _filter_klee_cases(
+                _load_klee_cases(benchmark_definition, mode),
+                args.config,
+                f"{benchmark_definition.config_location}.klee_cases",
+            )
             if not case_entries:
                 if case_index is None:
                     return
+                if args.config:
+                    raise SystemExit(
+                        f"benchmark {selector_text!r} does not define KLEE cases for config {args.config!r}"
+                    )
                 raise SystemExit(f"benchmark {selector_text!r} does not define KLEE cases")
             if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
                 raise ValueError(f"{benchmark_definition.config_location}.klee_cases requires a KLEE tool in tools")
