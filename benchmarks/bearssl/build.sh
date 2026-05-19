@@ -18,13 +18,12 @@ resolve_runner_config_path() {
 
 usage() {
     cat <<EOF
-Usage: $0 (--klee | --self-comp | --binsec | --abacus) [--preset NAME]
+Usage: $0 (--klee | --binsec | --abacus) [--preset NAME]
 
 Builds the BearSSL aes_big/des_tab benchmark wrappers for the requested mode.
 
 Modes:
     --klee        Build KLEE executables and bitcode
-  --self-comp   Build self-comp bitcode artifacts
   --binsec      Build BINSEC executables (32-bit)
   --abacus      Build Abacus executables (32-bit)
 
@@ -47,10 +46,6 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --klee)
             MODE="klee"
-            shift
-            ;;
-        --self-comp)
-            MODE="self_comp"
             shift
             ;;
         --binsec)
@@ -192,14 +187,6 @@ generate_runner_artifacts_for_id() {
     python "$repo_root/tools/generate_runner_artifacts.py" "${generator_args[@]}"
 }
 
-record_branch() {
-    local pass_path="../../branch-recorder/build/libBranchRecorder.so"
-    opt -load "$pass_path" \
-        -load-pass-plugin="$pass_path" \
-        -passes=branch-recorder \
-        "$1" -o "$1"
-}
-
 build_klee_mode() {
     local id="$1"
     local generated_dir
@@ -220,33 +207,6 @@ build_klee_mode() {
 
     wllvm "${flags[@]}" "${klee_flags[@]}" -DKLEE_CF -DCONCRETE_PUBS "${sources[@]}" -o "$fix_exe"
     extract-bc "$fix_exe"
-
-    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY "${sources[@]}" -o "$var_replay"
-    clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS "${sources[@]}" -o "$fix_replay"
-}
-
-build_self_comp_mode() {
-    local id="$1"
-    local generated_dir
-    local flags
-
-    generate_runner_artifacts_for_id "$id"
-    mapfile -t sources < <(bench_sources_for_id "$id")
-    generated_dir="$(bench_generated_dir_for_id "$id")"
-    flags=("${common_flags[@]}" -I "$generated_dir")
-
-    local var_exe="self_comp_var_pub_${id}"
-    local fix_exe="self_comp_fix_pub_${id}"
-    local var_replay="klee_var_pub_replay_${id}"
-    local fix_replay="klee_fix_pub_replay_${id}"
-
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP "${sources[@]}" -o "$var_exe"
-    extract-bc "$var_exe"
-    record_branch "$var_exe.bc"
-
-    wllvm "${flags[@]}" "${klee_flags[@]}" -DSELF_COMP -DCONCRETE_PUBS "${sources[@]}" -o "$fix_exe"
-    extract-bc "$fix_exe"
-    record_branch "$fix_exe.bc"
 
     clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY "${sources[@]}" -o "$var_replay"
     clang "${flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS "${sources[@]}" -o "$fix_replay"
@@ -291,9 +251,6 @@ for id in "${bench_ids[@]}"; do
     case "$MODE" in
         klee)
             build_klee_mode "$id"
-            ;;
-        self_comp)
-            build_self_comp_mode "$id"
             ;;
         binsec)
             build_binsec_mode "$id"

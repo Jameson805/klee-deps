@@ -23,19 +23,11 @@ int driver_main(void)
     ret = mbedtls_mpi_read_binary(&mod,  mod_buf,  len);
     if (ret != 0) { fprintf(stderr, "ERROR: mbedtls_mpi_read_binary(mod) failed: %d\n", ret); goto fail; }
 
-    #ifdef SELF_COMP
-        branchRecordingEnabled = 1;
-    #endif
-
     #ifdef USE_SLICED
         mbedtls_mpi_exp_mod_slice_1(&result, &base, &exp, &mod);
         ret = 0;
     #else
         ret = mbedtls_mpi_exp_mod(&result, &base, &exp, &mod, NULL);
-    #endif
-
-    #ifdef SELF_COMP
-        branchRecordingEnabled = 0;
     #endif
 
     if (ret != 0) {
@@ -50,10 +42,6 @@ int driver_main(void)
     return 0;
 
 fail:
-    #ifdef SELF_COMP
-        branchRecordingEnabled = 0;
-    #endif
-
     mbedtls_mpi_free(&result);
     mbedtls_mpi_free(&mod);
     mbedtls_mpi_free(&exp);

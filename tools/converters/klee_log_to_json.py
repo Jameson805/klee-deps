@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+"""Convert KLEE output directories into the shared combined JSON schema.
+
+This converter is shared by the KLEE-family runners. It reads aggregated
+``messages.txt`` records, keeps only positive findings, and optionally attaches
+counterexamples extracted from KTest files. The converter also accepts the
+per-finding ``non_ct`` records emitted by ``klee_self_comp`` so the shared
+runner can keep one JSON normalization path across the KLEE variants.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -76,6 +85,7 @@ def _to_float(value: object) -> float | None:
 
 
 def load_preaggregated_from_messages(messages_path: str, tag: str) -> list[dict[str, object]]:
+    """Read KLEE messages.txt entries for one finding kind and merge repeats."""
     rows_by_inst_id: dict[int, dict[str, object]] = {}
     with open(messages_path, "r", encoding="utf-8", errors="replace") as handle:
         for line in handle:
@@ -102,6 +112,15 @@ def load_preaggregated_from_messages(messages_path: str, tag: str) -> list[dict[
                 "visit_time": _to_float(payload.get("visit_time")),
                 "non_ct_time": _to_float(payload.get("non_ct_time")),
             }
+
+            # klee-self-comp emits one JSON record per finding with `non_ct: true`
+            # but does not currently populate the aggregated non_ct_count fields
+            # expected by the original control-flow converter.
+            if row["non_ct_count"] is None and payload.get("non_ct") is True:
+                row["non_ct_count"] = 1
+                if row["non_ct_time"] is None:
+                    row["non_ct_time"] = _to_float(payload.get("time"))
+
             existing_row = rows_by_inst_id.get(inst_id)
             if existing_row is None:
                 rows_by_inst_id[inst_id] = row
@@ -229,6 +248,7 @@ def convert_klee_output(
     public: str = "",
     library: str,
 ) -> dict[str, object]:
+    """Normalize one KLEE output directory into the repository's shared JSON."""
     kind = normalize_result_kind(kind)
 
     messages_path = os.path.join(klee_output, "messages.txt")

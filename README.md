@@ -39,7 +39,7 @@ The main tool families currently wired into the repository are:
 
 - `klee_cf`
 - `klee_eager`
-- `self_comp`
+- `klee_self_comp`
 - `binsec`
 - `abacus`
 
@@ -65,7 +65,7 @@ Useful entrypoints:
 
 - `python -m scripts.experiments.run_klee_cf ...`: run the control-flow KLEE variant
 - `python -m scripts.experiments.run_klee_eager ...`: run the eager KLEE variant
-- `python -m scripts.experiments.run_self_comp ...`: run the self-composition baseline
+- `python -m scripts.experiments.run_klee_self_comp ...`: run the KLEE self-composition mode
 - `python -m scripts.experiments.run_binsec ...`: run Binsec and convert its output
 - `python -m scripts.experiments.run_abacus ...`: run ABACUS and convert its output
 - `python -m scripts.experiments.run_experiments ...`: run the multi-tool campaign and postprocess it
@@ -105,16 +105,11 @@ Minimal shape:
 library = "example"
 code_path = "benchmarks/example"
 path_prefixes = ["benchmarks/example/"]
-tools = ["klee_cf", "klee_eager", "self_comp", "binsec"]
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 
 [benchmarks.builds.klee]
 script = "benchmarks/example/build.sh"
 tool_flag = "--klee"
-preset = "default"
-
-[benchmarks.builds.self_comp]
-script = "benchmarks/example/build.sh"
-tool_flag = "--self-comp"
 preset = "default"
 
 [benchmarks.builds.binsec]
@@ -125,6 +120,7 @@ preset = "default"
 [benchmarks.build_aliases]
 klee_cf = "klee"
 klee_eager = "klee"
+klee_self_comp = "klee"
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/example_runner.toml"
@@ -204,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     ...
 ```
 
-If the tool is just a thin mode wrapper, follow the `run_klee_cf.py` or `run_klee_eager.py` pattern. If it has its own execution flow, follow `run_binsec.py`, `run_self_comp.py`, or `run_abacus.py`.
+If the tool is just a thin mode wrapper, follow the `run_klee_cf.py`, `run_klee_eager.py`, or `run_klee_self_comp.py` pattern. If it has its own execution flow, follow `run_binsec.py` or `run_abacus.py`.
 
 ### 3. Reuse shared benchmark expansion when possible
 

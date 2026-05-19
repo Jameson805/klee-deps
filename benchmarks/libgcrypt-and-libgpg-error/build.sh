@@ -22,13 +22,12 @@ resolve_runner_config_path() {
 }
 
 usage() {
-    echo "Usage: $0 [--skip-deps] [--sliced] (--klee | --binsec | --abacus | --self-comp) --preset NAME"
+    echo "Usage: $0 [--skip-deps] [--sliced] (--klee | --binsec | --abacus) --preset NAME"
     echo "  --skip-deps    Skip building libgpg-error and libgcrypt"
     echo "  --sliced       Build libgcrypt-1.10.1-sliced instead of libgcrypt-1.10.1"
     echo "  --klee         Build KLEE bitcode and Replay binaries"
     echo "  --binsec       Build BINSEC binaries"
     echo "  --abacus       Build Abacus binaries"
-    echo "  --self-comp    Build self-composition KLEE bitcode"
     echo "  --preset NAME  Select the preset to materialize into generated runner artifacts"
 }
 
@@ -55,16 +54,15 @@ while [[ $# -gt 0 ]]; do
             SLICED=1
             shift
             ;;
-        --klee|--binsec|--abacus|--self-comp)
+        --klee|--binsec|--abacus)
             if [[ -n "$MODE" ]]; then
-                echo "Multiple build modes specified. Choose exactly one of --klee, --binsec, --abacus, --self-comp."
+                echo "Multiple build modes specified. Choose exactly one of --klee, --binsec, or --abacus."
                 exit 1
             fi
             case "$1" in
                 --klee)      MODE="klee"      ;;
                 --binsec)    MODE="binsec"    ;;
                 --abacus)    MODE="abacus"    ;;
-                --self-comp) MODE="self_comp" ;;
             esac
             shift
             ;;
@@ -93,7 +91,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$MODE" ]]; then
-    echo "Missing required build mode. Choose exactly one of --klee, --binsec, --abacus, --self-comp."
+    echo "Missing required build mode. Choose exactly one of --klee, --binsec, or --abacus."
     usage
     exit 1
 fi
@@ -142,7 +140,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     CC=clang
     if [[ "$MODE" == "abacus" ]]; then
         CC=gcc
-    elif [[ "$MODE" == "klee" || "$MODE" == "self_comp" ]]; then
+    elif [[ "$MODE" == "klee" ]]; then
         export LLVM_COMPILER=clang
         CC=wllvm
     fi
@@ -238,20 +236,3 @@ if [[ "$MODE" == "abacus" ]]; then
     # clang "${flags[@]}" -m32 -DUSE_SLICED -DABACUS klee_main.c powm_sliced.c "${libs[@]}" -o abacus_fix_pub_modexp_sliced
 fi
 
-record_branch() {
-    pass_path="../../branch-recorder/build/libBranchRecorder.so"
-    opt -load "${pass_path}" \
-        -load-pass-plugin="${pass_path}" \
-        -passes=branch-recorder \
-        "$1" -o "$1"
-}
-
-if [[ "$MODE" == "self_comp" ]]; then
-    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP klee_main.c "${libs[@]}" -o self_comp_var_pub_modexp
-    extract-bc self_comp_var_pub_modexp
-    record_branch self_comp_var_pub_modexp.bc
-
-    wllvm "${flags[@]}" "${klee_flags[@]}" "${NOIND_EXE_FLAGS[@]}" -DSELF_COMP -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o self_comp_fix_pub_modexp
-    extract-bc self_comp_fix_pub_modexp
-    record_branch self_comp_fix_pub_modexp.bc
-fi

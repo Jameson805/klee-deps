@@ -45,10 +45,6 @@ int driver_main(void)
         goto fail;
     }
 
-    #ifdef SELF_COMP
-        branchRecordingEnabled = 1;
-    #endif
-
     #if defined(RECP)
         if (!BN_mod_exp_recp(result, base, exp, mod, ctx)) {
             fprintf(stderr, "ERROR: BN_mod_exp_recp failed\n");
@@ -74,10 +70,6 @@ int driver_main(void)
         }
     #endif
 
-    #ifdef SELF_COMP
-        branchRecordingEnabled = 0;
-    #endif
-
     BN_free(result);
     BN_free(mod);
     BN_free(exp);
@@ -86,10 +78,6 @@ int driver_main(void)
     return 0;
 
 fail:
-    #ifdef SELF_COMP
-        branchRecordingEnabled = 0;
-    #endif
-
     if (result)  BN_free(result);
     if (mod) BN_free(mod);
     if (exp)BN_free(exp);

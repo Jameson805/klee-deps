@@ -42,18 +42,10 @@ int driver_main(void)
         fprintf(stderr, "gcry_mpi_new(result) failed: out of memory\n"); goto fail;
     }
 
-    #ifdef SELF_COMP
-        branchRecordingEnabled = 1;
-    #endif
-
     #ifdef USE_SLICED
         _gcry_mpi_powm_slice_1(result, base, exp, mod); /* no error code */
     #else
         gcry_mpi_powm(result, base, exp, mod);          /* no error code */
-    #endif
-
-    #ifdef SELF_COMP
-        branchRecordingEnabled = 0;
     #endif
 
     gcry_mpi_release(result);
@@ -63,10 +55,6 @@ int driver_main(void)
     return 0;
 
 fail:
-    #ifdef SELF_COMP
-        branchRecordingEnabled = 0;
-    #endif
-
     if (result) gcry_mpi_release(result);
     if (base)   gcry_mpi_release(base);
     if (exp)    gcry_mpi_release(exp);

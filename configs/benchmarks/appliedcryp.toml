@@ -2,16 +2,11 @@
 library = "appliedcryp"
 code_path = "benchmarks/appliedCryp"
 path_prefixes = ["benchmarks/appliedCryp/"]
-tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
 [benchmarks.builds.abacus]
 script = "benchmarks/appliedCryp/build.sh"
 tool_flag = "--abacus"
-preset = "default"
-
-[benchmarks.builds.self_comp]
-script = "benchmarks/appliedCryp/build.sh"
-tool_flag = "--self-comp"
 preset = "default"
 
 [benchmarks.builds.binsec]
@@ -27,6 +22,7 @@ preset = "default"
 [benchmarks.build_aliases]
 klee_cf = "klee"
 klee_eager = "klee"
+klee_self_comp = "klee"
 
 [benchmarks.runner_profiles.3way]
 config = "configs/runner/appliedcryp_3way_runner_config.toml"
@@ -42,8 +38,6 @@ preset = "default"
 
 [benchmarks.path_templates]
 abacus_executable = "{code_path}/abacus_{public_mode}_{artifact_suffix}"
-self_comp_bitcode = "{code_path}/self_comp_{public_mode}_{artifact_suffix}.bc"
-self_comp_replay_executable = "klee_{public_mode}_replay_{artifact_suffix}"
 binsec_sse_script = "{code_path}/generated/{artifact_suffix}/binsec_{public_mode}.cfg"
 binsec_executable = "{code_path}/binsec_{public_mode}_{artifact_suffix}"
 klee_bitcode = "{code_path}/klee_{public_mode}_{artifact_suffix}.bc"
@@ -82,4 +76,4 @@ public_mode = "fix_pub"
 [[benchmarks.configs]]
 config = "var_pub"
 public_mode = "var_pub"
-tools = ["klee_cf", "klee_eager", "self_comp", "binsec"]
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]

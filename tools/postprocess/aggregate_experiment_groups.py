@@ -36,7 +36,7 @@ from tools.shared.configuration_metadata import load_column_metadata_bundle
 
 
 METADATA_COLS = ["library", "file", "line", "column", "kind"]
-MULTI_TOKEN_TOOL_PREFIXES = ["klee_cf", "klee_eager", "self_comp"]
+MULTI_TOKEN_TOOL_PREFIXES = ["klee_cf", "klee_eager", "klee_self_comp"]
 LINESTYLES = ("-", ":", "--")
 CURVE_ID_LABEL_PLOT_EXTENSION = 1.14
 CURVE_ID_LABEL_X_OFFSET_POINTS = 30.0

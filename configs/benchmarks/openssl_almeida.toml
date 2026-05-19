@@ -2,16 +2,11 @@
 library = "openssl_almeida"
 code_path = "benchmarks/openssl_almeida"
 path_prefixes = ["benchmarks/openssl_almeida/"]
-tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
 [benchmarks.builds.abacus]
 script = "benchmarks/openssl_almeida/build.sh"
 tool_flag = "--abacus"
-preset = "default"
-
-[benchmarks.builds.self_comp]
-script = "benchmarks/openssl_almeida/build.sh"
-tool_flag = "--self-comp"
 preset = "default"
 
 [benchmarks.builds.binsec]
@@ -27,6 +22,7 @@ preset = "default"
 [benchmarks.build_aliases]
 klee_cf = "klee"
 klee_eager = "klee"
+klee_self_comp = "klee"
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml"
@@ -49,7 +45,7 @@ runner_profile = "default"
 [[benchmarks.configs]]
 config = "var_pub"
 public_mode = "var_pub"
-tools = ["klee_cf", "klee_eager", "self_comp", "binsec"]
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 public_layout = "options:4,s3_flags:4,flags:4,slicing_cheat:4,block_size:4,mac_size:4"
 public_inputs = [

@@ -309,9 +309,6 @@ def _render_header(resolved: dict[str, object]) -> list[str]:
         size_value = input_specs[input_id]["size"]
         size_expr = str(size_value) if isinstance(size_value, int) else size_value
         lines.append(f"unsigned char {input_id}[{size_expr}];")
-        if input_specs[input_id]["kind"] == "secret":
-            lines.append(f"unsigned char runner_secret_1_{input_id}[{size_expr}];")
-            lines.append(f"unsigned char runner_secret_2_{input_id}[{size_expr}];")
     lines.append("")
 
     lines.append("#include \"runner.h\"")
@@ -357,7 +354,7 @@ def _render_header(resolved: dict[str, object]) -> list[str]:
     lines.append("}")
     lines.append("")
 
-    lines.append("#if defined(KLEE_CF) || defined(SELF_COMP)")
+    lines.append("#if defined(KLEE_CF)")
     lines.append("void runner_apply_klee_assumptions(void) {")
     for input_id in input_order:
         size_value = input_specs[input_id]["size"]
@@ -382,70 +379,6 @@ def _render_header(resolved: dict[str, object]) -> list[str]:
     for input_id in input_order:
         if input_specs[input_id]["kind"] == "public":
             lines.append(f'    klee_make_symbolic_sc({input_id}, sizeof({input_id}), "{input_specs[input_id]["name"]}", 0);')
-    lines.append("}")
-    lines.append("#endif")
-    lines.append("")
-
-    lines.append("#ifdef SELF_COMP")
-    lines.append("void runner_make_selfcomp_secret_variants(void) {")
-    for input_id in input_order:
-        if input_specs[input_id]["kind"] == "secret":
-            lines.append(f'    klee_make_symbolic(runner_secret_1_{input_id}, sizeof(runner_secret_1_{input_id}), "{input_specs[input_id]["name"]}_1");')
-            lines.append(f'    klee_make_symbolic(runner_secret_2_{input_id}, sizeof(runner_secret_2_{input_id}), "{input_specs[input_id]["name"]}_2");')
-    lines.append("}")
-    lines.append("")
-    lines.append("void runner_copy_secret_input_variant_1(void) {")
-    for input_id in input_order:
-        if input_specs[input_id]["kind"] == "secret":
-            lines.append(f"    runner_copy_bytes({input_id}, runner_secret_1_{input_id}, sizeof({input_id}));")
-    lines.append("}")
-    lines.append("")
-    lines.append("void runner_copy_secret_input_variant_2(void) {")
-    for input_id in input_order:
-        if input_specs[input_id]["kind"] == "secret":
-            lines.append(f"    runner_copy_bytes({input_id}, runner_secret_2_{input_id}, sizeof({input_id}));")
-    lines.append("}")
-    lines.append("")
-    lines.append("void runner_make_selfcomp_public_inputs(void) {")
-    for input_id in input_order:
-        if input_specs[input_id]["kind"] == "public":
-            lines.append(f'    klee_make_symbolic({input_id}, sizeof({input_id}), "{input_specs[input_id]["name"]}");')
-    lines.append("}")
-    lines.append("")
-    lines.append("void runner_dump_counterexample(FILE *stream, int include_public_inputs) {")
-    lines.append("    const char runner_hex[] = \"0123456789abcdef\";")
-    for input_id in input_order:
-        if input_specs[input_id]["kind"] == "secret":
-            input_name = input_specs[input_id]["name"]
-            lines.append(f"    char {input_id}_1_hex[sizeof(runner_secret_1_{input_id}) * 2 + 3];")
-            lines.append(f"    char {input_id}_2_hex[sizeof(runner_secret_2_{input_id}) * 2 + 3];")
-            for variant in (1, 2):
-                buffer_name = f"runner_secret_{variant}_{input_id}"
-                hex_name = f"{input_id}_{variant}_hex"
-                lines.append(f"    {hex_name}[0] = '0';")
-                lines.append(f"    {hex_name}[1] = 'x';")
-                lines.append(f"    for (size_t i = 0; i < sizeof({buffer_name}); ++i) {{")
-                lines.append(f"        unsigned char value = (unsigned char)klee_get_value_i32((unsigned){buffer_name}[i]);")
-                lines.append(f"        {hex_name}[2 + i * 2] = runner_hex[(value >> 4) & 0x0F];")
-                lines.append(f"        {hex_name}[2 + i * 2 + 1] = runner_hex[value & 0x0F];")
-                lines.append("    }")
-                lines.append(f"    {hex_name}[sizeof({buffer_name}) * 2 + 2] = '\\0';")
-            lines.append(f'    fprintf(stream, " {input_name}_1=%s {input_name}_2=%s", {input_id}_1_hex, {input_id}_2_hex);')
-    lines.append("    if (include_public_inputs) {")
-    for input_id in input_order:
-        if input_specs[input_id]["kind"] == "public":
-            input_name = input_specs[input_id]["name"]
-            lines.append(f"        char {input_id}_hex[sizeof({input_id}) * 2 + 3];")
-            lines.append(f"        {input_id}_hex[0] = '0';")
-            lines.append(f"        {input_id}_hex[1] = 'x';")
-            lines.append(f"        for (size_t i = 0; i < sizeof({input_id}); ++i) {{")
-            lines.append(f"            unsigned char value = (unsigned char)klee_get_value_i32((unsigned){input_id}[i]);")
-            lines.append(f"            {input_id}_hex[2 + i * 2] = runner_hex[(value >> 4) & 0x0F];")
-            lines.append(f"            {input_id}_hex[2 + i * 2 + 1] = runner_hex[value & 0x0F];")
-            lines.append("        }")
-            lines.append(f"        {input_id}_hex[sizeof({input_id}) * 2 + 2] = '\\0';")
-            lines.append(f'        fprintf(stream, " {input_name}=%s", {input_id}_hex);')
-    lines.append("    }")
     lines.append("}")
     lines.append("#endif")
     lines.append("")

@@ -31,12 +31,12 @@ klee_eager_dfs_4 = true
 klee_eager_dfs_16 = true
 klee_eager_rand_path_dfs_4 = true
 klee_eager_rand_path_dfs_16 = true
-self_comp_default_4 = true
-self_comp_default_16 = true
-self_comp_dfs_4 = true
-self_comp_dfs_16 = true
-self_comp_rand_path_dfs_4 = true
-self_comp_rand_path_dfs_16 = true
+klee_self_comp_default_4 = true
+klee_self_comp_default_16 = true
+klee_self_comp_dfs_4 = true
+klee_self_comp_dfs_16 = true
+klee_self_comp_rand_path_dfs_4 = true
+klee_self_comp_rand_path_dfs_16 = true
 binsec_4 = true
 binsec_16 = true
 
@@ -118,41 +118,41 @@ tool = "klee_eager"
 destination = "klee_eager_rand_path_dfs_16"
 args = ["{run_time}", "--sym-size", "16", "--search", "random-path,dfs", "--pin-root", "{pin_root}"]
 
-[run_definitions.self_comp_default_4]
-tag = "Self Comp Default 4"
-tool = "self_comp"
-destination = "self_comp_default_4"
-args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
+[run_definitions.klee_self_comp_default_4]
+tag = "KLEE Self-Comp Default 4"
+tool = "klee_self_comp"
+destination = "klee_self_comp_default_4"
+args = ["{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
 
-[run_definitions.self_comp_default_16]
-tag = "Self Comp Default 16"
-tool = "self_comp"
-destination = "self_comp_default_16"
-args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
+[run_definitions.klee_self_comp_default_16]
+tag = "KLEE Self-Comp Default 16"
+tool = "klee_self_comp"
+destination = "klee_self_comp_default_16"
+args = ["{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
 
-[run_definitions.self_comp_dfs_4]
-tag = "Self Comp DFS 4"
-tool = "self_comp"
-destination = "self_comp_dfs_4"
-args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
+[run_definitions.klee_self_comp_dfs_4]
+tag = "KLEE Self-Comp DFS 4"
+tool = "klee_self_comp"
+destination = "klee_self_comp_dfs_4"
+args = ["{run_time}", "--search", "dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
 
-[run_definitions.self_comp_dfs_16]
-tag = "Self Comp DFS 16"
-tool = "self_comp"
-destination = "self_comp_dfs_16"
-args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
+[run_definitions.klee_self_comp_dfs_16]
+tag = "KLEE Self-Comp DFS 16"
+tool = "klee_self_comp"
+destination = "klee_self_comp_dfs_16"
+args = ["{run_time}", "--search", "dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
 
-[run_definitions.self_comp_rand_path_dfs_4]
-tag = "Self Comp Rand Path DFS 4"
-tool = "self_comp"
-destination = "self_comp_rand_path_dfs_4"
-args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "random-path,dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
+[run_definitions.klee_self_comp_rand_path_dfs_4]
+tag = "KLEE Self-Comp Rand Path DFS 4"
+tool = "klee_self_comp"
+destination = "klee_self_comp_rand_path_dfs_4"
+args = ["{run_time}", "--search", "random-path,dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
 
-[run_definitions.self_comp_rand_path_dfs_16]
-tag = "Self Comp Rand Path DFS 16"
-tool = "self_comp"
-destination = "self_comp_rand_path_dfs_16"
-args = ["--klee-root", "{klee_root}", "--max-time", "{run_time}", "--search", "random-path,dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
+[run_definitions.klee_self_comp_rand_path_dfs_16]
+tag = "KLEE Self-Comp Rand Path DFS 16"
+tool = "klee_self_comp"
+destination = "klee_self_comp_rand_path_dfs_16"
+args = ["{run_time}", "--search", "random-path,dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
 
 [run_definitions.binsec_4]
 tag = "Binsec 4"

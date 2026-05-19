@@ -1,14 +1,16 @@
-"""Shared implementation for the KLEE-CF and KLEE-Eager runners.
+"""Shared implementation for the KLEE-family runners.
 
-The two modes differ mostly in binary path and a handful of flags, so they
-share one runner that builds benchmark-local artifacts, applies optional loop
-preprocessing, converts KLEE output into the shared JSON schema, and replays
-positives with the benchmark's replay executable.
+KLEE-CF, KLEE-Eager, and KLEE-Self-Comp all execute benchmark-local bitcode,
+apply the same optional preprocessing, convert KLEE output into the shared JSON
+schema, and replay positives with the benchmark's replay executable. The mode
+profile below keeps the per-runner binary path and mode-specific flags explicit
+without forking the orchestration flow again.
 """
 
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -53,6 +55,43 @@ from tools.shared.result_schema import KIND_BRANCH, KIND_MEMORY, build_payload
 
 SOLVER_BACKENDS = ("stp", "metasmt", "dummy", "z3")
 OPTIMIZE_ARRAY_VALUES = ("false", "all", "index", "value")
+
+
+@dataclass(frozen=True)
+class KleeModeProfile:
+    tool_id: str
+    binary_path: str
+    results_dir: str
+    extra_flag: str | None = None
+
+
+MODE_PROFILES = {
+    "klee_cf": KleeModeProfile(
+        tool_id="klee_cf",
+        binary_path="klee-controlflow/build/bin/klee",
+        results_dir="results/klee_cf_results",
+        extra_flag="concretize_on_solver_timeout",
+    ),
+    "klee_eager": KleeModeProfile(
+        tool_id="klee_eager",
+        binary_path="klee-eager/build/bin/klee",
+        results_dir="results/klee_eager_results",
+        extra_flag="product_program_fallback",
+    ),
+    "klee_self_comp": KleeModeProfile(
+        tool_id="klee_self_comp",
+        binary_path="klee-self-comp/build/bin/klee",
+        results_dir="results/klee_self_comp_results",
+    ),
+}
+
+
+def _mode_profile(mode: str) -> KleeModeProfile:
+    try:
+        return MODE_PROFILES[mode]
+    except KeyError as error:
+        supported = ", ".join(sorted(MODE_PROFILES))
+        raise ValueError(f"unknown KLEE-family mode {mode!r}; expected one of {supported}") from error
 
 
 def _format_replay_opts(secret_inputs: list[str], public_inputs: list[str], public_mode: str) -> str:
@@ -202,7 +241,8 @@ def _load_klee_preprocess_steps(benchmark_definition, tool_id: str) -> list[dict
 
 
 def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
-    """CLI entrypoint shared by the KLEE-CF and KLEE-Eager wrappers."""
+    """CLI entrypoint shared by the KLEE-family wrappers."""
+    profile = _mode_profile(mode)
     parser = argparse.ArgumentParser(description="Run one of the KLEE-based experiment configurations.")
     parser.add_argument("max_time", help="Overall timeout for each KLEE run")
     parser.add_argument("--sym-size", type=int, default=4)
@@ -213,9 +253,9 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--config", help="Run only KLEE cases whose config id matches this value")
     parser.add_argument("--mod-exp-only", action="store_true")
     parser.add_argument("--search", default="random-path,nurs:covnew")
-    if mode == "klee_cf":
+    if profile.extra_flag == "concretize_on_solver_timeout":
         parser.add_argument("--concretize-on-solver-timeout", default="true")
-    else:
+    elif profile.extra_flag == "product_program_fallback":
         parser.add_argument("--product-program-fallback", action="store_true")
     parser.add_argument("--solver-backend", default="stp", choices=SOLVER_BACKENDS)
     parser.add_argument("--optimize-array", default="false", choices=OPTIMIZE_ARRAY_VALUES)
@@ -228,7 +268,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--tmp-dir", default="/tmp", help="Parent directory for temporary benchmark workspaces")
     parser.add_argument(
         "--results-dir",
-        default=("results/klee_cf_results" if mode == "klee_cf" else "results/klee_eager_results"),
+        default=profile.results_dir,
         help="Directory where run outputs are written",
     )
     parser.add_argument(
@@ -256,9 +296,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
 
     limit_bytes = 70_000_000 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))
-    klee_bin_dir = REPO_ROOT / (
-        "klee-controlflow/build/bin" if mode == "klee_cf" else "klee-eager/build/bin"
-    )
+    klee_bin_dir = (REPO_ROOT / profile.binary_path).parent
     env = dict(os.environ)
     env["PATH"] = f"{klee_bin_dir}:{env.get('PATH', '')}"
     os.environ["PATH"] = env["PATH"]
@@ -279,9 +317,9 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         context.log(f"config={args.config or '<all>'}")
         context.log(f"mod_exp_only={'true' if args.mod_exp_only else 'false'}")
         context.log(f"search_strategies={args.search}")
-        if mode == "klee_cf":
+        if profile.extra_flag == "concretize_on_solver_timeout":
             context.log(f"concretize_on_solver_timeout={args.concretize_on_solver_timeout}")
-        else:
+        elif profile.extra_flag == "product_program_fallback":
             context.log(
                 f"product_program_fallback={'true' if args.product_program_fallback else 'false'}"
             )
@@ -318,9 +356,9 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
                 )
                 if not case_entries:
                     continue
-                if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
+                if mode not in benchmark_definition.tools:
                     raise ValueError(
-                        f"{benchmark_definition.config_location}.klee_cases requires a KLEE tool in tools"
+                        f"{benchmark_definition.config_location}.klee_cases requires {mode!r} in tools"
                     )
                 # The parent process only enumerates benchmark/case pairs. Each
                 # spawned child below creates its own temporary workspace inside
@@ -368,6 +406,7 @@ def run_benchmark(
 ) -> None:
     """Build one benchmark variant and execute one or more selected KLEE cases."""
     def worker_main() -> None:
+        local_profile = _mode_profile(mode)
         local_context = context or ExperimentContext()
         local_env = env or dict(os.environ)
         local_results_dir = Path(results_dir)
@@ -388,8 +427,8 @@ def run_benchmark(
             local_context.run(build_command, env=local_env, cwd=workspace.root)
             step_entries = _load_klee_preprocess_steps(benchmark_definition, mode)
             if step_entries:
-                if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
-                    raise ValueError(f"{benchmark_definition.config_location}.klee_preprocess_steps requires a KLEE tool in tools")
+                if mode not in benchmark_definition.tools:
+                    raise ValueError(f"{benchmark_definition.config_location}.klee_preprocess_steps requires {mode!r} in tools")
                 loop_limiter = REPO_ROOT / "loop-limiter/build/libLoopLimiter.so"
                 # Preprocessing stays explicit in the benchmark TOML because only a
                 # subset of cases need loop bounding and each benchmark blacklists a
@@ -432,8 +471,8 @@ def run_benchmark(
                         f"benchmark {selector_text!r} does not define KLEE cases for config {args.config!r}"
                     )
                 raise SystemExit(f"benchmark {selector_text!r} does not define KLEE cases")
-            if not ({"klee_cf", "klee_eager"} & benchmark_definition.tools):
-                raise ValueError(f"{benchmark_definition.config_location}.klee_cases requires a KLEE tool in tools")
+            if mode not in benchmark_definition.tools:
+                raise ValueError(f"{benchmark_definition.config_location}.klee_cases requires {mode!r} in tools")
             if case_index is None:
                 selected_case_indexes = range(len(case_entries))
             else:
@@ -523,18 +562,15 @@ def run_benchmark(
                     "--signal=INT",
                     f"--kill-after={args.kill_after}",
                     args.max_time,
-                    str(
-                        REPO_ROOT
-                        / ("klee-controlflow/build/bin/klee" if mode == "klee_cf" else "klee-eager/build/bin/klee")
-                    ),
+                    str(REPO_ROOT / local_profile.binary_path),
                     "--libc=uclibc",
                     "--posix-runtime",
                     "--external-calls=all",
                     f"--solver-backend={args.solver_backend}",
                 ]
-                if mode == "klee_cf":
+                if local_profile.extra_flag == "concretize_on_solver_timeout":
                     command.append(f"--concretize-on-solver-timeout={args.concretize_on_solver_timeout}")
-                else:
+                elif local_profile.extra_flag == "product_program_fallback":
                     command.append(
                         f"--product-program-fallback={'true' if args.product_program_fallback else 'false'}"
                     )

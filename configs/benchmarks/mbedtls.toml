@@ -2,16 +2,11 @@
 library = "mbedtls"
 code_path = "benchmarks/mbedtls-3.2.1"
 path_prefixes = ["benchmarks/mbedtls-3.2.1/"]
-tools = ["klee_cf", "klee_eager", "self_comp", "binsec", "abacus"]
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
 [benchmarks.builds.abacus]
 script = "benchmarks/mbedtls-3.2.1/build.sh"
 tool_flag = "--abacus"
-preset = "size_{sym_size}"
-
-[benchmarks.builds.self_comp]
-script = "benchmarks/mbedtls-3.2.1/build.sh"
-tool_flag = "--self-comp"
 preset = "size_{sym_size}"
 
 [benchmarks.builds.binsec]
@@ -27,6 +22,7 @@ preset = "size_{sym_size}"
 [benchmarks.build_aliases]
 klee_cf = "klee"
 klee_eager = "klee"
+klee_self_comp = "klee"
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
@@ -64,7 +60,7 @@ runner_profile = "default"
 [[benchmarks.configs]]
 config = "var_pub"
 public_mode = "var_pub"
-tools = ["klee_cf", "klee_eager", "self_comp", "binsec"]
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 
 [[benchmarks.configs]]
