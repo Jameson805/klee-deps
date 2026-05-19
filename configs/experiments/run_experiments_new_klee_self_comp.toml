@@ -1,0 +1,59 @@
+[campaign]
+num_copies = 10
+max_parallel_workers = 10
+temp_dir = "/datapool/theta-lin-experiments/tmp"
+output = "/datapool/theta-lin-experiments/20260502_new_klee_self_comp"
+run_time = "2h"
+klee_root = "/home/theta-lin/klee/build/bin"
+pin_root = "/datapool/theta-lin/pin-external-4.2-99776-g21d818fa2-gcc-linux"
+sliced_map_csv = "configs/postprocess/sliced_map.csv"
+filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
+# ideal_config_selection_csv = "configs/postprocess/ideal_config_selection.csv"
+by_library_output_prefix = "filtered_reproduction_status_by_library"
+
+[benchmarks]
+klee_self_comp = ["appliedcryp:default", "bearssl:default", "ghostrider:default", "libg:default", "openssl_almeida:default", "pycrypto:default"]
+
+[runs]
+klee_self_comp_default_4 = true
+klee_self_comp_default_16 = true
+klee_self_comp_dfs_4 = true
+klee_self_comp_dfs_16 = true
+klee_self_comp_rand_path_dfs_4 = true
+klee_self_comp_rand_path_dfs_16 = true
+
+[run_definitions.klee_self_comp_default_4]
+tag = "KLEE Self-Comp Default 4"
+tool = "klee_self_comp"
+destination = "klee_self_comp_default_4"
+args = ["{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
+
+[run_definitions.klee_self_comp_default_16]
+tag = "KLEE Self-Comp Default 16"
+tool = "klee_self_comp"
+destination = "klee_self_comp_default_16"
+args = ["{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
+
+[run_definitions.klee_self_comp_dfs_4]
+tag = "KLEE Self-Comp DFS 4"
+tool = "klee_self_comp"
+destination = "klee_self_comp_dfs_4"
+args = ["{run_time}", "--search", "dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
+
+[run_definitions.klee_self_comp_dfs_16]
+tag = "KLEE Self-Comp DFS 16"
+tool = "klee_self_comp"
+destination = "klee_self_comp_dfs_16"
+args = ["{run_time}", "--search", "dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
+
+[run_definitions.klee_self_comp_rand_path_dfs_4]
+tag = "KLEE Self-Comp Rand Path DFS 4"
+tool = "klee_self_comp"
+destination = "klee_self_comp_rand_path_dfs_4"
+args = ["{run_time}", "--search", "random-path,dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
+
+[run_definitions.klee_self_comp_rand_path_dfs_16]
+tag = "KLEE Self-Comp Rand Path DFS 16"
+tool = "klee_self_comp"
+destination = "klee_self_comp_rand_path_dfs_16"
+args = ["{run_time}", "--search", "random-path,dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
