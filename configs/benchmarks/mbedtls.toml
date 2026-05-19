@@ -43,16 +43,16 @@ extra_args = ["--ctchecker-prefix", "library"]
 mod_exp_extra_args = ["--filename", "bignum.c", "--lines", "1968:2202"]
 
 [[benchmarks.klee_preprocess_steps]]
-arguments = ["-blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz", "-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub.bc"]
+arguments = ["-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub.bc"]
 
 [[benchmarks.klee_preprocess_steps]]
-arguments = ["-blacklist=bitlen_i64_nosign", "-break", "-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub.bc"]
+arguments = ["-break", "-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub.bc"]
 
 [[benchmarks.klee_preprocess_steps]]
-arguments = ["-blacklist=bitlen_i64_nosign,mbedtls_mpi_bitlen,mbedtls_clz", "-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub.bc"]
+arguments = ["-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub.bc"]
 
 [[benchmarks.klee_preprocess_steps]]
-arguments = ["-blacklist=bitlen_i64_nosign", "-break", "-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub.bc"]
+arguments = ["-break", "-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub.bc"]
 
 [benchmarks.variants.default]
 

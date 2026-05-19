@@ -42,16 +42,16 @@ public_inputs = ["base", "mod"]
 mod_exp_extra_args = ["--filename", "mpi-pow.c", "--lines", "404:771"]
 
 [[benchmarks.klee_preprocess_steps]]
-arguments = ["-blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift", "-o", "benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc", "benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub.bc"]
+arguments = ["-o", "benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop.bc", "benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub.bc"]
 
 [[benchmarks.klee_preprocess_steps]]
-arguments = ["-blacklist=buf_nonzero,buf_bitlen,__builtin_clzl,__builtin_clz,__builtin_ctzl,__builtin_ctz,_gcry_mpih_lshift", "-o", "benchmarks/libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc", "benchmarks/libgcrypt-and-libgpg-error/klee_var_pub.bc"]
+arguments = ["-o", "benchmarks/libgcrypt-and-libgpg-error/klee_var_pub_lim_loop.bc", "benchmarks/libgcrypt-and-libgpg-error/klee_var_pub.bc"]
 
 [[benchmarks.klee_preprocess_steps]]
-arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc", "benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub.bc"]
+arguments = ["-break", "-o", "benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub_lim_loop_break.bc", "benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub.bc"]
 
 [[benchmarks.klee_preprocess_steps]]
-arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "benchmarks/libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc", "benchmarks/libgcrypt-and-libgpg-error/klee_var_pub.bc"]
+arguments = ["-break", "-o", "benchmarks/libgcrypt-and-libgpg-error/klee_var_pub_lim_loop_break.bc", "benchmarks/libgcrypt-and-libgpg-error/klee_var_pub.bc"]
 
 [benchmarks.variants.default]
 

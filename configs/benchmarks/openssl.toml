@@ -39,10 +39,10 @@ secret_inputs = ["exp"]
 public_inputs = ["base", "mod"]
 
 [benchmarks.preprocess_profiles.lim_loop]
-arguments = ["-blacklist=buf_nonzero,buf_bitlen,bn_add_words,bn_sub_words,bn_mul_add_words,bn_mul_words,bn_sqr_words,bn_div_words,bn_mul_mont,BN_num_bits,MOD_EXP_CTIME_COPY_TO_PREBUF,MOD_EXP_CTIME_COPY_FROM_PREBUF", "-o", "{output}", "{input}"]
+arguments = ["-o", "{output}", "{input}"]
 
 [benchmarks.preprocess_profiles.lim_loop_break]
-arguments = ["-blacklist=buf_nonzero,buf_bitlen", "-break", "-o", "{output}", "{input}"]
+arguments = ["-break", "-o", "{output}", "{input}"]
 
 [benchmarks.variants.default]
 
