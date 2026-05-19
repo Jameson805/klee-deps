@@ -92,10 +92,7 @@ def load_preaggregated_from_messages(messages_path: str, tag: str) -> list[dict[
             inst_id = _to_int(payload.get("inst_id"))
             if inst_id is None:
                 continue
-            if inst_id in rows_by_inst_id:
-                continue
-
-            rows_by_inst_id[inst_id] = {
+            row = {
                 "filename": payload.get("filename"),
                 "line": _to_int(payload.get("line")),
                 "column": _to_int(payload.get("col")),
@@ -105,6 +102,17 @@ def load_preaggregated_from_messages(messages_path: str, tag: str) -> list[dict[
                 "visit_time": _to_float(payload.get("visit_time")),
                 "non_ct_time": _to_float(payload.get("non_ct_time")),
             }
+            existing_row = rows_by_inst_id.get(inst_id)
+            if existing_row is None:
+                rows_by_inst_id[inst_id] = row
+                continue
+
+            # KLEE may emit an early per-inst_id stub before the later aggregated
+            # summary that carries visit/non-CT counts and timings. Merge repeated
+            # entries so the richer later summary is not discarded.
+            for key, value in row.items():
+                if value is not None:
+                    existing_row[key] = value
 
     return sorted(
         rows_by_inst_id.values(),
@@ -256,6 +264,8 @@ def convert_klee_output(
             row for row in rows
             if isinstance(row.get("line"), int) and start <= int(row["line"]) <= end
         ]
+
+    rows = [row for row in rows if (_to_int(row.get("non_ct_count")) or 0) > 0]
 
     code_root = os.path.abspath(code_path) if code_path else None
     if code_root:
