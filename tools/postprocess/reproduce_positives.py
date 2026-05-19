@@ -16,8 +16,11 @@ from dataclasses import dataclass
 from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple
 
 from tools.shared.result_schema import (
+    KIND_BRANCH,
+    KIND_MEMORY,
     STATUS_IDENTICAL_TRACE,
     STATUS_LOCATION_MISMATCH,
+    STATUS_KIND_MISMATCH,
     STATUS_NOT_REPRODUCED,
     STATUS_SUCCESS,
     STATUS_TIMEOUT,
@@ -81,6 +84,7 @@ class ReplayResult:
     culprit_ip: Optional[int]
     resolved_ip: Optional[int]
     location: Optional[Tuple[str, int, int]]
+    divergence_kind: str
     column_bounds: Optional[Tuple[Optional[int], Optional[int]]] = None
 
 
@@ -355,6 +359,23 @@ def compare_trace_files(trace_a_path: str, trace_b_path: str) -> Optional[Diverg
                 )
 
 
+def classify_divergence(divergence: Divergence) -> str:
+    event_a = divergence.event_a
+    event_b = divergence.event_b
+
+    if event_a is None or event_b is None:
+        return KIND_BRANCH
+
+    if event_a.ip != event_b.ip:
+        return KIND_BRANCH
+
+    memory_kinds = {"R", "W"}
+    if event_a.kind in memory_kinds and event_b.kind in memory_kinds:
+        return KIND_MEMORY
+
+    return KIND_BRANCH
+
+
 def resolve_divergence_location(
     executable: str,
     divergence: Divergence,
@@ -447,6 +468,7 @@ def analyze_input_bytes(
             culprit_ip=divergence.culprit_ip,
             resolved_ip=resolved_ip,
             location=location,
+            divergence_kind=classify_divergence(divergence),
             column_bounds=column_bounds,
         )
 
@@ -508,17 +530,23 @@ def resolve_ktest_file(klee_output: str, inst_id: int, kind: str) -> str:
 def print_replay_location(result: ReplayResult) -> None:
     if result.location is None:
         if result.culprit_ip is not None:
-            print(f"Divergence after 0x{result.culprit_ip:x}")
+            print(f"{result.divergence_kind} divergence after 0x{result.culprit_ip:x}")
         else:
-            print("Divergence observed but no instruction address was resolved")
+            print(f"{result.divergence_kind} divergence observed but no instruction address was resolved")
         return
 
     file_name, line_no, col_no = result.location
     address = result.resolved_ip if result.resolved_ip is not None else result.culprit_ip
     if address is None:
-        print(f"{file_name}:{line_no}:{col_no}")
+        print(f"{result.divergence_kind} divergence at {file_name}:{line_no}:{col_no}")
         return
-    print(f"0x{address:x}: {file_name}:{line_no}:{col_no}")
+    print(f"{result.divergence_kind} divergence at 0x{address:x}: {file_name}:{line_no}:{col_no}")
+
+
+def divergence_kind_matches(expected_kind: Optional[str], actual_kind: str) -> bool:
+    if expected_kind is None:
+        return True
+    return expected_kind == actual_kind
 
 
 def location_matches(
@@ -821,10 +849,15 @@ def mode_dataframe(
 
         if replay.location is None:
             if replay.culprit_ip is not None:
-                print(f"Failed at 0x{replay.culprit_ip:x} (no debug info)")
+                print(f"Failed with {replay.divergence_kind} divergence at 0x{replay.culprit_ip:x} (no debug info)")
             else:
-                print("Failed (no debug info)")
+                print(f"Failed ({replay.divergence_kind} divergence, no debug info)")
             df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+            continue
+
+        if not divergence_kind_matches(row_kind, replay.divergence_kind):
+            print(f"Failed (kind mismatch: expected {row_kind}, got {replay.divergence_kind})")
+            df.at[idx, "reproduced_status"] = STATUS_KIND_MISMATCH
             continue
 
         actual_file, actual_line, actual_col = replay.location
@@ -914,6 +947,7 @@ def mode_input_values(
     expected_filename: Optional[str] = None,
     expected_line: Optional[int] = None,
     expected_column: Optional[int] = None,
+    expected_kind: Optional[str] = None,
 ) -> int:
     warn_addrinfo_unavailable()
 
@@ -952,6 +986,10 @@ def mode_input_values(
         return 1
 
     print_replay_location(replay)
+    if not divergence_kind_matches(expected_kind, replay.divergence_kind):
+        print(f"Kind mismatch: expected {expected_kind}, got {replay.divergence_kind}")
+        return 42  # unique code for kind mismatch
+
     if replay.location is None:
         if expected_filename is not None or expected_line is not None or expected_column is not None:
             return 3
@@ -1035,6 +1073,15 @@ def mode_abacus_json(
 
         filename = row.get("filename")
         line_no = coerce_int(row.get("line"))
+        expected_kind = None
+        raw_kind = row.get("kind")
+        if raw_kind is not None:
+            try:
+                expected_kind = normalize_result_kind(raw_kind)
+            except (TypeError, ValueError) as err:
+                print(f"Reproducing {filename}:{line_no} ... invalid kind ({err})")
+                df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+                continue
         print(f"Reproducing {filename}:{line_no} ... ", end="", flush=True)
 
         secret_spec, public_spec = specs
@@ -1047,6 +1094,7 @@ def mode_abacus_json(
             debug=debug,
             expected_filename=filename if isinstance(filename, str) else None,
             expected_line=line_no,
+            expected_kind=expected_kind,
         )
         if rc == 0:
             print("Success")
