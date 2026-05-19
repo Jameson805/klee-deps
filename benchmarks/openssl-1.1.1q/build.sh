@@ -7,7 +7,7 @@ cd "$script_dir"
 KLEE_PATH="../../klee-controlflow"
 
 resolve_runner_config_path() {
-    local variant="normal"
+    local variant="default"
     if [[ "$SLICED" -eq 1 ]]; then
         variant="sliced"
     fi
@@ -34,10 +34,11 @@ MODE=""
 PRESET=""
 
 # Flags that reduce indirect control-flow artifacts (e.g., PLT indirections / PIE thunks).
-# Note: `-no-pie` is a linker flag, so keep it in LDFLAGS for dependency builds.
+# Use a compiler-specific link flag so gcc keeps `-no-pie` while clang/wllvm get
+# the linker-prefixed form they forward correctly.
 NOIND_CFLAGS=( -fno-pie -fno-plt )
-NOIND_LDFLAGS=( -Wl,-no-pie )
-NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
+NOIND_LDFLAGS=()
+NOIND_EXE_FLAGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -100,6 +101,13 @@ if ! [[ "$PRESET" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
     echo "Preset name contains unsupported characters: $PRESET"
     exit 1
 fi
+
+if [[ "$MODE" == "abacus" ]]; then
+    NOIND_LDFLAGS=( -no-pie )
+else
+    NOIND_LDFLAGS=( -Wl,-no-pie )
+fi
+NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
 
 ensure_bn_exp_link() {
     local bn_dir="crypto/bn"

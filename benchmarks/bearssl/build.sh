@@ -40,10 +40,8 @@ NOIND_CFLAGS=(
     -fno-pie
     -fno-plt
 )
-NOIND_LDFLAGS=(
-    -Wl,-no-pie
-)
-NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
+NOIND_LDFLAGS=()
+NOIND_EXE_FLAGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -92,6 +90,13 @@ if [[ -n "$PRESET" ]] && ! [[ "$PRESET" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; the
     echo "Preset name contains unsupported characters: $PRESET" >&2
     exit 1
 fi
+
+if [[ "$MODE" == "abacus" ]]; then
+    NOIND_LDFLAGS=( -no-pie )
+else
+    NOIND_LDFLAGS=( -Wl,-no-pie )
+fi
+NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
 
 if command -v wllvm >/dev/null 2>&1 && [[ -z "${LLVM_COMPILER:-}" ]]; then
     export LLVM_COMPILER=clang

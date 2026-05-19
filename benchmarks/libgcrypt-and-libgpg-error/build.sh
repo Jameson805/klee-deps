@@ -38,12 +38,12 @@ MODE=""
 PRESET=""
 
 # Flags that reduce indirect control-flow artifacts (e.g., PLT indirections / PIE thunks).
-# We also force "no PIE" at link-time. Since some autotools projects build shared
-# libraries by default, we configure deps with --disable-shared (static-only) so
-# this flag cannot accidentally affect a shared-library link.
+# We also force "no PIE" through the compiler driver. Since some autotools projects
+# build shared libraries by default, we configure deps with --disable-shared
+# (static-only) so this flag cannot accidentally affect a shared-library link.
 NOIND_CFLAGS=( -fno-pie -fno-plt )
-NOIND_LDFLAGS=( -Wl,-no-pie )
-NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
+NOIND_LDFLAGS=()
+NOIND_EXE_FLAGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -106,6 +106,13 @@ if ! [[ "$PRESET" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
     echo "Preset name contains unsupported characters: $PRESET"
     exit 1
 fi
+
+if [[ "$MODE" == "abacus" ]]; then
+    NOIND_LDFLAGS=( -no-pie )
+else
+    NOIND_LDFLAGS=( -Wl,-no-pie )
+fi
+NOIND_EXE_FLAGS=( "${NOIND_CFLAGS[@]}" "${NOIND_LDFLAGS[@]}" )
 
 mkdir -p generated
 generator_args=(

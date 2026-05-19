@@ -29,6 +29,7 @@ from typing import Callable, TextIO
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _DURATION_TOKEN_RE = re.compile(r"(?P<amount>\d+)(?P<unit>[hmsHMS])")
+_TRANSIENT_BENCHMARK_DIR_NAMES = {"build"}
 
 
 @dataclass(frozen=True)
@@ -535,6 +536,14 @@ def prepare_benchmark_workspace(benchmark_root: str | Path, tmp_dir: str | Path 
 
     current_source = REPO_ROOT
     current_workspace = workspace_root
+
+    def ignore_transient_entries(_directory: str, entry_names: list[str]) -> set[str]:
+        return {
+            entry_name
+            for entry_name in entry_names
+            if entry_name in _TRANSIENT_BENCHMARK_DIR_NAMES
+        }
+
     for depth, part in enumerate(benchmark_relative.parts):
         source_child = current_source / part
         workspace_child = current_workspace / part
@@ -553,7 +562,12 @@ def prepare_benchmark_workspace(benchmark_root: str | Path, tmp_dir: str | Path 
             current_workspace = workspace_child
             continue
         try:
-            shutil.copytree(source_child, workspace_child, symlinks=True)
+            shutil.copytree(
+                source_child,
+                workspace_child,
+                symlinks=True,
+                ignore=ignore_transient_entries,
+            )
         except OSError as error:
             shutil.rmtree(workspace_root, ignore_errors=True)
             if error.errno == errno.ENOSPC:

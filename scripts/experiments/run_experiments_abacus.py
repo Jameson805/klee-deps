@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -88,6 +89,42 @@ def docker_build_command(build_context: Path) -> list[str]:
     return command
 
 
+def docker_user_args() -> list[str]:
+    """Run Docker containers as the invoking host user when possible."""
+    if os.name != "posix":
+        return []
+    return ["--user", f"{os.getuid()}:{os.getgid()}"]
+
+
+def abacus_runtime_artifacts_ready(abacus_root: Path) -> bool:
+    """Return whether the mounted ABACUS checkout already has the runtime artifacts."""
+    pin_tool = abacus_root / "Pintools" / "obj-ia32" / "MyPinToolLinux.so"
+    qif_binary = abacus_root / "build" / "App" / "QIF" / "QIF"
+    return pin_tool.is_file() and qif_binary.is_file()
+
+
+def docker_bootstrap_command(*, container_abacus_root: Path) -> list[str]:
+    """Build the ABACUS QIF binary and ia32 pintool inside the container."""
+    container_build_root = Path("/tmp/abacus-build")
+    bootstrap_script = " && ".join(
+        [
+            f"rm -rf {container_build_root}",
+            f"cmake -S {container_abacus_root} -B {container_build_root} -DCMAKE_BUILD_TYPE=Release",
+            f"cmake --build {container_build_root} --parallel",
+            f"mkdir -p {container_abacus_root / 'build' / 'App' / 'QIF'}",
+            f"cp {container_build_root / 'App' / 'QIF' / 'QIF'} {container_abacus_root / 'build' / 'App' / 'QIF' / 'QIF'}",
+            (
+                "make "
+                f"-C {container_abacus_root / 'Pintools'} "
+                f"PIN_ROOT={container_abacus_root / 'Intel-Pin-Archive'} "
+                "TARGET=ia32 "
+                '-j"$(nproc)"'
+            ),
+        ]
+    )
+    return ["bash", "-lc", bootstrap_script]
+
+
 def run_merge_steps(output_dir: Path, sym_sizes: list[int]) -> int:
     """Merge per-copy JSON outputs for each configured ABACUS sym-size."""
     for sym_size in sym_sizes:
@@ -120,6 +157,7 @@ def run_worker_copies(
         destination = output_dir / f"abacus_{sym_size}"
         launched_runs: list[LaunchedProcess] = []
         try:
+            shutil.rmtree(destination, ignore_errors=True)
             destination.mkdir(parents=True, exist_ok=True)
             for copy_index in range(num_copies):
                 worker_destination = destination / str(copy_index)
@@ -169,11 +207,17 @@ def run_docker_campaign(
         "docker",
         "run",
         "--rm",
+        *docker_user_args(),
         "-w",
         str(container_workdir),
     ]
     append_mount(command, REPO_ROOT, container_workdir, seen_mounts)
     append_mount(command, docker_abacus_repo, container_abacus_root, seen_mounts)
+
+    if not abacus_runtime_artifacts_ready(docker_abacus_repo):
+        bootstrap_command = command + [DOCKER_IMAGE_TAG, *docker_bootstrap_command(container_abacus_root=container_abacus_root)]
+        if run_checked(bootstrap_command) != 0:
+            return 1
 
     if output_dir.exists():
         container_output_dir = container_path_for_host_path(output_dir, container_workdir)
