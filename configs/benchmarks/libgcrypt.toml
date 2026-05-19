@@ -32,6 +32,9 @@ klee_eager = "klee"
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
 
+[benchmarks.path_templates]
+abacus_executable = "{code_path}/abacus_{public_mode}_modexp"
+
 [benchmarks.tool_defaults.klee]
 code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi"
 secret_inputs = ["exp"]
