@@ -34,6 +34,15 @@ from tools.shared.experiment_registry import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _resolve_preset_name(preset_template: str, sym_size: int | None, *, owner: str) -> str:
+    """Resolve one preset template, requiring a sym size only when the template uses it."""
+    if "{sym_size}" in preset_template:
+        if sym_size is None:
+            raise SystemExit(f"{owner} requires --sym-size because preset {preset_template!r} depends on it")
+        return preset_template.format(sym_size=sym_size)
+    return preset_template
+
+
 @dataclass(frozen=True)
 class AbacusValidationCase:
     """Replay metadata derived from one registry-backed ABACUS benchmark case."""
@@ -114,7 +123,7 @@ def _count_replayable_rows(json_file: Path) -> int:
     return replayable_rows
 
 
-def _infer_sym_size(results_dir: Path, sym_size_override: int | None) -> int:
+def _infer_sym_size(results_dir: Path, sym_size_override: int | None) -> int | None:
     """Infer sym size from the results directory name unless the caller overrides it."""
 
     if sym_size_override is not None:
@@ -122,10 +131,10 @@ def _infer_sym_size(results_dir: Path, sym_size_override: int | None) -> int:
     suffix = results_dir.name.removeprefix("abacus_")
     if suffix.isdigit():
         return int(suffix)
-    raise SystemExit("Could not determine sym size; use --sym-size.")
+    return None
 
 
-def _ensure_replay_executable(case: AbacusValidationCase, sym_size: int) -> Path:
+def _ensure_replay_executable(case: AbacusValidationCase, sym_size: int | None) -> Path:
     """Return the replay executable for one case, building it on demand when absent."""
 
     replay_path = REPO_ROOT / case.replay_executable
@@ -136,7 +145,11 @@ def _ensure_replay_executable(case: AbacusValidationCase, sym_size: int) -> Path
         str(REPO_ROOT / case.build_script),
         case.build_tool_flag,
         "--preset",
-        case.build_preset.format(sym_size=sym_size),
+        _resolve_preset_name(
+            case.build_preset,
+            sym_size,
+            owner=f"ABACUS replay build preset for {case.output_stem}",
+        ),
         *case.build_extra_args,
     ]
     print(f"Replay executable not found: {replay_path}")
@@ -156,7 +169,7 @@ def validate_results_dir(
     timeout: int,
     pin_root: str | None,
 ) -> int:
-    """Validate one merged `abacus_<sym>` directory in place or into another output dir."""
+    """Validate one merged ABACUS results directory in place or into another output dir."""
 
     case_index = _build_case_index()
     sym_size = _infer_sym_size(results_dir, sym_size_override)
@@ -193,7 +206,7 @@ def validate_results_dir(
         reproduce_return_code = reproduce_abacus_json_positives(
             input_json=str(json_file),
             executable=str(replay_executable),
-            sym_size=sym_size,
+            sym_size=sym_size if sym_size is not None else 0,
             timeout=timeout,
             output=str(output_json),
             library=case.library,

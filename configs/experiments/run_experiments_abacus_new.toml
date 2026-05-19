@@ -1,0 +1,18 @@
+[campaign]
+abacus_root = "/datapool/theta-lin/Abacus"
+num_copies = 10
+tmp_dir = "/datapool/theta-lin-experiments/tmp"
+output = "/datapool/theta-lin-experiments/20260502_new_abacus"
+# For these benchmarks the ABACUS build and runner presets come from each
+# benchmark's own runner config, so leave campaign.sym_sizes unset and let the
+# campaign use one benchmark-config-driven bucket.
+
+[benchmarks]
+abacus = [
+  "appliedcryp:default",
+  "bearssl:default",
+  "ghostrider:default",
+  "libg:default",
+  "openssl_almeida:default",
+  "pycrypto:default",
+]

@@ -3,7 +3,9 @@ abacus_root = "/datapool/theta-lin/Abacus"
 num_copies = 3
 tmp_dir = "/datapool/theta-lin-experiments/tmp"
 output = "/datapool/theta-lin-experiments/abacus_test"
+# Keep an explicit size here: mbedtls:default uses size_{sym_size} for both the
+# benchmark build preset and the modexp runner preset.
 sym_sizes = [4]
 
 [benchmarks]
-abacus = ["mbedtls:default", "libgcrypt:default"]
+abacus = ["mbedtls:default"]

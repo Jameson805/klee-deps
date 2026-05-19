@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import subprocess
@@ -46,6 +47,14 @@ DOCKER_PROXY_ENV_VARS = (
     "HTTPS_PROXY",
     "NO_PROXY",
 )
+
+
+@dataclass(frozen=True)
+class AbacusBucket:
+    """One ABACUS campaign bucket, optionally tied to a numeric sym size."""
+
+    label: str
+    sym_size: int | None
 
 
 def resolve_host_path(path: str | Path) -> Path:
@@ -119,20 +128,32 @@ def docker_bootstrap_command(*, container_abacus_root: Path) -> list[str]:
     return ["bash", "-lc", bootstrap_script]
 
 
-def run_merge_steps(output_dir: Path, sym_sizes: list[int]) -> int:
-    """Merge per-copy JSON outputs for each configured ABACUS sym-size."""
-    for sym_size in sym_sizes:
-        destination = output_dir / f"abacus_{sym_size}"
+def _parse_buckets(campaign: dict[str, object]) -> list[AbacusBucket]:
+    """Parse campaign buckets, defaulting to one benchmark-config-driven bucket."""
+    raw_sym_sizes = campaign.get("sym_sizes")
+    if raw_sym_sizes is None:
+        return [AbacusBucket(label="config", sym_size=None)]
+    if not isinstance(raw_sym_sizes, list) or not raw_sym_sizes:
+        raise SystemExit("campaign.sym_sizes must be a non-empty array of integers when provided")
+    if not all(isinstance(sym_size, int) and sym_size >= 0 for sym_size in raw_sym_sizes):
+        raise SystemExit("campaign.sym_sizes must contain only non-negative integers")
+    return [AbacusBucket(label=str(sym_size), sym_size=sym_size) for sym_size in raw_sym_sizes]
+
+
+def run_merge_steps(output_dir: Path, buckets: list[AbacusBucket]) -> int:
+    """Merge per-copy JSON outputs for each configured ABACUS bucket."""
+    for bucket in buckets:
+        destination = output_dir / f"abacus_{bucket.label}"
         if merge_json_runs_main([str(destination)]) != 0:
             return 1
     return 0
 
 
-def run_validation_steps(output_dir: Path, sym_sizes: list[int]) -> int:
-    """Run host-side ABACUS validation over the merged per-sym outputs."""
+def run_validation_steps(output_dir: Path, buckets: list[AbacusBucket]) -> int:
+    """Run host-side ABACUS validation over the merged per-bucket outputs."""
     command = ["--output-base", str(output_dir)]
-    for sym_size in sym_sizes:
-        command.extend(["--sym-size", str(sym_size)])
+    for bucket in buckets:
+        command.extend(["--bucket", bucket.label])
     print(f"$ {sys.executable} -m scripts.validation.validate_experiments_abacus {' '.join(command)}")
     return validate_experiments_abacus_main(command)
 
@@ -141,7 +162,7 @@ def print_completion_summary(output_dir: Path, *, validated: bool) -> None:
     """Print the short host-side completion summary for ABACUS campaigns."""
     print("All Abacus prototype runs completed.")
     print(f"Collected Abacus output root: {output_dir}")
-    print(f"Per-size merged JSON generated under: {output_dir}/abacus_<sym>")
+    print(f"Per-bucket merged JSON generated under: {output_dir}/abacus_<bucket>")
     if validated:
         print("Host-side Abacus validation step completed; see output above for replay counts.")
     else:
@@ -152,15 +173,15 @@ def run_worker_copies(
     *,
     abacus_root: Path,
     benchmark_csv_value: str | None,
+    buckets: list[AbacusBucket],
     num_copies: int,
     output_dir: Path,
-    sym_sizes: list[int],
     tmp_dir: str,
 ) -> int:
-    """Launch direct host-side ABACUS workers for each configured sym-size."""
+    """Launch direct host-side ABACUS workers for each configured bucket."""
     tool = campaign_tool("abacus")
-    for sym_size in sym_sizes:
-        destination = output_dir / f"abacus_{sym_size}"
+    for bucket in buckets:
+        destination = output_dir / f"abacus_{bucket.label}"
         launched_runs: list[LaunchedProcess] = []
         try:
             shutil.rmtree(destination, ignore_errors=True)
@@ -169,15 +190,18 @@ def run_worker_copies(
                 worker_destination = destination / str(copy_index)
                 worker_destination.mkdir(parents=True, exist_ok=True)
                 current_worker_log_path = worker_log_path(destination, copy_index)
+                worker_args = [str(abacus_root)]
+                if bucket.sym_size is not None:
+                    worker_args.extend(["--sym-size", str(bucket.sym_size)])
                 worker_argv = tool.build_worker_argv(
-                    [str(abacus_root), "--sym-size", str(sym_size)],
+                    worker_args,
                     benchmark_csv=benchmark_csv_value,
                     results_dir=worker_destination,
                     tmp_dir=tmp_dir,
                 )
                 launched_runs.append(
                     launch_prefixed_module(
-                        f"ABACUS SYM {sym_size} #{copy_index}",
+                        f"ABACUS {bucket.label} #{copy_index}",
                         tool.module_name,
                         worker_argv,
                         cwd=REPO_ROOT,
@@ -196,8 +220,8 @@ def run_docker_campaign(
     *,
     docker_abacus_repo: Path,
     config_path: Path,
+    buckets: list[AbacusBucket],
     output_dir: Path,
-    sym_sizes: list[int],
     validate: bool,
     args: argparse.Namespace,
 ) -> int:
@@ -253,9 +277,9 @@ def run_docker_campaign(
 
     if run_checked(command) != 0:
         return 1
-    if run_merge_steps(output_dir, sym_sizes) != 0:
+    if run_merge_steps(output_dir, buckets) != 0:
         return 1
-    if validate and run_validation_steps(output_dir, sym_sizes) != 0:
+    if validate and run_validation_steps(output_dir, buckets) != 0:
         return 1
     print_completion_summary(output_dir, validated=validate)
     return 0
@@ -312,11 +336,7 @@ def main(argv: list[str] | None = None) -> int:
     output_raw = campaign.get("output", str(REPO_ROOT / "results/abacus_experiments"))
     if not isinstance(output_raw, str) or not output_raw:
         raise SystemExit("campaign.output must be a non-empty string")
-    sym_sizes = campaign.get("sym_sizes", [4, 16])
-    if not isinstance(sym_sizes, list) or not sym_sizes:
-        raise SystemExit("campaign.sym_sizes must be a non-empty array of integers")
-    if not all(isinstance(sym_size, int) and sym_size >= 0 for sym_size in sym_sizes):
-        raise SystemExit("campaign.sym_sizes must contain only non-negative integers")
+    buckets = _parse_buckets(campaign)
 
     try:
         benchmark_csv = benchmark_csv_from_config(benchmarks_section.get("abacus"), "benchmarks.abacus")
@@ -343,9 +363,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.docker and not args.inside_container:
         if args.postprocess_only:
-            if run_merge_steps(output_dir, sym_sizes) != 0:
+            if run_merge_steps(output_dir, buckets) != 0:
                 raise SystemExit(1)
-            if args.validate and run_validation_steps(output_dir, sym_sizes) != 0:
+            if args.validate and run_validation_steps(output_dir, buckets) != 0:
                 raise SystemExit(1)
             print_completion_summary(output_dir, validated=args.validate)
             return 0
@@ -354,9 +374,9 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"docker ABACUS repo path does not exist: {docker_abacus_repo}")
         return run_docker_campaign(
             docker_abacus_repo=docker_abacus_repo,
+            buckets=buckets,
             config_path=config_path,
             output_dir=output_dir,
-            sym_sizes=sym_sizes,
             validate=args.validate,
             args=args,
         )
@@ -378,9 +398,9 @@ def main(argv: list[str] | None = None) -> int:
         if run_worker_copies(
             abacus_root=abacus_root,
             benchmark_csv_value=benchmark_csv_value,
+            buckets=buckets,
             num_copies=num_copies,
             output_dir=output_dir,
-            sym_sizes=sym_sizes,
             tmp_dir=tmp_dir,
         ) != 0:
             raise SystemExit(1)
@@ -388,9 +408,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.inside_container:
         return 0
 
-    if run_merge_steps(output_dir, sym_sizes) != 0:
+    if run_merge_steps(output_dir, buckets) != 0:
         raise SystemExit(1)
-    if args.validate and run_validation_steps(output_dir, sym_sizes) != 0:
+    if args.validate and run_validation_steps(output_dir, buckets) != 0:
         raise SystemExit(1)
     print_completion_summary(output_dir, validated=args.validate)
     return 0

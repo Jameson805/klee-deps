@@ -6,6 +6,9 @@ abacus_root = "/path/to/abacus"
 num_copies = 10
 tmp_dir = "/tmp"
 output = "results/abacus_experiments"
+# Optional. Keep this only for benchmarks whose build or runner presets use
+# size_{sym_size}. Leave it unset for benchmarks that should use their own
+# fixed runner config directly.
 sym_sizes = [4, 16]
 
 [benchmarks]

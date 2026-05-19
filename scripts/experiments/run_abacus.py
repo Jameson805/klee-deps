@@ -51,6 +51,15 @@ from tools.shared.experiment_registry import (
 CAMPAIGN_TOOL = CampaignTool(tool_id="abacus", module_name=__name__)
 
 
+def _resolve_preset_name(preset_template: str, sym_size: int | None, *, owner: str) -> str:
+    """Resolve one preset template, requiring a sym size only when the template uses it."""
+    if "{sym_size}" in preset_template:
+        if sym_size is None:
+            raise SystemExit(f"{owner} requires --sym-size because preset {preset_template!r} depends on it")
+        return preset_template.format(sym_size=sym_size)
+    return preset_template
+
+
 def _load_abacus_cases(benchmark_definition) -> list[dict[str, object]]:
     """Load ABACUS cases, preferring explicit per-tool overrides when present."""
     raw_cases = benchmark_definition.extra_config.get("abacus_cases")
@@ -97,7 +106,11 @@ def main(argv=None):
     """CLI entrypoint for direct ABACUS runs across selected benchmarks."""
     parser = argparse.ArgumentParser(description="Run the ABACUS prototype over the configured benchmark set.")
     parser.add_argument("abacus_root", help="Path to the ABACUS checkout")
-    parser.add_argument("--sym-size", type=int, default=4, help="Symbol size in bytes")
+    parser.add_argument(
+        "--sym-size",
+        type=int,
+        help="Symbol size in bytes for benchmarks whose build or runner presets depend on it",
+    )
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -114,7 +127,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    if args.sym_size < 0:
+    if args.sym_size is not None and args.sym_size < 0:
         raise SystemExit(f"Invalid --sym-size value: {args.sym_size}")
 
     try:
@@ -136,7 +149,7 @@ def main(argv=None):
         context.log("##########")
         context.log("Args:")
         context.log(f"abacus_root={abacus_root}")
-        context.log(f"sym_size={args.sym_size}")
+        context.log(f"sym_size={args.sym_size if args.sym_size is not None else 'auto'}")
         context.log(f"verbose={'true' if args.verbose else 'false'}")
         context.log(f"tmp_dir={args.tmp_dir}")
         context.log(f"results_dir={results_dir}")
@@ -220,7 +233,16 @@ def run_benchmark(
         with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
             local_context.log(f"temporary_workspace={workspace.root}")
             build_command = [build.script, build.tool_flag]
-            build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
+            build_command.extend(
+                [
+                    "--preset",
+                    _resolve_preset_name(
+                        build.preset,
+                        args.sym_size,
+                        owner=f"ABACUS build preset for {selector_text}",
+                    ),
+                ]
+            )
             local_context.run(build_command, cwd=workspace.root)
 
             case_entries = _load_abacus_cases(benchmark_definition)
@@ -241,7 +263,11 @@ def run_benchmark(
                     runner_profile_id,
                 )
                 resolved_runner_config = str(resolve_repo_path(runner_profile.config))
-                resolved_preset_name = runner_profile.preset.format(sym_size=args.sym_size)
+                resolved_preset_name = _resolve_preset_name(
+                    runner_profile.preset,
+                    args.sym_size,
+                    owner=f"ABACUS runner preset for {selector_text}",
+                )
             output_metadata = {
                 **normalized_case_output_metadata(case_table, case_location),
                 "library_key": benchmark_definition.library_id,
@@ -251,7 +277,7 @@ def run_benchmark(
                 workspace,
                 abacus_root,
                 local_results_dir,
-                args.sym_size,
+                args.sym_size if args.sym_size is not None else 0,
                 expect_string(case_table, "executable", case_location),
                 expect_string(case_table, "outfile", case_location),
                 metadata=output_metadata,
