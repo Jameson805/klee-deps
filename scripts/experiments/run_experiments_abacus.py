@@ -31,6 +31,7 @@ from scripts.experiments.common import (
     wait_for_processes,
     worker_log_path,
 )
+from scripts.validation.validate_experiments_abacus import main as validate_experiments_abacus_main
 from tools.postprocess.merge_json_runs_by_experiment import main as merge_json_runs_main
 from tools.shared.campaign_tools import campaign_tool
 from tools.shared.experiment_registry import format_benchmark_selector, selected_benchmarks
@@ -96,13 +97,6 @@ def docker_user_args() -> list[str]:
     return ["--user", f"{os.getuid()}:{os.getgid()}"]
 
 
-def abacus_runtime_artifacts_ready(abacus_root: Path) -> bool:
-    """Return whether the mounted ABACUS checkout already has the runtime artifacts."""
-    pin_tool = abacus_root / "Pintools" / "obj-ia32" / "MyPinToolLinux.so"
-    qif_binary = abacus_root / "build" / "App" / "QIF" / "QIF"
-    return pin_tool.is_file() and qif_binary.is_file()
-
-
 def docker_bootstrap_command(*, container_abacus_root: Path) -> list[str]:
     """Build the ABACUS QIF binary and ia32 pintool inside the container."""
     container_build_root = Path("/tmp/abacus-build")
@@ -134,12 +128,24 @@ def run_merge_steps(output_dir: Path, sym_sizes: list[int]) -> int:
     return 0
 
 
-def print_completion_summary(output_dir: Path) -> None:
+def run_validation_steps(output_dir: Path, sym_sizes: list[int]) -> int:
+    """Run host-side ABACUS validation over the merged per-sym outputs."""
+    command = ["--output-base", str(output_dir)]
+    for sym_size in sym_sizes:
+        command.extend(["--sym-size", str(sym_size)])
+    print(f"$ {sys.executable} -m scripts.validation.validate_experiments_abacus {' '.join(command)}")
+    return validate_experiments_abacus_main(command)
+
+
+def print_completion_summary(output_dir: Path, *, validated: bool) -> None:
     """Print the short host-side completion summary for ABACUS campaigns."""
     print("All Abacus prototype runs completed.")
     print(f"Collected Abacus output root: {output_dir}")
     print(f"Per-size merged JSON generated under: {output_dir}/abacus_<sym>")
-    print("Run validation separately on merged results when needed.")
+    if validated:
+        print("Host-side Abacus validation step completed; see output above for replay counts.")
+    else:
+        print("Run validation separately on merged results when needed, or rerun with --validate.")
 
 
 def run_worker_copies(
@@ -192,6 +198,7 @@ def run_docker_campaign(
     config_path: Path,
     output_dir: Path,
     sym_sizes: list[int],
+    validate: bool,
     args: argparse.Namespace,
 ) -> int:
     """Build the Docker image and rerun this campaign inside the container."""
@@ -214,10 +221,9 @@ def run_docker_campaign(
     append_mount(command, REPO_ROOT, container_workdir, seen_mounts)
     append_mount(command, docker_abacus_repo, container_abacus_root, seen_mounts)
 
-    if not abacus_runtime_artifacts_ready(docker_abacus_repo):
-        bootstrap_command = command + [DOCKER_IMAGE_TAG, *docker_bootstrap_command(container_abacus_root=container_abacus_root)]
-        if run_checked(bootstrap_command) != 0:
-            return 1
+    bootstrap_command = command + [DOCKER_IMAGE_TAG, *docker_bootstrap_command(container_abacus_root=container_abacus_root)]
+    if run_checked(bootstrap_command) != 0:
+        return 1
 
     if output_dir.exists():
         container_output_dir = container_path_for_host_path(output_dir, container_workdir)
@@ -249,7 +255,9 @@ def run_docker_campaign(
         return 1
     if run_merge_steps(output_dir, sym_sizes) != 0:
         return 1
-    print_completion_summary(output_dir)
+    if validate and run_validation_steps(output_dir, sym_sizes) != 0:
+        return 1
+    print_completion_summary(output_dir, validated=validate)
     return 0
 
 
@@ -277,6 +285,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Container path where the repository is mounted (default: host repo path)",
     )
     parser.add_argument("--postprocess-only", action="store_true", help="Run only merge steps")
+    parser.add_argument("--validate", action="store_true", help="Run host-side validation after merge steps")
     parser.add_argument("--inside-container", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
@@ -336,7 +345,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.postprocess_only:
             if run_merge_steps(output_dir, sym_sizes) != 0:
                 raise SystemExit(1)
-            print_completion_summary(output_dir)
+            if args.validate and run_validation_steps(output_dir, sym_sizes) != 0:
+                raise SystemExit(1)
+            print_completion_summary(output_dir, validated=args.validate)
             return 0
         docker_abacus_repo = resolve_host_path(args.docker)
         if not docker_abacus_repo.is_dir():
@@ -346,6 +357,7 @@ def main(argv: list[str] | None = None) -> int:
             config_path=config_path,
             output_dir=output_dir,
             sym_sizes=sym_sizes,
+            validate=args.validate,
             args=args,
         )
 
@@ -378,7 +390,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if run_merge_steps(output_dir, sym_sizes) != 0:
         raise SystemExit(1)
-    print_completion_summary(output_dir)
+    if args.validate and run_validation_steps(output_dir, sym_sizes) != 0:
+        raise SystemExit(1)
+    print_completion_summary(output_dir, validated=args.validate)
     return 0
 
 
