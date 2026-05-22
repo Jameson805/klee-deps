@@ -1,5 +1,5 @@
-[submodule "klee-controlflow"]
-	path = klee-controlflow
+[submodule "klee-cf"]
+	path = klee-cf
 	url = https://github.com/Jameson805/klee-controlflow/
 [submodule "klee-eager"]
 	path = klee-eager

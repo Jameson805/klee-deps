@@ -1,0 +1,37 @@
+name: klee-deps-build
+channels:
+  - conda-forge
+dependencies:
+  - python=3.14
+  - cmake>=3.26
+  - ninja
+  - make
+  - m4
+  - git
+  - curl
+  - opam
+  - file
+  - pkg-config
+  - bison
+  - flex
+  - perl
+  - unzip
+  - gmp
+  - zlib
+  - boost-cpp
+  - sqlite
+  - ncurses
+  - gperftools
+  - llvm=16
+  - llvmdev=16
+  - clang=16
+  - clangxx=16
+  - pip
+  - pip:
+      - lit
+      - wllvm
+      - tabulate
+      - jinja2
+      - pandas
+      - numpy
+      - matplotlib

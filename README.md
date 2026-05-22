@@ -4,6 +4,68 @@ This repository is an experiment workspace for comparing multiple constant-time 
 
 The current pipeline is organized around one design rule: benchmark wrappers and benchmark metadata should stay tool-agnostic wherever possible, while tool-specific execution details stay in the runner that owns them.
 
+## Building The Toolchain
+
+The repository now includes a root build flow for the local KLEE toolchain and the loop-limiter LLVM plugin:
+
+```bash
+./build_all.sh all
+```
+
+That flow does the following:
+
+1. Creates or updates a conda environment from `environment-build.yml`.
+2. Initializes the KLEE git submodules if needed.
+3. Builds STP and `klee-uclibc` under `build/deps/`.
+4. Downloads Intel Pin under `build/deps/pin` and registers the real Pin binaries in `build/tool-paths.json`.
+5. Installs `opam` in the conda environment, then clones and builds BINSEC in a local opam switch under `build/deps/src/binsec` and registers the real `binsec` plus `dune` executables in `build/tool-paths.json`.
+6. Configures and builds every top-level `klee-*` submodule under `build/<project>/`.
+7. Builds `loop-limiter` under the same top-level build root.
+
+For direct manual use, the build step records workspace-local tool artifacts in
+`build/tool-paths.json`. KLEE variants are registered in the manifest with
+distinct ids, while activation exposes convenience shell functions for each
+variant name:
+
+```bash
+source ./activate-workspace.sh
+klee-cf --version
+klee-eager --version
+klee-self-comp --version
+```
+
+Those names stay workspace-local via the manifest, so separate worktrees can
+expose different KLEE builds without overwriting each other inside a shared
+conda environment.
+
+BINSEC and Pin follow the same manifest-first rule after `./build_all.sh binsec`,
+`./build_all.sh pin`, or `./build_all.sh all`. The activation helper reads
+`build/tool-paths.json`, prepends directories for direct executable artifacts,
+defines shell aliases for manifest ids whose real binary name differs, and when
+BINSEC is present enters the local opam switch for the shell session. When Intel
+Pin is installed by the root build, activation also exports `PIN_ROOT` to the
+workspace-local Pin kit under `build/deps/pin`.
+
+To opt into the shared conda environment plus the current workspace's manifest-
+backed tool activation for one shell session, source:
+
+```bash
+source ./activate-workspace.sh
+```
+
+Useful narrower invocations:
+
+```bash
+./build_all.sh env
+./build_all.sh deps
+./build_all.sh pin
+./build_all.sh binsec
+./build_all.sh klee --project klee-cf
+./build_all.sh extras
+```
+
+The script expects a working `conda` installation on the host and uses the active conda environment to provide LLVM 16, Clang 16, CMake, Ninja, OPAM, Dune, GMP, and the Python packages used by the rest of the repository. BINSEC itself is built from source in a workspace-local OPAM root under `build/opam-root`.
+
 ## Overview
 
 At a high level, the repository works like this:
@@ -45,7 +107,11 @@ The main tool families currently wired into the repository are:
 
 ## Running Scripts
 
-Run repository-owned Python CLIs from the repository root with `python -m ...`. That keeps imports and relative paths consistent.
+Run repository-owned Python CLIs from the repository root with `python -m ...`. That is the canonical and supported invocation style, and it keeps imports and relative paths consistent.
+
+Repository Python entrypoints assume Python 3.14. The supported setup is the shared conda environment defined in `environment-build.yml`.
+
+Direct file execution such as `python scripts/experiments/run_klee_cf.py` is not a supported entrypoint.
 
 Examples:
 
@@ -261,6 +327,8 @@ The code and documentation style in this repository is intentionally pragmatic a
 - keep benchmark identity explicit as `library_id` plus `variant_id`
 - use explicit metadata files and structured fields instead of deriving semantics from filenames
 - use type hints on shared and public Python functions when the surrounding file already does
+- repository Python code should use absolute package imports such as `scripts.experiments.common` or `tools.shared.experiment_registry`, and repository Python entrypoints should use the canonical `python -m ...` invocation style rather than relative imports, direct-file assumptions, or `sys.path` hacks
+- shell wrappers and benchmark build scripts that invoke repository Python modules should call `python -m ...` from the repository root instead of executing `.py` files by path
 - document code sections whose behavior is hard to infer, easy to misuse, constrained by subtle pitfalls, or kept as temporary patches
 - explain the reason for non-obvious designs and workarounds, not just the mechanical behavior, especially around workspace isolation, replay behavior, metadata propagation, fairness of comparisons, and KLEE integration boundaries
 - use short comments for local rationale and longer nearby documentation when future readers need control-flow or design context
