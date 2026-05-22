@@ -7,9 +7,10 @@ stored metadata remains stable and lossless across tools.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 
 RUN_METADATA_FILENAME = "_run_metadata.json"

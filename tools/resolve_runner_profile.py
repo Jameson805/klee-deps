@@ -4,11 +4,6 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
-import sys
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.experiments.common import resolve_repo_path
 from tools.shared.experiment_registry import definition, runner_profile_for_definition

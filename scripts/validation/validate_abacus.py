@@ -16,12 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from scripts.experiments.common import expand_benchmark_cases, resolve_case_template
+from scripts.experiments.common import REPO_ROOT, expand_benchmark_cases, resolve_case_template
 from tools.postprocess.reproduce_positives import reproduce_abacus_json_positives
 from tools.shared.experiment_registry import (
     build_for_tool,
@@ -29,9 +25,6 @@ from tools.shared.experiment_registry import (
     definition,
     selected_benchmarks,
 )
-
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _resolve_preset_name(preset_template: str, sym_size: int | None, *, owner: str) -> str:

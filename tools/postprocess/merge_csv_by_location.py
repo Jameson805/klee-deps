@@ -2,7 +2,6 @@
 
 import argparse
 import sys
-from typing import Optional, Sequence
 
 from tools.shared.configuration_metadata import merge_column_metadata
 
@@ -63,7 +62,7 @@ def merge_on_location(left_path: str, right_path: str, output_path: str) -> int:
     return int(len(merged))
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
 
     p = argparse.ArgumentParser(
         description="Merge two KLEE CSV files on (library,file,line,column,kind) into one CSV (outer merge)."

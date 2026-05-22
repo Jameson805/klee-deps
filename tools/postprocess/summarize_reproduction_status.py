@@ -12,8 +12,9 @@ import csv
 import json
 import os
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any
 
 from tools.postprocess.apply_sliced_map import load_sliced_map
 from tools.postprocess.csv_to_latex_table import escape_latex
@@ -118,7 +119,7 @@ def _location_context(
     library: str,
     filename: str,
     line: int,
-    column: Optional[int],
+    column: int | None,
 ) -> str:
     column_text = "?" if column is None else str(column)
     return f"{json_path} data[{row_number}] ({library}, {filename}, {line}, {column_text})"
@@ -172,11 +173,11 @@ def _resolve_location(
     *,
     library_hint: str,
     sliced: bool,
-    sliced_map: Optional[Mapping[tuple[str, str, int, int], tuple[str, int, int]]],
+    sliced_map: Mapping[tuple[str, str, int, int], tuple[str, int, int]] | None,
     keep_unmapped: bool,
     json_path: Path,
     row_number: int,
-) -> tuple[str, str, int, Optional[int], str]:
+) -> tuple[str, str, int, int | None, str]:
     filename = row.get("filename")
     if not isinstance(filename, str) or not filename.strip():
         raise SystemExit(f"{json_path} data[{row_number}]: missing filename")
@@ -187,7 +188,7 @@ def _resolve_location(
         raise SystemExit(f"{json_path} data[{row_number}]: invalid line {row.get('line')!r}") from None
 
     column_value = row.get("column")
-    column: Optional[int]
+    column: int | None
     if column_value is None or column_value == "":
         column = None
     else:
@@ -257,7 +258,7 @@ def collect_reproduction_status_counts(
     root_dir: Path,
     *,
     filter_path: Path,
-    sliced_map_path: Optional[Path],
+    sliced_map_path: Path | None,
     keep_unmapped: bool,
 ) -> tuple[
     list[str],
@@ -390,7 +391,7 @@ def summarize_reproduction_statuses(
     *,
     filter_path: Path,
     output_path: Path,
-    sliced_map_path: Optional[Path],
+    sliced_map_path: Path | None,
     keep_unmapped: bool,
 ) -> tuple[int, int]:
     """Write the main reproduction-status summary CSV."""
@@ -806,7 +807,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 

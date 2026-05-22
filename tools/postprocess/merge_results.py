@@ -13,7 +13,8 @@ import json
 import math
 import os
 import sys
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 from tools.shared.configuration_metadata import (
     build_column_metadata,
@@ -22,10 +23,10 @@ from tools.shared.configuration_metadata import (
 )
 
 
-Location = Tuple[str, str, int, Optional[int], Optional[str]]
+Location = tuple[str, str, int, int | None, str | None]
 
 
-def _to_float(value: Any) -> Optional[float]:
+def _to_float(value: Any) -> float | None:
     if value is None:
         return None
     try:
@@ -41,7 +42,7 @@ def _basename_only(path_value: str) -> str:
     return os.path.basename(path_value.replace("\\", "/"))
 
 
-def _normalize_kind(value: object) -> Optional[str]:
+def _normalize_kind(value: object) -> str | None:
     if not isinstance(value, str):
         return None
     kind = value.strip()
@@ -78,7 +79,7 @@ def _load_violations_from_json(
     path: str,
     *,
     all_positives: bool = False,
-) -> tuple[dict[str, Any], Dict[Location, float]]:
+) -> tuple[dict[str, Any], dict[Location, float]]:
     rows, metadata = _read_payload(path)
     if not metadata:
         raise SystemExit(
@@ -92,7 +93,7 @@ def _load_violations_from_json(
             "Regenerate the run outputs with the current campaign runners before running postprocess."
         )
 
-    out: Dict[Location, float] = {}
+    out: dict[Location, float] = {}
     for row in rows:
         non_ct_time = _to_float(row.get("non_ct_time"))
         if non_ct_time is None:
@@ -129,7 +130,7 @@ def merge_runs(
     *,
     sliced_only: bool = False,
     all_positives: bool = False,
-) -> tuple[List[str], Dict[str, Dict[Location, float]], Dict[str, dict[str, Any]]]:
+) -> tuple[list[str], dict[str, dict[Location, float]], dict[str, dict[str, Any]]]:
     """Merge all run directories under ``root_dir`` into exact result columns."""
     if not os.path.isdir(root_dir):
         raise SystemExit(f"Input '{root_dir}' is not a directory")
@@ -137,9 +138,9 @@ def merge_runs(
     run_metadata_by_name = load_run_metadata(root_dir)
     run_names = sorted(run_metadata_by_name)
 
-    ordered_columns: List[str] = []
-    by_col: Dict[str, Dict[Location, float]] = {}
-    column_metadata: Dict[str, dict[str, Any]] = {}
+    ordered_columns: list[str] = []
+    by_col: dict[str, dict[Location, float]] = {}
+    column_metadata: dict[str, dict[str, Any]] = {}
 
     for run_name in run_names:
         run_metadata = run_metadata_by_name[run_name]
@@ -180,12 +181,12 @@ def merge_runs(
 def write_csv(
     output_path: str,
     ordered_columns: Sequence[str],
-    by_col: Dict[str, Dict[Location, float]],
-    column_metadata: Dict[str, dict[str, Any]],
+    by_col: dict[str, dict[Location, float]],
+    column_metadata: dict[str, dict[str, Any]],
 ) -> int:
     """Write the merged CSV and its metadata sidecar."""
-    all_locations: Set[Location] = set()
-    wildcard_locations: Set[Tuple[str, str, int, Optional[str]]] = set()
+    all_locations: set[Location] = set()
+    wildcard_locations: set[tuple[str, str, int, str | None]] = set()
 
     for column in ordered_columns:
         for library, filename, line, column_value, kind in by_col.get(column, {}).keys():
@@ -215,7 +216,7 @@ def write_csv(
         writer = csv.writer(handle)
         writer.writerow(["library", "file", "line", "column", "kind", *ordered_columns])
         for library, filename, line, column_value, kind in rows:
-            output_row: List[str] = [
+            output_row: list[str] = [
                 library,
                 filename,
                 str(line),
@@ -234,7 +235,7 @@ def write_csv(
     return len(rows)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint for wide-CSV generation from campaign output trees."""
     parser = argparse.ArgumentParser(
         description=(

@@ -19,9 +19,6 @@ import subprocess
 import sys
 import tomllib
 
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
 from scripts.experiments.common import (
     REPO_ROOT,
     LaunchedProcess,

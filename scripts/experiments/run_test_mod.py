@@ -12,6 +12,7 @@ import os
 import resource
 
 from scripts.experiments.common import ExperimentContext, REPO_ROOT
+from tools.shared.tool_artifacts import resolve_executable_path
 
 
 def main() -> int:
@@ -20,10 +21,10 @@ def main() -> int:
     limit_bytes = 70_000_000 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))
 
-    bin_path = REPO_ROOT / "klee-controlflow" / "build" / "bin"
+    klee_executable = str(resolve_executable_path("klee-cf"))
     script_path = REPO_ROOT / "tools" / "postprocess"
     env = dict(os.environ)
-    env["PATH"] = f"{bin_path}:{script_path}:{env.get('PATH', '')}"
+    env["PATH"] = f"{script_path}:{env.get('PATH', '')}"
 
     context = ExperimentContext()
     context.run(["benchmarks/mbedtls-3.2.1/build_test_mod.sh"], env=env)
@@ -34,7 +35,7 @@ def main() -> int:
             "--signal=INT",
             "--kill-after=30s",
             "10m",
-            "klee",
+            klee_executable,
             "--libc=uclibc",
             "--posix-runtime",
             "--external-calls=all",

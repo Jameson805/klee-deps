@@ -21,9 +21,6 @@ import sys
 import time
 import tomllib
 
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
 from scripts.experiments.common import (
     CampaignTool,
     LaunchedProcess,

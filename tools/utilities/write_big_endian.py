@@ -2,7 +2,6 @@
 
 import argparse
 import sys
-from typing import Optional
 
 
 def parse_int(s: str) -> int:
@@ -13,7 +12,7 @@ def parse_int(s: str) -> int:
         raise argparse.ArgumentTypeError(f"invalid integer value '{s}'") from e
 
 
-def write_big_endian(path: str, value: int, size: Optional[int] = None) -> None:
+def write_big_endian(path: str, value: int, size: int | None = None) -> None:
     """
     Write 'value' as an unsigned big-endian binary to 'path'.
 
@@ -74,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 

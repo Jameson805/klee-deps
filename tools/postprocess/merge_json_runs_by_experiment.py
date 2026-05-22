@@ -7,7 +7,8 @@ import os
 import re
 import sys
 from glob import glob
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 
 FINAL_COLUMN_ORDER = [
@@ -26,7 +27,7 @@ FINAL_COLUMN_ORDER = [
 ]
 
 
-def _to_float(value: Any) -> Optional[float]:
+def _to_float(value: Any) -> float | None:
     if value is None:
         return None
     try:
@@ -38,7 +39,7 @@ def _to_float(value: Any) -> Optional[float]:
     return out
 
 
-def _to_int(value: Any) -> Optional[int]:
+def _to_int(value: Any) -> int | None:
     if value is None:
         return None
     try:
@@ -47,7 +48,7 @@ def _to_int(value: Any) -> Optional[int]:
         return None
 
 
-def _natural_key(text: str) -> List[Any]:
+def _natural_key(text: str) -> list[Any]:
     return [int(part) if part.isdigit() else part.lower() for part in re.split(r"(\d+)", text)]
 
 
@@ -56,7 +57,7 @@ def _basename_only(path_value: str) -> str:
     return os.path.basename(path_value.replace("\\", "/"))
 
 
-def _geometric_mean(values: List[float]) -> Optional[float]:
+def _geometric_mean(values: list[float]) -> float | None:
     if not values:
         return None
     cleaned = [value for value in values if math.isfinite(value) and value >= 0.0]
@@ -67,7 +68,7 @@ def _geometric_mean(values: List[float]) -> Optional[float]:
     return math.exp(sum(math.log(value) for value in cleaned) / len(cleaned))
 
 
-def _read_payload(path: str) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def _read_payload(path: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     with open(path, "r", encoding="utf-8") as f:
         payload = json.load(f)
 
@@ -86,9 +87,9 @@ def _read_payload(path: str) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     return [], {}
 
 
-def _group_input_files(dst_dir: str) -> Dict[str, List[str]]:
+def _group_input_files(dst_dir: str) -> dict[str, list[str]]:
     pattern = os.path.join(dst_dir, "*", "*.json")
-    grouped: Dict[str, List[str]] = {}
+    grouped: dict[str, list[str]] = {}
     for path in glob(pattern):
         base = os.path.basename(path)
         grouped.setdefault(base, []).append(path)
@@ -110,9 +111,9 @@ def _remove_previous_merged_outputs(dst_dir: str) -> None:
 
 def _merge_single_experiment(
     paths: Sequence[str],
-) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    by_location: Dict[Tuple[str, int, Optional[int], str, Optional[str]], Dict[str, Any]] = {}
-    merged_metadata: Dict[str, Any] | None = None
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    by_location: dict[tuple[str, int, int | None, str, str | None], dict[str, Any]] = {}
+    merged_metadata: dict[str, Any] | None = None
 
     for path in paths:
         rows, metadata = _read_payload(path)
@@ -175,7 +176,7 @@ def _merge_single_experiment(
                 counts = slot["reproduced_status_counts"]
                 counts[key_status] = counts.get(key_status, 0) + 1
 
-    merged_rows: List[Dict[str, Any]] = []
+    merged_rows: list[dict[str, Any]] = []
     for (filename, line, column, library, kind), slot in sorted(
         by_location.items(),
         key=lambda item: (
@@ -251,7 +252,7 @@ def merge_all(dst_dir: str) -> int:
     return written
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Merge per-run JSON results by experiment name from dst/*/*.json into dst/<experiment>.json. "

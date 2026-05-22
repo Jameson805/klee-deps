@@ -16,7 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from tools.shared.result_schema import (
     STATUS_NOT_REPRODUCED,

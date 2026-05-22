@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from tools.shared.result_schema import (
     KIND_BRANCH,
@@ -25,10 +25,10 @@ configure_int_max_str_digits()
 
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-_INSTRUCTION_KIND_CACHE: Dict[Tuple[str, int], str] = {}
+_INSTRUCTION_KIND_CACHE: dict[tuple[str, int], str] = {}
 
 
-def _classify_instruction_text(text: str) -> Optional[str]:
+def _classify_instruction_text(text: str) -> str | None:
     # ABACUS logs report only the divergent instruction address, not whether the
     # underlying side channel was control-flow- or memory-driven. We therefore
     # classify the instruction text itself and fail loudly when that heuristic is
@@ -100,7 +100,7 @@ def _instruction_kind_for_address(executable_path: str, address: int) -> str:
     return kind
 
 
-def load_runner_config(config_path: str) -> Dict[str, Any]:
+def load_runner_config(config_path: str) -> dict[str, Any]:
     try:
         with open(config_path, "rb") as handle:
             config = tomllib.load(handle)
@@ -115,7 +115,7 @@ def load_runner_config(config_path: str) -> Dict[str, Any]:
     return config
 
 
-def _resolve_input_size(size_spec: Any, macros: Dict[str, Any]) -> int:
+def _resolve_input_size(size_spec: Any, macros: dict[str, Any]) -> int:
     if isinstance(size_spec, int):
         if size_spec <= 0:
             raise ValueError(f"input size must be positive (got {size_spec})")
@@ -130,7 +130,7 @@ def _resolve_input_size(size_spec: Any, macros: Dict[str, Any]) -> int:
     raise ValueError(f"unsupported input size specification: {size_spec!r}")
 
 
-def _value_to_bytes(value: Any, size: int) -> List[int]:
+def _value_to_bytes(value: Any, size: int) -> list[int]:
     if isinstance(value, int):
         try:
             return list(int(value).to_bytes(size, byteorder="big", signed=False))
@@ -140,7 +140,7 @@ def _value_to_bytes(value: Any, size: int) -> List[int]:
     if isinstance(value, list):
         if len(value) != size:
             raise ValueError(f"byte-seed length {len(value)} does not match expected size {size}")
-        out: List[int] = []
+        out: list[int] = []
         for byte_value in value:
             if not isinstance(byte_value, int) or byte_value < 0 or byte_value > 0xFF:
                 raise ValueError("ABACUS reference secret bytes must be integers in [0, 255]")
@@ -150,14 +150,14 @@ def _value_to_bytes(value: Any, size: int) -> List[int]:
     raise ValueError(f"unsupported ABACUS seed format: {value!r}")
 
 
-def _bytes_to_int(values: List[int]) -> int:
+def _bytes_to_int(values: list[int]) -> int:
     result = 0
     for value in values:
         result = (result << 8) | value
     return result
 
 
-def _load_abacus_secret_layout(runner_config_path: str, preset_name: str) -> List[Dict[str, Any]]:
+def _load_abacus_secret_layout(runner_config_path: str, preset_name: str) -> list[dict[str, Any]]:
     try:
         runner_config = load_runner_config(runner_config_path)
     except ValueError as exc:
@@ -188,7 +188,7 @@ def _load_abacus_secret_layout(runner_config_path: str, preset_name: str) -> Lis
         if isinstance(input_id, str):
             input_by_id[input_id] = entry
 
-    layout: List[Dict[str, Any]] = []
+    layout: list[dict[str, Any]] = []
     for input_id in secret_ids:
         if input_id not in input_by_id:
             raise ValueError(f"abacus secret input {input_id!r} is missing from inputs")
@@ -213,14 +213,14 @@ def _load_abacus_secret_layout(runner_config_path: str, preset_name: str) -> Lis
     return layout
 
 
-def _build_counterexamples(secret_layout: List[Dict[str, Any]], divergent_bytes: List[int]) -> Dict[str, int]:
+def _build_counterexamples(secret_layout: list[dict[str, Any]], divergent_bytes: list[int]) -> dict[str, int]:
     total_size = sum(int(entry["size"]) for entry in secret_layout)
     if len(divergent_bytes) != total_size:
         raise ValueError(
             f"divergent input length {len(divergent_bytes)} does not match configured secret length {total_size}"
         )
 
-    counterexamples: Dict[str, int] = {}
+    counterexamples: dict[str, int] = {}
     offset = 0
     for entry in secret_layout:
         size = int(entry["size"])
@@ -242,8 +242,8 @@ def convert_abacus_log(
     preset_name: str | None = None,
     code_root: str | None = None,
     library: str,
-    metadata: Dict[str, Any] | None = None,
-) -> Dict[str, Any]:
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     if not os.path.isfile(log_path):
         raise FileNotFoundError(f"log not found: {log_path}")
 
@@ -268,10 +268,10 @@ def convert_abacus_log(
     with open(log_path, "r", encoding="utf-8", errors="replace") as handle:
         lines = handle.readlines()
 
-    divergent: Dict[int, List[int]] = {}
-    locations: Dict[int, Dict[str, Any]] = {}
-    se_time: Optional[float] = None
-    qif_time: Optional[float] = None
+    divergent: dict[int, list[int]] = {}
+    locations: dict[int, dict[str, Any]] = {}
+    se_time: float | None = None
+    qif_time: float | None = None
     code_root_abs = os.path.abspath(code_root) if code_root else None
 
     i = 0
@@ -293,7 +293,7 @@ def convert_abacus_log(
         m_div = re.match(r"^\[Divergent Input\]\s+0x([0-9a-fA-F]+):\s*$", s)
         if m_div:
             addr = int(m_div.group(1), 16)
-            bvals: List[int] = []
+            bvals: list[int] = []
             i += 1
             while i < len(lines):
                 t = lines[i].rstrip("\n")
@@ -328,7 +328,7 @@ def convert_abacus_log(
                         except Exception:
                             pass
 
-                    entry: Dict[str, Any] = {
+                    entry: dict[str, Any] = {
                         "filename": filename,
                         "line": line_no,
                     }
@@ -348,10 +348,10 @@ def convert_abacus_log(
 
         i += 1
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     non_ct_time = (se_time + qif_time) if se_time is not None and qif_time is not None else None
     for addr in sorted(set(divergent.keys()) | set(locations.keys())):
-        row: Dict[str, Any] = {
+        row: dict[str, Any] = {
             "filename": None,
             "line": None,
             "counterexamples": None,
@@ -367,7 +367,7 @@ def convert_abacus_log(
             row["counterexamples"] = _build_counterexamples(secret_layout, divergent[addr])
         rows.append(row)
 
-    validated_rows: List[Dict[str, Any]] = []
+    validated_rows: list[dict[str, Any]] = []
     for row in rows:
         optional = {
             key: value
@@ -429,7 +429,7 @@ def convert_abacus_log(
     return payload
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(
         description=(
             "Parse an Abacus per-case log and emit combined JSON with source location, code line, "

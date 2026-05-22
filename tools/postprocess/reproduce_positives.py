@@ -12,9 +12,11 @@ import subprocess
 import sys
 import tempfile
 from collections import deque
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple
+from typing import Any
 
+from tools.shared.tool_artifacts import resolve_intel_pin_root
 from tools.shared.result_schema import (
     KIND_BRANCH,
     KIND_MEMORY,
@@ -44,7 +46,10 @@ PRIME_SUFFIXES = ("__prime", "_prime")
 TRACE_LOOKBACK = 64
 
 _ADDRINFO_WARNING_EMITTED = False
-_PIN_RUNTIME_CACHE: Dict[Tuple[str, str], "PinRuntime"] = {}
+_PIN_RUNTIME_CACHE: dict[tuple[str, str], "PinRuntime"] = {}
+
+type SourceLocation = tuple[str, int, int]
+type ColumnBounds = tuple[int | None, int | None]
 
 
 @dataclass(frozen=True)
@@ -67,25 +72,25 @@ class PinRuntime:
 class TraceEvent:
     kind: str
     ip: int
-    address: Optional[int] = None
+    address: int | None = None
 
 
 @dataclass(frozen=True)
 class Divergence:
     index: int
-    event_a: Optional[TraceEvent]
-    event_b: Optional[TraceEvent]
-    culprit_ip: Optional[int]
-    recent_ips: Tuple[int, ...]
+    event_a: TraceEvent | None
+    event_b: TraceEvent | None
+    culprit_ip: int | None
+    recent_ips: tuple[int, ...]
 
 
 @dataclass(frozen=True)
 class ReplayResult:
-    culprit_ip: Optional[int]
-    resolved_ip: Optional[int]
-    location: Optional[Tuple[str, int, int]]
+    culprit_ip: int | None
+    resolved_ip: int | None
+    location: SourceLocation | None
     divergence_kind: str
-    column_bounds: Optional[Tuple[Optional[int], Optional[int]]] = None
+    column_bounds: ColumnBounds | None = None
 
 
 @dataclass(frozen=True)
@@ -94,7 +99,7 @@ class LocationMatchResult:
     snapped: bool = False
 
 
-def parse_list(spec: str) -> List[str]:
+def parse_list(spec: str) -> list[str]:
     return [part.strip() for part in spec.split(",") if part and part.strip()]
 
 
@@ -108,7 +113,7 @@ def require_tools(tools: Sequence[str]) -> None:
         sys.exit(2)
 
 
-def coerce_int(value: Any) -> Optional[int]:
+def coerce_int(value: Any) -> int | None:
     if value is None or isinstance(value, bool):
         return None
     try:
@@ -144,11 +149,8 @@ def warn_addrinfo_unavailable() -> None:
     _ADDRINFO_WARNING_EMITTED = True
 
 
-def resolve_pin_root(pin_root: Optional[str]) -> str:
-    candidate = pin_root or os.environ.get("PIN_ROOT")
-    if not candidate:
-        raise RuntimeError("Intel Pin root not configured. Pass --pin-root or set PIN_ROOT.")
-    resolved = os.path.abspath(candidate)
+def resolve_pin_root() -> str:
+    resolved = os.path.abspath(str(resolve_intel_pin_root()))
     if not os.path.isdir(resolved):
         raise RuntimeError(f"Intel Pin root does not exist: {resolved}")
     return resolved
@@ -304,7 +306,7 @@ def run_pin_trace(
     if not trace_ready:
         if debug:
             print(f"[debug] Pin command: {shell_join(cmd)}", file=sys.stderr)
-        raise RuntimeError("Pin produced an empty trace; check PIN_ROOT, the replay executable, and the tracer build")
+        raise RuntimeError("Pin produced an empty trace; check the workspace Pin install, the replay executable, and the tracer build")
 
 
 def parse_trace_line(raw_line: str) -> TraceEvent:
@@ -316,8 +318,8 @@ def parse_trace_line(raw_line: str) -> TraceEvent:
     raise RuntimeError(f"Unrecognized Pin trace line: {raw_line.rstrip()}")
 
 
-def compare_trace_files(trace_a_path: str, trace_b_path: str) -> Optional[Divergence]:
-    recent_ips: Deque[int] = deque(maxlen=TRACE_LOOKBACK)
+def compare_trace_files(trace_a_path: str, trace_b_path: str) -> Divergence | None:
+    recent_ips: deque[int] = deque(maxlen=TRACE_LOOKBACK)
 
     with open(trace_a_path, "r", encoding="utf-8", errors="replace", buffering=1024 * 1024) as trace_a:
         with open(trace_b_path, "r", encoding="utf-8", errors="replace", buffering=1024 * 1024) as trace_b:
@@ -379,11 +381,11 @@ def classify_divergence(divergence: Divergence) -> str:
 def resolve_divergence_location(
     executable: str,
     divergence: Divergence,
-) -> Tuple[Optional[int], Optional[Tuple[str, int, int]], Optional[Tuple[Optional[int], Optional[int]]]]:
+) -> tuple[int | None, SourceLocation | None, ColumnBounds | None]:
     if get_addr_info_context is None:
         return divergence.culprit_ip, None, None
 
-    candidates: List[int] = []
+    candidates: list[int] = []
     if divergence.culprit_ip is not None:
         candidates.append(divergence.culprit_ip)
     for ip in reversed(divergence.recent_ips):
@@ -419,13 +421,13 @@ def analyze_input_bytes(
     executable: str,
     secret_names: Sequence[str],
     public_names: Sequence[str],
-    secret_orig: Dict[str, bytes],
-    secret_prime: Dict[str, bytes],
-    public_values: Dict[str, bytes],
+    secret_orig: dict[str, bytes],
+    secret_prime: dict[str, bytes],
+    public_values: dict[str, bytes],
     timeout: int,
     pin_root: str,
     debug: bool,
-) -> Optional[ReplayResult]:
+) -> ReplayResult | None:
     executable_path = os.path.abspath(executable)
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -434,8 +436,8 @@ def analyze_input_bytes(
         os.makedirs(run_a_dir, exist_ok=True)
         os.makedirs(run_b_dir, exist_ok=True)
 
-        files_run_a: List[str] = []
-        files_run_b: List[str] = []
+        files_run_a: list[str] = []
+        files_run_b: list[str] = []
 
         # Keep identical directory layouts between the two runs so argv stack addresses stay aligned.
         for name in secret_names:
@@ -495,10 +497,10 @@ def extract_ktest_inputs(
     ktest_file: str,
     secrets: Sequence[str],
     publics: Sequence[str],
-) -> Tuple[Dict[str, bytes], Dict[str, bytes], Dict[str, bytes]]:
-    secret_orig: Dict[str, bytes] = {}
-    secret_prime: Dict[str, bytes] = {}
-    public_values: Dict[str, bytes] = {}
+) -> tuple[dict[str, bytes], dict[str, bytes], dict[str, bytes]]:
+    secret_orig: dict[str, bytes] = {}
+    secret_prime: dict[str, bytes] = {}
+    public_values: dict[str, bytes] = {}
 
     for public_name in publics:
         public_values[public_name] = extract_var_bytes(ktest_file, public_name)
@@ -543,21 +545,21 @@ def print_replay_location(result: ReplayResult) -> None:
     print(f"{result.divergence_kind} divergence at 0x{address:x}: {file_name}:{line_no}:{col_no}")
 
 
-def divergence_kind_matches(expected_kind: Optional[str], actual_kind: str) -> bool:
+def divergence_kind_matches(expected_kind: str | None, actual_kind: str) -> bool:
     if expected_kind is None:
         return True
     return expected_kind == actual_kind
 
 
 def location_matches(
-    expected_filename: Optional[str],
-    expected_line: Optional[int],
-    expected_column: Optional[int],
+    expected_filename: str | None,
+    expected_line: int | None,
+    expected_column: int | None,
     actual_file: str,
     actual_line: int,
     actual_column: int,
-    actual_previous_column: Optional[int] = None,
-    actual_next_column: Optional[int] = None,
+    actual_previous_column: int | None = None,
+    actual_next_column: int | None = None,
 ) -> LocationMatchResult:
     if expected_filename is not None and os.path.basename(expected_filename) != os.path.basename(actual_file):
         return LocationMatchResult(matches=False)
@@ -586,8 +588,8 @@ def location_matches(
 def format_snapped_success(
     actual_column: int,
     expected_column: int,
-    previous_column: Optional[int],
-    next_column: Optional[int],
+    previous_column: int | None,
+    next_column: int | None,
 ) -> str:
     if previous_column is not None and next_column is not None:
         window = f"{previous_column} <= y <= {next_column}"
@@ -603,8 +605,8 @@ def format_snapped_success(
     )
 
 
-def parse_secret_input_spec(spec: str) -> Dict[str, Tuple[int, int, int]]:
-    result: Dict[str, Tuple[int, int, int]] = {}
+def parse_secret_input_spec(spec: str) -> dict[str, tuple[int, int, int]]:
+    result: dict[str, tuple[int, int, int]] = {}
     if not spec:
         return result
 
@@ -633,8 +635,8 @@ def parse_secret_input_spec(spec: str) -> Dict[str, Tuple[int, int, int]]:
     return result
 
 
-def parse_public_input_spec(spec: str) -> Dict[str, Tuple[int, int]]:
-    result: Dict[str, Tuple[int, int]] = {}
+def parse_public_input_spec(spec: str) -> dict[str, tuple[int, int]]:
+    result: dict[str, tuple[int, int]] = {}
     if not spec:
         return result
 
@@ -661,12 +663,12 @@ def parse_public_input_spec(spec: str) -> Dict[str, Tuple[int, int]]:
 
 
 def build_value_input_bytes(
-    secrets: Dict[str, Tuple[int, int, int]],
-    publics: Dict[str, Tuple[int, int]],
-) -> Tuple[Dict[str, bytes], Dict[str, bytes], Dict[str, bytes]]:
-    secret_orig: Dict[str, bytes] = {}
-    secret_prime: Dict[str, bytes] = {}
-    public_values: Dict[str, bytes] = {}
+    secrets: dict[str, tuple[int, int, int]],
+    publics: dict[str, tuple[int, int]],
+) -> tuple[dict[str, bytes], dict[str, bytes], dict[str, bytes]]:
+    secret_orig: dict[str, bytes] = {}
+    secret_prime: dict[str, bytes] = {}
+    public_values: dict[str, bytes] = {}
 
     for name, (size, value_orig, value_prime) in secrets.items():
         try:
@@ -684,7 +686,7 @@ def build_value_input_bytes(
     return secret_orig, secret_prime, public_values
 
 
-def _load_json_notes(path: str) -> Dict[str, Any]:
+def _load_json_notes(path: str) -> dict[str, Any]:
     try:
         with open(path, "r", encoding="utf-8") as stream:
             raw = json.load(stream)
@@ -699,14 +701,14 @@ def _load_json_notes(path: str) -> Dict[str, Any]:
 
 
 def _build_abacus_specs(
-    counterexamples: Dict[str, int],
-    notes: Dict[str, Any],
+    counterexamples: dict[str, int],
+    notes: dict[str, Any],
     sym_size: int,
-) -> Optional[Tuple[str, str]]:
+) -> tuple[str, str] | None:
     secret_layout = notes.get("secret_layout")
     public_layout = notes.get("public_layout")
 
-    secret_parts: List[str] = []
+    secret_parts: list[str] = []
     if isinstance(secret_layout, list) and secret_layout:
         for entry in secret_layout:
             if not isinstance(entry, dict):
@@ -729,7 +731,7 @@ def _build_abacus_specs(
             return None
         secret_parts.append(f"exp:{sym_size}={int(exp)}/{int(exp_prime)}")
 
-    public_parts: List[str] = []
+    public_parts: list[str] = []
     if isinstance(public_layout, list) and public_layout:
         for entry in public_layout:
             if not isinstance(entry, dict):
@@ -758,9 +760,8 @@ def mode_dataframe(
     secret: str,
     public: str,
     timeout: int,
-    output: Optional[str],
+    output: str | None,
     library: str,
-    pin_root: Optional[str],
     debug: bool,
 ) -> int:
     from tools.shared.common import load_combined_json, save_combined_json  # type: ignore
@@ -768,7 +769,7 @@ def mode_dataframe(
     require_tools(["ktest-tool"])
     warn_addrinfo_unavailable()
 
-    resolved_pin_root = resolve_pin_root(pin_root)
+    resolved_pin_root = resolve_pin_root()
     executable_path = os.path.abspath(executable)
     secrets = parse_list(secret)
     publics = parse_list(public)
@@ -898,13 +899,12 @@ def mode_ktest_file(
     secret: str,
     public: str,
     timeout: int,
-    pin_root: Optional[str],
     debug: bool,
 ) -> int:
     require_tools(["ktest-tool"])
     warn_addrinfo_unavailable()
 
-    resolved_pin_root = resolve_pin_root(pin_root)
+    resolved_pin_root = resolve_pin_root()
     executable_path = os.path.abspath(executable)
     secrets = parse_list(secret)
     publics = parse_list(public)
@@ -942,12 +942,11 @@ def mode_input_values(
     secret_spec: str,
     public_spec: str,
     timeout: int,
-    pin_root: Optional[str],
     debug: bool,
-    expected_filename: Optional[str] = None,
-    expected_line: Optional[int] = None,
-    expected_column: Optional[int] = None,
-    expected_kind: Optional[str] = None,
+    expected_filename: str | None = None,
+    expected_line: int | None = None,
+    expected_column: int | None = None,
+    expected_kind: str | None = None,
 ) -> int:
     warn_addrinfo_unavailable()
 
@@ -959,7 +958,7 @@ def mode_input_values(
         print(f"Error parsing inputs: {err}", file=sys.stderr)
         return 2
 
-    resolved_pin_root = resolve_pin_root(pin_root)
+    resolved_pin_root = resolve_pin_root()
     executable_path = os.path.abspath(executable)
 
     try:
@@ -1027,14 +1026,13 @@ def mode_abacus_json(
     executable: str,
     sym_size: int,
     timeout: int,
-    output: Optional[str],
+    output: str | None,
     library: str,
-    pin_root: Optional[str],
     debug: bool,
 ) -> int:
     from tools.shared.common import load_combined_json, save_combined_json  # type: ignore
 
-    resolved_pin_root = resolve_pin_root(pin_root)
+    resolved_pin_root = resolve_pin_root()
     notes = _load_json_notes(input_json)
     df = load_combined_json(input_json)
     if "counterexamples" not in df.columns:
@@ -1132,9 +1130,8 @@ def reproduce_json_positives(
     secret: str,
     public: str = "",
     timeout: int = 300,
-    output: Optional[str] = None,
+    output: str | None = None,
     library: str = "unknown",
-    pin_root: Optional[str] = None,
     debug: bool = False,
 ) -> int:
     return mode_dataframe(
@@ -1146,7 +1143,6 @@ def reproduce_json_positives(
         timeout=timeout,
         output=output,
         library=library,
-        pin_root=pin_root,
         debug=debug,
     )
 
@@ -1158,7 +1154,6 @@ def reproduce_ktest_positive(
     secret: str,
     public: str = "",
     timeout: int = 300,
-    pin_root: Optional[str] = None,
     debug: bool = False,
 ) -> int:
     return mode_ktest_file(
@@ -1167,7 +1162,6 @@ def reproduce_ktest_positive(
         secret=secret,
         public=public,
         timeout=timeout,
-        pin_root=pin_root,
         debug=debug,
     )
 
@@ -1178,18 +1172,16 @@ def reproduce_input_values(
     secret_spec: str,
     public_spec: str,
     timeout: int = 300,
-    pin_root: Optional[str] = None,
     debug: bool = False,
-    expected_filename: Optional[str] = None,
-    expected_line: Optional[int] = None,
-    expected_column: Optional[int] = None,
+    expected_filename: str | None = None,
+    expected_line: int | None = None,
+    expected_column: int | None = None,
 ) -> int:
     return mode_input_values(
         executable=executable,
         secret_spec=secret_spec,
         public_spec=public_spec,
         timeout=timeout,
-        pin_root=pin_root,
         debug=debug,
         expected_filename=expected_filename,
         expected_line=expected_line,
@@ -1203,9 +1195,8 @@ def reproduce_abacus_json_positives(
     executable: str,
     sym_size: int = 4,
     timeout: int = 300,
-    output: Optional[str] = None,
+    output: str | None = None,
     library: str = "unknown",
-    pin_root: Optional[str] = None,
     debug: bool = False,
 ) -> int:
     return mode_abacus_json(
@@ -1215,12 +1206,11 @@ def reproduce_abacus_json_positives(
         timeout=timeout,
         output=output,
         library=library,
-        pin_root=pin_root,
         debug=debug,
     )
 
 
-def build_parsers_and_dispatch(argv: List[str]) -> int:
+def build_parsers_and_dispatch(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Reproduce divergence either from a dataframe (--json), a single .ktest (--file), "
@@ -1260,7 +1250,6 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
     )
     parser.add_argument("--timeout", type=int, default=300, help="Timeout in seconds (default: 300).")
     parser.add_argument("--output", help="Output JSON path for --json and --abacus-json modes.")
-    parser.add_argument("--pin-root", default=None, help="Path to the external Intel Pin kit (defaults to PIN_ROOT).")
     parser.add_argument("--debug", action="store_true", help="Print the exact Pin command when a replay fails or times out.")
     parser.add_argument("--sym-size", type=int, default=4, help="Symbol byte size for --abacus-json mode (default: 4).")
     parser.add_argument(
@@ -1286,7 +1275,6 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
             timeout=args.timeout,
             output=args.output,
             library=args.library,
-            pin_root=args.pin_root,
             debug=args.debug,
         )
 
@@ -1299,7 +1287,6 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
             secret=args.secret,
             public=args.public,
             timeout=args.timeout,
-            pin_root=args.pin_root,
             debug=args.debug,
         )
 
@@ -1311,7 +1298,6 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
             timeout=args.timeout,
             output=args.output,
             library=args.library,
-            pin_root=args.pin_root,
             debug=args.debug,
         )
 
@@ -1322,12 +1308,11 @@ def build_parsers_and_dispatch(argv: List[str]) -> int:
         secret_spec=args.secret,
         public_spec=args.public,
         timeout=args.timeout,
-        pin_root=args.pin_root,
         debug=args.debug,
     )
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     try:
         return build_parsers_and_dispatch(list(sys.argv[1:] if argv is None else argv))
     except RuntimeError as err:

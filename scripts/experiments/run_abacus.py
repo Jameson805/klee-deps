@@ -6,16 +6,14 @@ invoke the Pin-based ABACUS trace collection, and convert the resulting log
 into the repository's shared JSON schema for later merging.
 """
 
+from __future__ import annotations
+
 import argparse
 from pathlib import Path
 import signal
 import shlex
 import shutil
 import sys
-from typing import Dict, List, Optional, Set, Union
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.experiments.common import (
     CampaignTool,
@@ -95,14 +93,14 @@ def _load_abacus_cases(benchmark_definition) -> list[dict[str, object]]:
     return cases
 
 
-def remove_suffix(value, suffix):
+def remove_suffix(value: str, suffix: str) -> str:
     """Drop ``suffix`` from ``value`` when it is present."""
     if value.endswith(suffix):
         return value[:-len(suffix)]
     return value
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint for direct ABACUS runs across selected benchmarks."""
     parser = argparse.ArgumentParser(description="Run the ABACUS prototype over the configured benchmark set.")
     parser.add_argument("abacus_root", help="Path to the ABACUS checkout")
@@ -158,7 +156,7 @@ def main(argv=None):
             + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in benchmarks)
         )
         context.log("##########")
-        launched_runs = []  # type: List[LaunchedProcess]
+        launched_runs: list[LaunchedProcess] = []
 
         def handle_signal(signum: int, _frame: object) -> None:
             print("interrupted, stopping ABACUS case workers", file=sys.stderr)
@@ -168,7 +166,7 @@ def main(argv=None):
         signal.signal(signal.SIGINT, handle_signal)
         signal.signal(signal.SIGTERM, handle_signal)
 
-        seen_case_outputs = set()  # type: Set[str]
+        seen_case_outputs: set[str] = set()
         try:
             for library_id, variant_id in benchmarks:
                 benchmark_definition = definition(library_id, variant_id)
@@ -255,8 +253,8 @@ def run_benchmark(
             case_location = f"{benchmark_definition.config_location}.abacus_cases[{case_index}]"
             case_table = expect_table(case_entries[case_index], case_location)
             runner_profile_id = optional_string(case_table, "runner_profile", case_location)
-            resolved_runner_config = None  # type: Optional[str]
-            resolved_preset_name = None  # type: Optional[str]
+            resolved_runner_config: str | None = None
+            resolved_preset_name: str | None = None
             if runner_profile_id is not None:
                 _resolved_profile_id, runner_profile = runner_profile_for_definition(
                     benchmark_definition,

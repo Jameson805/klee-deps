@@ -6,8 +6,9 @@ import os
 import re
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 import subprocess
+import tomllib
 
 from tools.shared.result_schema import (
     KIND_BRANCH,
@@ -31,15 +32,8 @@ configure_int_max_str_digits()
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, "..", ".."))
 
-
-try:
-    import tomllib  # Python 3.11+
-except Exception:  # pragma: no cover
-    tomllib = None  # type: ignore
-
-
 # Import get_addr_info from repository utility package.
-_ADDRINFO_IMPORT_ERROR: Optional[str] = None
+_ADDRINFO_IMPORT_ERROR: str | None = None
 try:
     from tools.utilities.addrinfo import get_addr_info  # type: ignore
 except Exception as e:  # pragma: no cover
@@ -70,7 +64,7 @@ def _is_sep_line(s: str) -> bool:
     return bool(s) and all(ch == "=" for ch in s)
 
 
-def parse_output_log(path: str, title: Optional[str]) -> Dict[int, LeakInfo]:
+def parse_output_log(path: str, title: str | None) -> dict[int, LeakInfo]:
     """Parse BINSEC output.log and return map: address(int) -> LeakInfo.
 
     If title is provided, only parses leak lines within the section labeled:
@@ -79,8 +73,8 @@ def parse_output_log(path: str, title: Optional[str]) -> Dict[int, LeakInfo]:
         =======
     """
 
-    leaks: Dict[int, LeakInfo] = {}
-    current_title: Optional[str] = None
+    leaks: dict[int, LeakInfo] = {}
+    current_title: str | None = None
 
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
@@ -111,7 +105,7 @@ def parse_output_log(path: str, title: Optional[str]) -> Dict[int, LeakInfo]:
     return leaks
 
 
-def _as_int(x: Any) -> Optional[int]:
+def _as_int(x: Any) -> int | None:
     if x is None:
         return None
     if isinstance(x, int):
@@ -124,14 +118,14 @@ def _as_int(x: Any) -> Optional[int]:
     return None
 
 
-def _extract_scalar_list_value(val: Any) -> Optional[int]:
+def _extract_scalar_list_value(val: Any) -> int | None:
     """BINSEC encodes many things as a TOML list like ["0x123"] or ["42"]."""
     if not isinstance(val, list) or not val:
         return None
     return _as_int(val[0])
 
 
-def parse_binsec_toml(path: str) -> Tuple[List[int], Dict[int, Dict[str, Dict[str, int]]]]:
+def parse_binsec_toml(path: str) -> tuple[list[int], dict[int, dict[str, dict[str, int]]]]:
     """Parse a BINSEC -checkct stats TOML.
 
     Returns:
@@ -143,16 +137,11 @@ def parse_binsec_toml(path: str) -> Tuple[List[int], Dict[int, Dict[str, Dict[st
       - We ignore memory dumps (tables ending in .memory."@") on purpose.
     """
 
-    if tomllib is None:
-        raise RuntimeError(
-            "tomllib is not available. Use Python 3.11+ (or install a TOML parser and adapt this script)."
-        )
-
     with open(path, "rb") as f:
         doc = tomllib.load(f)
 
     ct_report = doc.get("CT report", {})
-    insecure: List[int] = []
+    insecure: list[int] = []
 
     status = ct_report.get("Instructions status", {})
     insecure_list = status.get("insecure", [])
@@ -162,7 +151,7 @@ def parse_binsec_toml(path: str) -> Tuple[List[int], Dict[int, Dict[str, Dict[st
             if addr is not None:
                 insecure.append(addr)
 
-    models: Dict[int, Dict[str, Dict[str, int]]] = {}
+    models: dict[int, dict[str, dict[str, int]]] = {}
     insec_models = ct_report.get("Insecurity models", {})
     if isinstance(insec_models, dict):
         for addr_key, payload in insec_models.items():
@@ -186,8 +175,8 @@ def parse_binsec_toml(path: str) -> Tuple[List[int], Dict[int, Dict[str, Dict[st
     return insecure, models
 
 
-def _build_basename_index(code_root: str) -> Dict[str, str]:
-    index: Dict[str, str] = {}
+def _build_basename_index(code_root: str) -> dict[str, str]:
+    index: dict[str, str] = {}
     for dirpath, _, filenames in os.walk(code_root):
         for fn in filenames:
             if fn not in index:
@@ -200,7 +189,7 @@ def _normalize_filename_for_json(path: str) -> str:
     return os.path.basename(path)
 
 
-def _relativize_to_code_root(debug_path: str, code_root: Optional[str]) -> str:
+def _relativize_to_code_root(debug_path: str, code_root: str | None) -> str:
     if not code_root:
         return _normalize_filename_for_json(debug_path)
     try:
@@ -215,11 +204,11 @@ def _relativize_to_code_root(debug_path: str, code_root: Optional[str]) -> str:
     return _normalize_filename_for_json(debug_path)
 
 
-def _parse_input_layouts(raw_specs: List[str], defaults: List[Tuple[str, int, str]], kind: str) -> List[InputLayout]:
+def _parse_input_layouts(raw_specs: list[str], defaults: list[tuple[str, int, str]], kind: str) -> list[InputLayout]:
     if not raw_specs:
         return [InputLayout(name=name, size=size, model_key=model_key) for name, size, model_key in defaults]
 
-    layouts: List[InputLayout] = []
+    layouts: list[InputLayout] = []
     for spec in raw_specs:
         parts = spec.split(":")
         if len(parts) != 3:
@@ -239,11 +228,11 @@ def _parse_input_layouts(raw_specs: List[str], defaults: List[Tuple[str, int, st
 
 
 def _pick_model_counterexamples(
-    models: Dict[int, Dict[str, Dict[str, int]]],
+    models: dict[int, dict[str, dict[str, int]]],
     addr: int,
-    secret_inputs: List[InputLayout],
-    public_inputs: List[InputLayout],
-) -> Optional[Dict[str, int]]:
+    secret_inputs: list[InputLayout],
+    public_inputs: list[InputLayout],
+) -> dict[str, int] | None:
     model = models.get(addr)
     if not model:
         return None
@@ -252,7 +241,7 @@ def _pick_model_counterexamples(
     s2 = model.get("secret2", {})
     pub = model.get("public", {})
 
-    counterexamples: Dict[str, int] = {}
+    counterexamples: dict[str, int] = {}
 
     for inp in secret_inputs:
         value = s1.get(inp.model_key) if isinstance(s1, dict) else None
@@ -284,17 +273,16 @@ def _tail_lines(text: str, n: int = 12) -> str:
 def _run_reproduce(
     reproduce_module: str,
     replay_executable: str,
-    counterexamples: Dict[str, int],
-    secret_inputs: List[InputLayout],
-    public_inputs: List[InputLayout],
+    counterexamples: dict[str, int],
+    secret_inputs: list[InputLayout],
+    public_inputs: list[InputLayout],
     timeout_s: int,
-    pin_root: Optional[str],
-) -> Tuple[Optional[Tuple[str, int, int]], int, str]:
+) -> tuple[tuple[str, int, int] | None, int, str]:
     """Run reproduce_positives.py --input and parse the reported divergence location.
 
     Returns: (location|None, returncode, combined_output)
     """
-    secret_parts: List[str] = []
+    secret_parts: list[str] = []
     for inp in secret_inputs:
         value = counterexamples.get(inp.name)
         prime_value = counterexamples.get(f"{inp.name}__prime")
@@ -302,7 +290,7 @@ def _run_reproduce(
             return None, 2, f"missing secret counterexamples for {inp.name}"
         secret_parts.append(f"{inp.name}:{inp.size}={value}/{prime_value}")
 
-    public_parts: List[str] = []
+    public_parts: list[str] = []
     for inp in public_inputs:
         value = counterexamples.get(inp.name)
         if value is None:
@@ -326,8 +314,6 @@ def _run_reproduce(
     ]
     if public_spec:
         cmd += ["--public", public_spec]
-    if pin_root:
-        cmd += ["--pin-root", pin_root]
 
     proc = subprocess.run(
         cmd,
@@ -349,38 +335,37 @@ def _run_reproduce(
 
 
 def build_rows(
-    insecure_addrs: List[int],
-    models: Dict[int, Dict[str, Dict[str, int]]],
-    leaks: Dict[int, LeakInfo],
+    insecure_addrs: list[int],
+    models: dict[int, dict[str, dict[str, int]]],
+    leaks: dict[int, LeakInfo],
     addr_executable: str,
-    code_root: Optional[str],
+    code_root: str | None,
     library: str,
-    secret_inputs: List[InputLayout],
-    public_inputs: List[InputLayout],
-    reproduce_module: Optional[str],
-    replay_executable: Optional[str],
+    secret_inputs: list[InputLayout],
+    public_inputs: list[InputLayout],
+    reproduce_module: str | None,
+    replay_executable: str | None,
     reproduce_timeout_s: int,
-    pin_root: Optional[str],
-) -> List[Dict[str, Any]]:
-    code_index: Optional[Dict[str, str]] = None
+) -> list[dict[str, Any]]:
+    code_index: dict[str, str] | None = None
     if code_root:
         code_index = _build_basename_index(code_root)
     source_library = library
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
 
     for addr in insecure_addrs:
-        info: Optional[Tuple[str, int, int]] = None
+        info: tuple[str, int, int] | None = None
         if get_addr_info is not None:
             try:
                 info = get_addr_info(addr_executable, addr)
             except Exception:
                 info = None
 
-        filename: Optional[str] = None
-        line_no: Optional[int] = None
-        col_no: Optional[int] = None
-        debug_path: Optional[str] = None
+        filename: str | None = None
+        line_no: int | None = None
+        col_no: int | None = None
+        debug_path: str | None = None
 
         if info is not None:
             debug_path, l, c = info
@@ -393,7 +378,7 @@ def build_rows(
 
         counterexamples = _pick_model_counterexamples(models, addr, secret_inputs, public_inputs)
 
-        code: Optional[str] = None
+        code: str | None = None
         if filename and line_no and code_root and code_index is not None:
             candidate = None
             if debug_path and os.path.isfile(debug_path):
@@ -403,7 +388,7 @@ def build_rows(
             if candidate:
                 code = get_source_line(source_library, candidate, line_no)
 
-        reproduced_status: Optional[str] = None
+        reproduced_status: str | None = None
         if (
             reproduce_module
             and replay_executable
@@ -426,7 +411,6 @@ def build_rows(
                 secret_inputs=secret_inputs,
                 public_inputs=public_inputs,
                 timeout_s=reproduce_timeout_s,
-                pin_root=pin_root,
             )
             if loc is None:
                 if rc == 124:
@@ -465,7 +449,7 @@ def build_rows(
                         flush=True,
                     )
 
-        row: Dict[str, Any] = {
+        row: dict[str, Any] = {
             "filename": filename,
             "line": line_no,
             "column": col_no,
@@ -485,7 +469,7 @@ def build_rows(
     return rows
 
 
-def default_title_for_toml_name(toml_path: str) -> Optional[str]:
+def default_title_for_toml_name(toml_path: str) -> str | None:
     name = os.path.basename(toml_path)
     mapping = {
         "mbedtls_fix_pub.toml": "Mbed TLS 3.2.1 (Fix Pub)",
@@ -522,22 +506,18 @@ def convert_binsec_toml(
     output_log: str,
     executable: str,
     sym_size: int = 4,
-    secret_inputs: List[str] | None = None,
-    public_inputs: List[str] | None = None,
+    secret_inputs: list[str] | None = None,
+    public_inputs: list[str] | None = None,
     replay_executable: str | None = None,
     reproduce: bool = False,
     reproduce_module: str | None = None,
     reproduce_timeout: int = 1200,
-    pin_root: str | None = None,
     output_path: str | None = None,
     title: str | None = None,
     code_path: str | None = None,
     library: str,
-    metadata: Dict[str, Any] | None = None,
-) -> Dict[str, object]:
-    if tomllib is None:
-        raise RuntimeError("tomllib not available; use Python 3.11+")
-
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, object]:
     title = title or default_title_for_toml_name(toml_path)
     needs_publics = bool(re.search(r"_var_pub\.toml$", os.path.basename(toml_path)))
     secret_layouts = _parse_input_layouts(secret_inputs or [], [("exp", sym_size, "exp_buf")], "secret")
@@ -565,10 +545,9 @@ def convert_binsec_toml(
         reproduce_module=reproduce_module if reproduce else None,
         replay_executable=replay_executable if reproduce else None,
         reproduce_timeout_s=reproduce_timeout,
-        pin_root=pin_root if reproduce else None,
     )
 
-    validated_rows: List[Dict[str, Any]] = []
+    validated_rows: list[dict[str, Any]] = []
     for row in rows:
         optional = {
             k: v
@@ -606,7 +585,7 @@ def convert_binsec_toml(
     return payload
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(
         description=(
             "Convert BINSEC -checkct stats TOML + output.log into a KLEE-like combined JSON "
@@ -668,11 +647,6 @@ def main(argv: List[str]) -> int:
         default=1200,
         help="Timeout seconds for each reproduction attempt (default: 1200).",
     )
-    p.add_argument(
-        "--pin-root",
-        default=None,
-        help="Path to the external Intel Pin kit (defaults to PIN_ROOT)",
-    )
     p.add_argument("--out", required=True, help="Output JSON path")
     p.add_argument(
         "--title",
@@ -715,7 +689,6 @@ def main(argv: List[str]) -> int:
             reproduce=args.reproduce,
             reproduce_module=args.reproduce_module,
             reproduce_timeout=args.reproduce_timeout,
-            pin_root=args.pin_root,
             output_path=args.out,
             title=args.title,
             code_path=args.code_path,

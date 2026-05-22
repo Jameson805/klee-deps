@@ -3,4 +3,5 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
-exec python3 "$repo_root/scripts/validation/validate_experiments_abacus.py" "$@"
+cd "$repo_root"
+exec python3 -m scripts.validation.validate_experiments_abacus "$@"

@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
+"""Resolve DWARF source locations for instruction addresses in ELF binaries."""
+
+from __future__ import annotations
 
 import argparse
 import bisect
 import os
-from typing import Any, Dict, List, Optional, Tuple
+import sys
+from typing import Any
 
 try:
-    from elftools.elf.elffile import ELFFile
+    from elftools.elf.elffile import ELFFile  # type: ignore[reportMissingImports]
 except ImportError:  # pragma: no cover - runtime dependency may be optional in some flows
     ELFFile = None
 
 # Per-executable cache: exe -> preprocessed DWARF lookup data
-_ADDR_CACHE: Dict[str, Dict[str, Any]] = {}
+_ADDR_CACHE: dict[str, dict[str, Any]] = {}
 
-AddrInfo = Tuple[str, int, int]
-AddrInfoContext = Tuple[str, int, int, Optional[int], Optional[int]]
+AddrInfo = tuple[str, int, int]
+AddrInfoContext = tuple[str, int, int, int | None, int | None]
 
 
 def _decode_dwarf_str(value: Any) -> str:
@@ -28,7 +32,7 @@ def _resolve_line_program_path(
     line_prog: Any,
     file_index: int,
     zero_based_files: bool,
-) -> Optional[str]:
+) -> str | None:
     if file_index < 0:
         return None
 
@@ -66,7 +70,7 @@ def _resolve_line_program_path(
     return os.path.normpath(os.path.join(comp_dir, name))
 
 
-def _line_program_uses_zero_based_files(line_prog: Any, entries: List[Any]) -> bool:
+def _line_program_uses_zero_based_files(line_prog: Any, entries: list[Any]) -> bool:
     version = int(line_prog.header.get("version", 0) or 0)
     if version >= 5:
         return True
@@ -90,8 +94,8 @@ def _ensure_addr_cache(exe: str) -> None:
         dwarfinfo = elffile.get_dwarf_info()
 
         # addr -> (path, line, col)
-        addr_map: Dict[int, AddrInfo] = {}
-        line_columns: Dict[Tuple[str, int], set[int]] = {}
+        addr_map: dict[int, AddrInfo] = {}
+        line_columns: dict[tuple[str, int], set[int]] = {}
 
         for cu in dwarfinfo.iter_CUs():
             top = cu.get_top_DIE()
@@ -132,7 +136,7 @@ def _ensure_addr_cache(exe: str) -> None:
         }
 
 
-def get_addr_info_context(exe: str, address: int) -> Optional[AddrInfoContext]:
+def get_addr_info_context(exe: str, address: int) -> AddrInfoContext | None:
     """Resolve an address to a source location plus neighboring DWARF columns."""
     if ELFFile is None:
         return None
@@ -143,7 +147,7 @@ def get_addr_info_context(exe: str, address: int) -> Optional[AddrInfoContext]:
     if not cache.get("has_dwarf"):
         return None
 
-    addr_map: Dict[int, AddrInfo] = cache["addr_map"]
+    addr_map: dict[int, AddrInfo] = cache["addr_map"]
     if not addr_map:
         return None
 
@@ -154,7 +158,7 @@ def get_addr_info_context(exe: str, address: int) -> Optional[AddrInfoContext]:
         return None
 
     path, line, column = addr_map[addrs[idx]]
-    columns: List[int] = cache["line_columns"].get((path, line), [])
+    columns: list[int] = cache["line_columns"].get((path, line), [])
     col_idx = bisect.bisect_left(columns, column)
 
     previous_column = None
@@ -173,7 +177,7 @@ def get_addr_info_context(exe: str, address: int) -> Optional[AddrInfoContext]:
     return path, line, column, previous_column, next_column
 
 
-def get_addr_info(exe: str, address: int) -> Optional[AddrInfo]:
+def get_addr_info(exe: str, address: int) -> AddrInfo | None:
     """Resolve an address to a source location using cached DWARF line data."""
     info = get_addr_info_context(exe, address)
     if info is None:
@@ -181,20 +185,20 @@ def get_addr_info(exe: str, address: int) -> Optional[AddrInfo]:
     return info[:3]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if ELFFile is None:
         print("Error: pyelftools is required for addrinfo CLI usage. Install with: pip install pyelftools")
-        exit(2)
+        sys.exit(2)
 
     parser = argparse.ArgumentParser(
         description="Find the source file, line, and column for a given instruction address."
     )
     parser.add_argument(
-        'executable_path',
+        "executable_path",
         help="The path to the ELF executable file."
     )
     parser.add_argument(
-        'address',
+        "address",
         help="The instruction address in hexadecimal format (e.g., 0x40114b)."
     )
 
@@ -205,7 +209,7 @@ if __name__ == '__main__':
         address_int = int(args.address, 16)
     except ValueError:
         print(f"Error: Invalid address format. Please use a hexadecimal string like '0x123abc'.")
-        exit(1)
+        sys.exit(1)
 
     info = get_addr_info(args.executable_path, address_int)
 
@@ -214,4 +218,4 @@ if __name__ == '__main__':
         print(f"{filename}:{line}:{column}")
     else:
         print(f"Could not find debug info for address {args.address} in '{args.executable_path}'.")
-        exit(1)
+        sys.exit(1)

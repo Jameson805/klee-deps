@@ -7,7 +7,8 @@ results without knowing each tool's raw log format.
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 STATUS_SUCCESS = "success"
 STATUS_TIMEOUT = "timeout"
@@ -40,7 +41,7 @@ MANDATORY_FIELDS = (
     "library",
 )
 
-MANDATORY_DTYPES: Dict[str, str] = {
+MANDATORY_DTYPES: dict[str, str] = {
     "filename": "object",
     "line": "Int64",
     "non_ct_time": "float64",
@@ -66,17 +67,17 @@ PREFERRED_COLUMN_ORDER = [
     "in_ctchecker",
 ]
 
-_SOURCE_LINE_CACHE: Dict[tuple[str, int], Optional[str]] = {}
+_SOURCE_LINE_CACHE: dict[tuple[str, int], str | None] = {}
 
 
-def format_location(file: Optional[str], line: Optional[int], col: Optional[int]) -> str:
+def format_location(file: str | None, line: int | None, col: int | None) -> str:
     """Render a compact ``file:line:column`` string for diagnostics."""
     if not file or line is None or col is None:
         return "<unknown>"
     return f"{file}:{line}:{col}"
 
 
-def _library_root(library: str) -> Optional[str]:
+def _library_root(library: str) -> str | None:
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     mapping = {
         "mbedtls": os.path.join(repo_root, "benchmarks", "mbedtls-3.2.1"),
@@ -88,12 +89,12 @@ def _library_root(library: str) -> Optional[str]:
     return root if root and os.path.isdir(root) else None
 
 
-def get_source_line(library: str, filename: str, line: int) -> Optional[str]:
+def get_source_line(library: str, filename: str, line: int) -> str | None:
     """Return a source line when the benchmark-relative path can be resolved."""
     if not isinstance(filename, str) or not filename or not isinstance(line, int) or line <= 0:
         return None
 
-    candidates: List[str] = []
+    candidates: list[str] = []
     if os.path.isabs(filename):
         candidates.append(filename)
     else:
@@ -108,7 +109,7 @@ def get_source_line(library: str, filename: str, line: int) -> Optional[str]:
         key = (os.path.abspath(path), line)
         if key in _SOURCE_LINE_CACHE:
             return _SOURCE_LINE_CACHE[key]
-        text: Optional[str] = None
+        text: str | None = None
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 for idx, line_text in enumerate(f, start=1):
@@ -142,8 +143,8 @@ def make_result_row(
     counterexamples: Any,
     reproduced_status: Any,
     library: Any,
-    optional_fields: Optional[Mapping[str, Any]] = None,
-) -> Dict[str, Any]:
+    optional_fields: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Validate and build one normalized result row."""
     if not isinstance(filename, str) or not filename:
         raise TypeError("filename must be a non-empty str")
@@ -168,7 +169,7 @@ def make_result_row(
     if not normalized_library:
         raise ValueError("library must be a non-empty str")
 
-    row: Dict[str, Any] = {}
+    row: dict[str, Any] = {}
     row["filename"] = filename
     row["line"] = line
     row["non_ct_time"] = non_ct_time
@@ -188,9 +189,9 @@ def make_result_row(
 def build_payload(
     rows: Iterable[Mapping[str, Any]],
     *,
-    optional_dtypes: Optional[Mapping[str, str]] = None,
-    metadata: Optional[Mapping[str, Any]] = None,
-) -> Dict[str, Any]:
+    optional_dtypes: Mapping[str, str] | None = None,
+    metadata: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build a complete payload with explicit column ordering and dtypes.
 
     Requiring explicit dtypes for optional fields keeps converters honest about
@@ -202,12 +203,12 @@ def build_payload(
     for row in normalized:
         observed.update(row.keys())
 
-    ordered: List[str] = [k for k in PREFERRED_COLUMN_ORDER if k in observed]
+    ordered: list[str] = [k for k in PREFERRED_COLUMN_ORDER if k in observed]
     extras = [k for k in observed if k not in ordered]
     ordered.extend(sorted(extras))
 
     optional_dtypes = dict(optional_dtypes or {})
-    dtypes: Dict[str, str] = {}
+    dtypes: dict[str, str] = {}
     for key in ordered:
         if key in MANDATORY_DTYPES:
             dtypes[key] = MANDATORY_DTYPES[key]
