@@ -13,12 +13,9 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
-import signal
 import shutil
+import signal
 import sys
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.experiments.common import (
     CampaignTool,
@@ -40,6 +37,8 @@ from scripts.experiments.common import (
     terminate_processes,
     wait_for_processes,
 )
+from tools.shared.tool_artifacts import resolve_executable_path
+
 from tools.converters.binsec_toml_to_json import convert_binsec_toml
 from tools.shared.experiment_registry import (
     build_for_tool,
@@ -108,14 +107,8 @@ def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
 
 
 def resolve_binsec_executable() -> str:
-    """Find the BINSEC executable and raise a clear CLI error if missing."""
-    executable = shutil.which("binsec")
-    if executable is None:
-        raise SystemExit(
-            "Error: could not find 'binsec' on PATH. When invoking run_binsec.py directly or via run_experiments.py, "
-            "launch it from a shell whose exported PATH includes the binsec executable."
-        )
-    return executable
+    """Resolve the BINSEC executable from the workspace build manifest."""
+    return str(resolve_executable_path("binsec"))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -127,7 +120,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sse-depth", type=int, default=1_000_000_000_000)
     parser.add_argument("--fml-solver", default="z3")
     parser.add_argument("--smt-solver", default="z3")
-    parser.add_argument("--pin-root")
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -162,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
         benchmarks = selected_benchmarks("binsec", args.benchmarks)
     except ValueError as error:
         raise SystemExit(str(error)) from error
-    args.binsec_executable = resolve_binsec_executable()
+    binsec_executable = resolve_binsec_executable()
     args.tmp_dir = str(Path(args.tmp_dir).expanduser().resolve())
 
     results_dir = resolve_repo_path(args.results_dir)
@@ -179,8 +171,7 @@ def main(argv: list[str] | None = None) -> int:
         context.log(f"sse_depth={args.sse_depth}")
         context.log(f"binsec_fml_solver={args.fml_solver}")
         context.log(f"binsec_smt_solver={args.smt_solver}")
-        context.log(f"binsec_executable={args.binsec_executable}")
-        context.log(f"pin_root={args.pin_root or os.environ.get('PIN_ROOT', '<unset>')}")
+        context.log(f"binsec_executable={binsec_executable}")
         context.log(f"verbose={'true' if args.verbose else 'false'}")
         context.log(f"tmp_dir={args.tmp_dir}")
         context.log(f"results_dir={results_dir}")
@@ -230,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
                         launch_output_captured_process(
                             title,
                             run_benchmark,
-                            (None, str(results_dir), args, library_id, variant_id, index),
+                            (None, str(results_dir), args, binsec_executable, library_id, variant_id, index),
                             log_path=worker_log_path,
                             verbose=args.verbose,
                         )
@@ -247,6 +238,7 @@ def run_benchmark(
     context: ExperimentContext | None,
     results_dir: Path | str,
     args: argparse.Namespace,
+    binsec_executable: str,
     library_id: str,
     variant_id: str,
     case_index: int,
@@ -293,6 +285,7 @@ def run_benchmark(
                 workspace,
                 local_results_dir,
                 args,
+                binsec_executable,
                 expect_string(case_table, "title", case_location),
                 expect_string(case_table, "sse_script", case_location),
                 expect_string(case_table, "stats_file", case_location),
@@ -309,6 +302,7 @@ def run_case(
     workspace,
     results_dir: Path,
     args: argparse.Namespace,
+    binsec_executable: str,
     title: str,
     sse_script: str,
     stats_file: str,
@@ -325,7 +319,7 @@ def run_case(
     context.log("=========")
     context.run(
         [
-            args.binsec_executable,
+            binsec_executable,
             "-sse",
             "-checkct",
             "-fml-solver",
@@ -409,7 +403,6 @@ def run_case(
                     public_inputs=public_inputs,
                     replay_executable=str(replay_path),
                     reproduce=True,
-                    pin_root=args.pin_root,
                     output_path=str(out_json),
                     code_path=workspace.resolve_code_path(benchmark_definition.code_path),
                     library=library,

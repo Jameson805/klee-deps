@@ -4,11 +4,12 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$script_dir"
 
-KLEE_PATH="../../klee-controlflow"
+source "$repo_root/scripts/shared/klee_tool_env.sh"
+load_klee_tool_layout "$repo_root"
 
 resolve_runner_config_path() {
     local variant="default"
-    python "$repo_root/tools/resolve_runner_profile.py" \
+    python -m tools.resolve_runner_profile \
         --library "mbedtls" \
         --variant "$variant" \
         --field config
@@ -120,7 +121,7 @@ fi
 
 mkdir -p "$script_dir/generated/modexp"
 
-python "$repo_root/tools/generate_runner_artifacts.py" "${generator_args[@]}"
+python -m tools.generate_runner_artifacts "${generator_args[@]}"
 
 if [ "$SKIP_DEPS" -eq 0 ]; then
     echo "Building dependencies..."
@@ -159,8 +160,8 @@ fi
 
 flags=( -g -O0 -I"$repo_root/include" -Iinclude -Igenerated/modexp )
 klee_flags=(\
-    -I"$KLEE_PATH/include" \
-    -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" \
+    -I"$KLEE_TOOL_INCLUDE_DIR" \
+    -L"$KLEE_TOOL_RUNTIME_LIB_DIR" -Wl,-rpath="$KLEE_TOOL_RUNTIME_LIB_DIR" \
     -lkleeRuntest \
 )
 libs=( build/library/libmbedtls.a build/library/libmbedx509.a build/library/libmbedcrypto.a )

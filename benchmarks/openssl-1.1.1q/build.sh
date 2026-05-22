@@ -4,14 +4,15 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$script_dir"
 
-KLEE_PATH="../../klee-controlflow"
+source "$repo_root/scripts/shared/klee_tool_env.sh"
+load_klee_tool_layout "$repo_root"
 
 resolve_runner_config_path() {
     local variant="default"
     if [[ "$SLICED" -eq 1 ]]; then
         variant="sliced"
     fi
-    python "$repo_root/tools/resolve_runner_profile.py" \
+    python -m tools.resolve_runner_profile \
         --library "openssl" \
         --variant "$variant" \
         --field config
@@ -168,8 +169,8 @@ fi
 
 flags_base=( -g -O0 -I"$repo_root/include" -Iinclude )
 klee_flags=(\
-    -I"$KLEE_PATH/include" \
-    -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" \
+    -I"$KLEE_TOOL_INCLUDE_DIR" \
+    -L"$KLEE_TOOL_RUNTIME_LIB_DIR" -Wl,-rpath="$KLEE_TOOL_RUNTIME_LIB_DIR" \
     -lkleeRuntest \
 )
 libs=( libcrypto.a )
@@ -192,7 +193,7 @@ for algo in "${algos[@]}"; do
             --binsec-var-pub-out "$generated_dir/binsec_var_pub.cfg"
         )
     fi
-    python "$repo_root/tools/generate_runner_artifacts.py" "${generator_args_for_algo[@]}"
+    python -m tools.generate_runner_artifacts "${generator_args_for_algo[@]}"
 
     if [[ "$MODE" == "klee" ]]; then
         # KLEE bitcode builds

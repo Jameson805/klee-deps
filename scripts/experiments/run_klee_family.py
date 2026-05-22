@@ -18,8 +18,6 @@ import resource
 import signal
 import shlex
 import shutil
-import sys
-
 from scripts.experiments.common import (
     ExperimentContext,
     LaunchedProcess,
@@ -38,6 +36,8 @@ from scripts.experiments.common import (
     terminate_processes,
     wait_for_processes,
 )
+from tools.shared.tool_artifacts import resolve_artifact_path, resolve_klee_tool_layout
+
 from tools.converters.klee_log_to_json import KLEE_OPTIONAL_DTYPES, convert_klee_output
 from tools.postprocess.reproduce_positives import reproduce_json_positives
 from tools.shared.experiment_registry import (
@@ -60,7 +60,7 @@ OPTIMIZE_ARRAY_VALUES = ("false", "all", "index", "value")
 @dataclass(frozen=True)
 class KleeModeProfile:
     tool_id: str
-    binary_path: str
+    executable_artifact: str
     results_dir: str
     extra_flag: str | None = None
 
@@ -68,19 +68,19 @@ class KleeModeProfile:
 MODE_PROFILES = {
     "klee_cf": KleeModeProfile(
         tool_id="klee_cf",
-        binary_path="klee-controlflow/build/bin/klee",
+        executable_artifact="klee-cf",
         results_dir="results/klee_cf_results",
         extra_flag="concretize_on_solver_timeout",
     ),
     "klee_eager": KleeModeProfile(
         tool_id="klee_eager",
-        binary_path="klee-eager/build/bin/klee",
+        executable_artifact="klee-eager",
         results_dir="results/klee_eager_results",
         extra_flag="product_program_fallback",
     ),
     "klee_self_comp": KleeModeProfile(
         tool_id="klee_self_comp",
-        binary_path="klee-self-comp/build/bin/klee",
+        executable_artifact="klee-self-comp",
         results_dir="results/klee_self_comp_results",
     ),
 }
@@ -259,7 +259,6 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         parser.add_argument("--product-program-fallback", action="store_true")
     parser.add_argument("--solver-backend", default="stp", choices=SOLVER_BACKENDS)
     parser.add_argument("--optimize-array", default="false", choices=OPTIMIZE_ARRAY_VALUES)
-    parser.add_argument("--pin-root")
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -296,10 +295,9 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
 
     limit_bytes = 70_000_000 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))
-    klee_bin_dir = (REPO_ROOT / profile.binary_path).parent
-    env = dict(os.environ)
-    env["PATH"] = f"{klee_bin_dir}:{env.get('PATH', '')}"
-    os.environ["PATH"] = env["PATH"]
+    klee_layout = resolve_klee_tool_layout(profile.executable_artifact)
+    klee_executable = str(klee_layout.binary)
+    loop_limiter_plugin = str(resolve_artifact_path("loop_limiter_plugin", expected_kind="shared-library"))
     results_dir = resolve_repo_path(args.results_dir)
 
     shutil.rmtree(results_dir, ignore_errors=True)
@@ -325,10 +323,11 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
             )
         context.log(f"solver_backend={args.solver_backend}")
         context.log(f"optimize_array={args.optimize_array}")
-        context.log(f"pin_root={args.pin_root or os.environ.get('PIN_ROOT', '<unset>')}")
         context.log(f"verbose={'true' if args.verbose else 'false'}")
         context.log(f"tmp_dir={Path(args.tmp_dir).expanduser().resolve()}")
         context.log(f"results_dir={results_dir}")
+        context.log(f"klee_executable={klee_executable}")
+        context.log(f"loop_limiter_plugin={loop_limiter_plugin}")
         context.log(
             "benchmarks="
             + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in benchmarks)
@@ -380,7 +379,18 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
                         launch_output_captured_process(
                             worker_tag,
                             run_benchmark,
-                            (None, None, str(results_dir), args, mode, library_id, variant_id, index),
+                            (
+                                None,
+                                None,
+                                str(results_dir),
+                                args,
+                                klee_executable,
+                                loop_limiter_plugin,
+                                mode,
+                                library_id,
+                                variant_id,
+                                index,
+                            ),
                             log_path=worker_log_path,
                             verbose=args.verbose,
                         )
@@ -398,6 +408,8 @@ def run_benchmark(
     env: dict[str, str] | None,
     results_dir: Path | str,
     args: argparse.Namespace,
+    klee_executable: str,
+    loop_limiter_plugin: str,
     mode: str,
     library_id: str,
     variant_id: str,
@@ -410,6 +422,7 @@ def run_benchmark(
         local_context = context or ExperimentContext()
         local_env = env or dict(os.environ)
         local_results_dir = Path(results_dir)
+        local_env["KLEE_TOOL_ID"] = local_profile.executable_artifact
 
         benchmark_definition = definition(library_id, variant_id)
         build = build_for_tool(benchmark_definition, mode)
@@ -429,7 +442,7 @@ def run_benchmark(
             if step_entries:
                 if mode not in benchmark_definition.tools:
                     raise ValueError(f"{benchmark_definition.config_location}.klee_preprocess_steps requires {mode!r} in tools")
-                loop_limiter = REPO_ROOT / "loop-limiter/build/libLoopLimiter.so"
+                loop_limiter = Path(loop_limiter_plugin)
                 # Preprocessing stays explicit in the benchmark TOML because only a
                 # subset of cases need loop bounding and each benchmark blacklists a
                 # different set of helper routines.
@@ -562,7 +575,7 @@ def run_benchmark(
                     "--signal=INT",
                     f"--kill-after={args.kill_after}",
                     args.max_time,
-                    str(REPO_ROOT / local_profile.binary_path),
+                    klee_executable,
                     "--libc=uclibc",
                     "--posix-runtime",
                     "--external-calls=all",
@@ -685,8 +698,6 @@ def run_benchmark(
                     "--output",
                     str(case_json),
                 ]
-                if args.pin_root:
-                    reproduce_command.extend(["--pin-root", args.pin_root])
                 reproduce_command.extend(replay_args)
                 local_context.log(f"$ {shlex.join(reproduce_command)}")
                 reproduce_return_code = reproduce_json_positives(
@@ -697,7 +708,6 @@ def run_benchmark(
                     public=replay_public,
                     output=str(case_json),
                     library=library,
-                    pin_root=args.pin_root,
                 )
                 if reproduce_return_code != 0:
                     raise SystemExit(reproduce_return_code)

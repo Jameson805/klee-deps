@@ -8,14 +8,15 @@ export PATH="/usr/lib/llvm-13/bin:$PATH"
 export CC=wllvm
 export LLVM_COMPILER=clang
 
-KLEE_PATH="../../klee-controlflow"
+source "$repo_root/scripts/shared/klee_tool_env.sh"
+load_klee_tool_layout "$repo_root"
 
 resolve_runner_config_path() {
     local variant="default"
     if [[ "$SLICED" -eq 1 ]]; then
         variant="sliced"
     fi
-    python "$repo_root/tools/resolve_runner_profile.py" \
+    python -m tools.resolve_runner_profile \
         --library "libgcrypt" \
         --variant "$variant" \
         --field config
@@ -130,7 +131,7 @@ fi
 
 mkdir -p "$script_dir/generated/modexp"
 
-python "$repo_root/tools/generate_runner_artifacts.py" "${generator_args[@]}"
+python -m tools.generate_runner_artifacts "${generator_args[@]}"
 
 install_root=$(realpath "./build")
 
@@ -192,7 +193,7 @@ fi
 
 # Flags and libraries
 flags=( -g -O0 -I"$repo_root/include" -Igenerated/modexp -isystem "${install_root}/include" )
-klee_flags=( -I"$KLEE_PATH/include" -L"$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib" -lkleeRuntest )
+klee_flags=( -I"$KLEE_TOOL_INCLUDE_DIR" -L"$KLEE_TOOL_RUNTIME_LIB_DIR" -Wl,-rpath="$KLEE_TOOL_RUNTIME_LIB_DIR" -lkleeRuntest )
 libs=( "${install_root}/lib/libgcrypt.a" "${install_root}/lib/libgpg-error.a" )
 
 if [[ "$MODE" == "klee" ]]; then

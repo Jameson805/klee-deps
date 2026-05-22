@@ -5,15 +5,19 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$script_dir"
 
-KLEE_PATH="../../klee-controlflow"
+source "$repo_root/scripts/shared/klee_tool_env.sh"
+load_klee_tool_layout "$repo_root"
 
 resolve_runner_config_path() {
     local profile_id="$1"
-    python "$repo_root/tools/resolve_runner_profile.py" \
-    --library "appliedcryp" \
-    --variant "default" \
-        --profile "$profile_id" \
-        --field config
+    (
+        cd "$repo_root"
+        python -m tools.resolve_runner_profile \
+        --library "appliedcryp" \
+        --variant "default" \
+            --profile "$profile_id" \
+            --field config
+    )
 }
 
 usage() {
@@ -111,8 +115,8 @@ common_flags=(
 )
 
 klee_flags=(
-    -I "$KLEE_PATH/include"
-    -L "$KLEE_PATH/build/lib" -Wl,-rpath="$KLEE_PATH/build/lib"
+    -I "$KLEE_TOOL_INCLUDE_DIR"
+    -L "$KLEE_TOOL_RUNTIME_LIB_DIR" -Wl,-rpath="$KLEE_TOOL_RUNTIME_LIB_DIR"
     -lkleeRuntest
 )
 
@@ -182,7 +186,10 @@ generate_runner_artifacts_for_id() {
         )
     fi
 
-    python "$repo_root/tools/generate_runner_artifacts.py" "${generator_args[@]}"
+    (
+        cd "$repo_root"
+        python -m tools.generate_runner_artifacts "${generator_args[@]}"
+    )
 }
 
 build_klee_mode() {

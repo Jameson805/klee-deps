@@ -6,13 +6,14 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 benchmark_dir="$repo_root/benchmarks/mbedtls-3.2.1"
 bignum_source="$benchmark_dir/library/bignum.c"
 
-binsec_root="${BINSEC_ROOT:-/home/theta-lin/binsec}"
+binsec_root="${BINSEC_ROOT:-}"
 binsec_path=""
 preset="size_4"
 kind="var_pub"
 timeout_seconds=60
 jump_enum=10
 sse_depth=1000000000000
+sse_heuristic="nurs"
 fml_solver="z3"
 smt_solver="z3"
 skip_build=0
@@ -32,10 +33,11 @@ Options:
   --timeout N          BINSEC -sse-timeout in seconds, default: 60
   --jump-enum N        BINSEC -sse-jump-enum value, default: 10
   --sse-depth N        BINSEC -sse-depth value, default: 1000000000000
+    --heuristic NAME     BINSEC -sse-heuristics value, default: nurs
   --fml-solver NAME    BINSEC formula solver, default: z3
   --smt-solver NAME    BINSEC SMT solver, default: z3
   --binsec PATH        Explicit BINSEC executable to run
-  --binsec-root PATH   BINSEC checkout root, default: /home/theta-lin/binsec
+    --binsec-root PATH   BINSEC checkout root used for fallback probing
   --skip-build         Reuse existing Mbed TLS BINSEC artifacts
   --out-dir PATH       Output directory, default: results/binsec_trace/<timestamp>
   -h, --help           Show this message
@@ -76,6 +78,7 @@ resolve_existing_executable() {
 }
 
 resolve_binsec_command() {
+    local opam_bin
     local installed_bin
     local resolved=""
     local on_path=""
@@ -95,19 +98,31 @@ resolve_binsec_command() {
         return 0
     fi
 
-    installed_bin="$binsec_root/_build/install/default/bin/binsec"
-    if resolved="$(resolve_existing_executable "$installed_bin")"; then
-        binsec_cmd=("$resolved")
-        return 0
-    fi
+    if [[ -n "$binsec_root" ]]; then
+        opam_bin="$binsec_root/_opam/bin/binsec"
+        if resolved="$(resolve_existing_executable "$opam_bin")"; then
+            binsec_cmd=("$resolved")
+            return 0
+        fi
 
-    if command -v dune >/dev/null 2>&1 && [[ -f "$binsec_root/dune-project" ]]; then
-        binsec_cmd=(dune exec --root "$binsec_root" -- binsec)
-        return 0
+        installed_bin="$binsec_root/_build/install/default/bin/binsec"
+        if resolved="$(resolve_existing_executable "$installed_bin")"; then
+            binsec_cmd=("$resolved")
+            return 0
+        fi
+
+        if command -v dune >/dev/null 2>&1 && [[ -f "$binsec_root/dune-project" ]]; then
+            binsec_cmd=(dune exec --root "$binsec_root" -- binsec)
+            return 0
+        fi
     fi
 
     echo "Error: unable to find a runnable BINSEC command." >&2
-    echo "Tried: PATH, $installed_bin, and dune exec under $binsec_root." >&2
+    if [[ -n "$binsec_root" ]]; then
+        echo "Tried: PATH, $binsec_root/_opam/bin/binsec, $binsec_root/_build/install/default/bin/binsec, and dune exec under $binsec_root." >&2
+    else
+        echo "Tried: PATH only. Pass --binsec PATH or --binsec-root PATH to enable checkout-local fallbacks." >&2
+    fi
     exit 1
 }
 
@@ -131,6 +146,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --sse-depth)
             sse_depth="${2:-}"
+            shift 2
+            ;;
+        --heuristic)
+            sse_heuristic="${2:-}"
             shift 2
             ;;
         --fml-solver)
@@ -226,12 +245,12 @@ fi
 
 case "$kind" in
     fix_pub)
-        sse_script="$benchmark_dir/generated/binsec_fix_pub.cfg"
-        executable="$benchmark_dir/binsec_fix_pub"
+        sse_script="$benchmark_dir/generated/modexp/binsec_fix_pub.cfg"
+        executable="$benchmark_dir/binsec_fix_pub_modexp"
         ;;
     var_pub)
-        sse_script="$benchmark_dir/generated/binsec_var_pub.cfg"
-        executable="$benchmark_dir/binsec_var_pub"
+        sse_script="$benchmark_dir/generated/modexp/binsec_var_pub.cfg"
+        executable="$benchmark_dir/binsec_var_pub_modexp"
         ;;
 esac
 
@@ -266,6 +285,7 @@ echo "Preset: $preset"
 echo "Kind: $kind"
 echo "Executable: $executable"
 echo "SSE script: $sse_script"
+echo "SSE heuristic: $sse_heuristic"
 echo "Tracing BINSEC execution..."
 
 cd "$repo_root"
@@ -277,7 +297,7 @@ set +e
     -sse-jump-enum "$jump_enum" \
     -sse-script "$sse_script" \
     -sse-depth "$sse_depth" \
-    -sse-heuristics nurs \
+    -sse-heuristics "$sse_heuristic" \
     -checkct-features control-flow,memory-access \
     -checkct-stats-file "$stats_file" \
     -sse-no-screen \
@@ -334,6 +354,7 @@ coverage_pct="$(awk -v visited="$visited_line_count" -v total="$all_line_count" 
     echo "kind=$kind"
     echo "executable=$executable"
     echo "sse_script=$sse_script"
+    echo "sse_heuristic=$sse_heuristic"
     echo "trace_log=$trace_log"
     echo "visited_addresses=$visited_addr_count"
     echo "visited_bignum_lines=$visited_line_count"
