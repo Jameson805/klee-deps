@@ -9,11 +9,17 @@ import argparse
 import os
 from pathlib import Path
 import re
+import struct
 import sys
 import tomllib
 
 
 IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _native_binsec_word_size() -> int:
+    """Return the native pointer width used by native-arch BINSEC builds."""
+    return struct.calcsize("P") * 8
 
 
 def load_runner_config(config_path: str | Path) -> dict[str, object]:
@@ -403,6 +409,9 @@ def _render_binsec_config(resolved: dict[str, object], base_path: str, mode_name
 
     with open(base_path, "r", encoding="utf-8") as f:
         lines = f.read().splitlines()
+
+    word_size = _native_binsec_word_size()
+    lines = [line.replace("<32>", f"<{word_size}>") for line in lines]
 
     while lines and lines[-1] == "":
         lines.pop()
