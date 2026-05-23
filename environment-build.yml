@@ -2,14 +2,13 @@ name: klee-deps-build
 channels:
   - conda-forge
 dependencies:
-  - python=3.14
+  - python=3.11
   - cmake>=3.26
   - ninja
   - make
   - m4
   - git
   - curl
-  - opam
   - file
   - pkg-config
   - bison
@@ -17,6 +16,8 @@ dependencies:
   - perl
   - unzip
   - gmp
+  - opam
+  - dune
   - zlib
   - boost-cpp
   - sqlite

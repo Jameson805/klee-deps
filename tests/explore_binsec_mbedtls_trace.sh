@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 benchmark_dir="$repo_root/benchmarks/mbedtls-3.2.1"
 bignum_source="$benchmark_dir/library/bignum.c"
 
-binsec_root="${BINSEC_ROOT:-}"
+binsec_root="${BINSEC_ROOT:-/home/theta-lin/binsec}"
 binsec_path=""
 preset="size_4"
 kind="var_pub"
@@ -37,7 +37,7 @@ Options:
   --fml-solver NAME    BINSEC formula solver, default: z3
   --smt-solver NAME    BINSEC SMT solver, default: z3
   --binsec PATH        Explicit BINSEC executable to run
-    --binsec-root PATH   BINSEC checkout root used for fallback probing
+  --binsec-root PATH   BINSEC checkout root, default: /home/theta-lin/binsec
   --skip-build         Reuse existing Mbed TLS BINSEC artifacts
   --out-dir PATH       Output directory, default: results/binsec_trace/<timestamp>
   -h, --help           Show this message
@@ -98,31 +98,25 @@ resolve_binsec_command() {
         return 0
     fi
 
-    if [[ -n "$binsec_root" ]]; then
-        opam_bin="$binsec_root/_opam/bin/binsec"
-        if resolved="$(resolve_existing_executable "$opam_bin")"; then
-            binsec_cmd=("$resolved")
-            return 0
-        fi
+    opam_bin="$binsec_root/_opam/bin/binsec"
+    if resolved="$(resolve_existing_executable "$opam_bin")"; then
+        binsec_cmd=("$resolved")
+        return 0
+    fi
 
-        installed_bin="$binsec_root/_build/install/default/bin/binsec"
-        if resolved="$(resolve_existing_executable "$installed_bin")"; then
-            binsec_cmd=("$resolved")
-            return 0
-        fi
+    installed_bin="$binsec_root/_build/install/default/bin/binsec"
+    if resolved="$(resolve_existing_executable "$installed_bin")"; then
+        binsec_cmd=("$resolved")
+        return 0
+    fi
 
-        if command -v dune >/dev/null 2>&1 && [[ -f "$binsec_root/dune-project" ]]; then
-            binsec_cmd=(dune exec --root "$binsec_root" -- binsec)
-            return 0
-        fi
+    if command -v dune >/dev/null 2>&1 && [[ -f "$binsec_root/dune-project" ]]; then
+        binsec_cmd=(dune exec --root "$binsec_root" -- binsec)
+        return 0
     fi
 
     echo "Error: unable to find a runnable BINSEC command." >&2
-    if [[ -n "$binsec_root" ]]; then
-        echo "Tried: PATH, $binsec_root/_opam/bin/binsec, $binsec_root/_build/install/default/bin/binsec, and dune exec under $binsec_root." >&2
-    else
-        echo "Tried: PATH only. Pass --binsec PATH or --binsec-root PATH to enable checkout-local fallbacks." >&2
-    fi
+    echo "Tried: PATH, $opam_bin, $installed_bin, and dune exec under $binsec_root." >&2
     exit 1
 }
 

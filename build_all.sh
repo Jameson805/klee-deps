@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-# Build the shared conda environment plus workspace-local tool artifacts.
-# The environment can be reused across worktrees, while the manifest stays
-# under this repository so each workspace can expose its own KLEE/BINSEC
-# builds without clobbering another checkout.
-
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,11 +18,6 @@ KLEE_UCLIBC_REPO_URL="${KLEE_UCLIBC_REPO_URL:-https://github.com/klee/klee-uclib
 BINSEC_REPO_URL="${BINSEC_REPO_URL:-https://github.com/binsec/binsec.git}"
 BINSEC_OCAML_COMPILER="${BINSEC_OCAML_COMPILER:-4.14.2}"
 ENABLE_TCMALLOC="${ENABLE_TCMALLOC:-OFF}"
-PIN_ARCHIVE_URL="${PIN_ARCHIVE_URL:-https://software.intel.com/sites/landingpage/pintool/downloads/pin-external-4.2-99776-g21d818fa2-gcc-linux.tar.gz}"
-PIN_INSTALL_ROOT="${PIN_INSTALL_ROOT:-$DEPS_ROOT/pin}"
-MINISAT_INSTALL_DIR=""
-
-BUILD_MANIFEST="${BUILD_MANIFEST:-$BUILD_ROOT/tool-paths.json}"
 
 MODE="all"
 declare -a REQUESTED_PROJECTS=()
@@ -43,20 +33,20 @@ die() {
 
 usage() {
     cat <<'EOF'
-Usage: ./build_all.sh [all|env|deps|pin|binsec|klee|extras] [options]
+Usage: ./build_all.sh [all|env|deps|binsec|klee|extras] [options]
 
 Modes:
   all     Create or update the conda env, initialize submodules, build STP and
-                    klee-uclibc, then build all KLEE submodules plus loop-limiter. If
-                    `opam` is available, BINSEC is also built.
+      klee-uclibc, build BINSEC in a local opam switch, then build all KLEE
+      submodules plus branch-recorder and loop-limiter.
   env     Create or update the conda environment only.
   deps    Create or update the conda environment, initialize submodules, and
-            build STP, klee-uclibc, and Intel Pin.
-  pin     Create or update the conda environment and install Intel Pin only.
+      build STP, klee-uclibc, and BINSEC.
   binsec  Create or update the conda environment and build BINSEC only.
   klee    Create or update the conda environment, initialize submodules, build
-      STP plus klee-uclibc, install Intel Pin, then build selected KLEE submodules.
-    extras  Create or update the conda environment and build loop-limiter.
+          STP plus klee-uclibc, then build selected KLEE submodules.
+  extras  Create or update the conda environment and build branch-recorder plus
+          loop-limiter.
 
 Options:
   --project <name>   Build only the named KLEE project. Repeatable.
@@ -66,15 +56,14 @@ Environment overrides:
   ENV_NAME, ENV_FILE, BUILD_ROOT, DEPS_ROOT, JOBS, CMAKE_GENERATOR,
   CMAKE_BUILD_TYPE, STP_VERSION, STP_REPO_URL, KLEE_UCLIBC_REPO_URL,
     BINSEC_REPO_URL, BINSEC_ROOT, BINSEC_OCAML_COMPILER, OPAM_ROOT,
-        ENABLE_TCMALLOC, PIN_ARCHIVE_URL, PIN_INSTALL_ROOT, LLVM_DIR, LLVMCC,
-        LLVMCXX, KLEE_CMAKE_EXTRA_ARGS, BUILD_MANIFEST.
+    ENABLE_TCMALLOC, LLVM_DIR, LLVMCC, LLVMCXX, KLEE_CMAKE_EXTRA_ARGS.
 EOF
 }
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            all|env|deps|pin|binsec|klee|extras)
+            all|env|deps|binsec|klee|extras)
                 MODE="$1"
                 ;;
             --project)
@@ -107,156 +96,6 @@ resolve_tool() {
         fi
     done
     return 1
-}
-
-ensure_build_manifest() {
-    # Keep artifact discovery explicit and workspace-local instead of deriving
-    # tool availability from ad hoc build directories.
-    mkdir -p "$(dirname "$BUILD_MANIFEST")"
-
-    if [[ ! -f "$BUILD_MANIFEST" ]]; then
-        cat > "$BUILD_MANIFEST" <<'EOF'
-{
-    "artifacts": {},
-    "tools": {}
-}
-EOF
-    fi
-}
-
-register_artifact() {
-    local artifact_id="$1"
-    local artifact_path="$2"
-    local artifact_kind="$3"
-
-    [[ -n "$artifact_id" ]] || die "register_artifact requires an artifact id"
-    [[ -e "$artifact_path" ]] || die "Expected artifact not found: $artifact_path"
-
-    ensure_build_manifest
-    python - "$BUILD_MANIFEST" "$artifact_id" "$artifact_path" "$artifact_kind" <<'PY'
-import json
-from pathlib import Path
-import sys
-
-manifest_path = Path(sys.argv[1])
-artifact_id = sys.argv[2]
-artifact_path = str(Path(sys.argv[3]).resolve())
-artifact_kind = sys.argv[4]
-
-if manifest_path.exists():
-    with manifest_path.open(encoding="utf-8") as handle:
-        data = json.load(handle)
-else:
-    data = {"artifacts": {}}
-
-artifacts = data.setdefault("artifacts", {})
-artifacts[artifact_id] = {"path": artifact_path, "kind": artifact_kind}
-
-with manifest_path.open("w", encoding="utf-8") as handle:
-    json.dump(data, handle, indent=2, sort_keys=True)
-    handle.write("\n")
-PY
-}
-
-register_klee_tool_record() {
-    local tool_id="$1"
-    local binary_path="$2"
-    local include_dir="$3"
-    local runtime_lib_dir="$4"
-
-    [[ -n "$tool_id" ]] || die "register_klee_tool_record requires a tool id"
-    [[ -x "$binary_path" ]] || die "Expected KLEE binary not found: $binary_path"
-    [[ -d "$include_dir" ]] || die "Expected KLEE include directory not found: $include_dir"
-    [[ -d "$runtime_lib_dir" ]] || die "Expected KLEE runtime lib directory not found: $runtime_lib_dir"
-
-    ensure_build_manifest
-    python - "$BUILD_MANIFEST" "$tool_id" "$binary_path" "$include_dir" "$runtime_lib_dir" <<'PY'
-import json
-from pathlib import Path
-import sys
-
-manifest_path = Path(sys.argv[1])
-tool_id = sys.argv[2]
-binary_path = str(Path(sys.argv[3]).resolve())
-include_dir = str(Path(sys.argv[4]).resolve())
-runtime_lib_dir = str(Path(sys.argv[5]).resolve())
-
-if manifest_path.exists():
-    with manifest_path.open(encoding="utf-8") as handle:
-        data = json.load(handle)
-else:
-    data = {"artifacts": {}, "tools": {}}
-
-tools = data.setdefault("tools", {})
-tools[tool_id] = {
-    "kind": "klee-tool",
-    "binary": binary_path,
-    "include_dir": include_dir,
-    "runtime_lib_dir": runtime_lib_dir,
-}
-
-with manifest_path.open("w", encoding="utf-8") as handle:
-    json.dump(data, handle, indent=2, sort_keys=True)
-    handle.write("\n")
-PY
-}
-
-prune_missing_artifacts() {
-    ensure_build_manifest
-    python - "$BUILD_MANIFEST" <<'PY'
-import json
-from pathlib import Path
-import sys
-
-manifest_path = Path(sys.argv[1])
-with manifest_path.open(encoding="utf-8") as handle:
-    data = json.load(handle)
-
-artifacts = data.get("artifacts", {})
-data["artifacts"] = {
-    key: value
-    for key, value in artifacts.items()
-    if isinstance(value, dict) and Path(value.get("path", "")).exists()
-}
-
-tools = data.get("tools", {})
-data["tools"] = {
-    key: value
-    for key, value in tools.items()
-    if isinstance(value, dict)
-    and Path(value.get("binary", "")).exists()
-    and Path(value.get("include_dir", "")).is_dir()
-    and Path(value.get("runtime_lib_dir", "")).is_dir()
-}
-
-with manifest_path.open("w", encoding="utf-8") as handle:
-    json.dump(data, handle, indent=2, sort_keys=True)
-    handle.write("\n")
-PY
-}
-
-unregister_artifact() {
-    local artifact_id="$1"
-
-    ensure_build_manifest
-    python - "$BUILD_MANIFEST" "$artifact_id" <<'PY'
-import json
-from pathlib import Path
-import sys
-
-manifest_path = Path(sys.argv[1])
-artifact_id = sys.argv[2]
-
-with manifest_path.open(encoding="utf-8") as handle:
-    data = json.load(handle)
-
-artifacts = data.get("artifacts", {})
-artifacts.pop(artifact_id, None)
-
-with manifest_path.open("w", encoding="utf-8") as handle:
-    json.dump(data, handle, indent=2, sort_keys=True)
-    handle.write("\n")
-PY
 }
 
 contains_requested_project() {
@@ -302,15 +141,13 @@ ensure_opam_root() {
 
     if [[ ! -f "$OPAM_ROOT/config" ]]; then
         log "Initializing opam root at $OPAM_ROOT"
-        env -u OPAMSWITCH -u OPAMROOT -u OPAMNOENVNOTICE \
-            opam init --root "$OPAM_ROOT" --disable-sandboxing --bare --yes
+        opam init --root "$OPAM_ROOT" --disable-sandboxing --bare --yes
     fi
 }
 
 ensure_submodules() {
     require_command git
     log "Initializing git submodules"
-    git -C "$ROOT_DIR" submodule sync --recursive
     git -C "$ROOT_DIR" submodule update --init --recursive
 }
 
@@ -360,12 +197,24 @@ clone_or_update_repo() {
     fi
 }
 
-register_executable_artifact() {
-    local artifact_id="$1"
-    local executable_path="$2"
+install_binsec_wrapper() {
+    local tool_name="$1"
+    local source_path="$2"
+    local target_path="$CONDA_PREFIX/bin/$tool_name"
+    local opam_bin
 
-    [[ -x "$executable_path" ]] || die "Expected executable not found: $executable_path"
-    register_artifact "$artifact_id" "$executable_path" executable
+    [[ -n "${CONDA_PREFIX:-}" ]] || die "CONDA_PREFIX is not set; cannot install BINSEC wrappers into the active environment"
+    opam_bin="$(command -v opam)"
+    [[ -n "$opam_bin" ]] || die "Could not resolve opam after activating the conda environment"
+    [[ -x "$source_path" ]] || die "Expected executable not found: $source_path"
+
+    cat > "$target_path" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+eval "\$($opam_bin env --root \"$OPAM_ROOT\" --set-switch --switch \"$BINSEC_ROOT\" --shell=bash)"
+exec "$source_path" "\$@"
+EOF
+    chmod +x "$target_path"
 }
 
 build_binsec() {
@@ -378,43 +227,34 @@ build_binsec() {
         log "Creating BINSEC local opam switch in $BINSEC_ROOT"
         (
             cd "$BINSEC_ROOT"
-            env -u OPAMSWITCH -u OPAMNOENVNOTICE \
-                OPAMROOT="$OPAM_ROOT" OCAML_COMPILER="$BINSEC_OCAML_COMPILER" make switch
+            OPAMROOT="$OPAM_ROOT" OCAML_COMPILER="$BINSEC_OCAML_COMPILER" make switch
         )
     fi
 
     log "Installing required BINSEC opam packages"
-    env -u OPAMSWITCH -u OPAMROOT -u OPAMNOENVNOTICE \
-        opam install --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" \
-        --yes dune dune-site menhir grain_dypgen ocamlgraph zarith toml
+    opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- \
+        opam install --yes dune dune-site menhir grain_dypgen ocamlgraph zarith toml
 
     log "Building BINSEC"
-    (
-        cd "$BINSEC_ROOT"
-        env -u OPAMSWITCH -u OPAMROOT -u OPAMNOENVNOTICE \
-            opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- make
-    )
+    opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- make
     log "Installing BINSEC into the local opam switch"
-    (
-        cd "$BINSEC_ROOT"
-        env -u OPAMSWITCH -u OPAMROOT -u OPAMNOENVNOTICE \
-            opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- make install
-    )
+    opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- make install
 
     switch_bin_dir="$BINSEC_ROOT/_opam/bin"
-    register_executable_artifact binsec "$switch_bin_dir/binsec"
-    register_executable_artifact dune "$switch_bin_dir/dune"
+    install_binsec_wrapper binsec "$switch_bin_dir/binsec"
+    install_binsec_wrapper dune "$switch_bin_dir/dune"
 
-    log "BINSEC is available via $switch_bin_dir/binsec"
-    log "Dune is available via $switch_bin_dir/dune"
+    log "BINSEC is available via $CONDA_PREFIX/bin/binsec"
+    log "Dune is available via $CONDA_PREFIX/bin/dune"
 }
 
 build_stp() {
+    local minisat_install
     local stp_src="$DEPS_ROOT/src/stp"
     local stp_build="$DEPS_ROOT/build/stp"
     local stp_install="$DEPS_ROOT/install/stp-$STP_VERSION"
 
-    build_minisat
+    minisat_install="$(build_minisat)"
 
     clone_or_update_repo "$STP_REPO_URL" "$stp_src" "tags/$STP_VERSION"
 
@@ -426,9 +266,7 @@ build_stp() {
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_C_COMPILER="$CLANG_BIN" \
         -DCMAKE_CXX_COMPILER="$CLANGXX_BIN" \
-        -DCMAKE_CXX_FLAGS="${STP_CXX_FLAGS:--include stdint.h}" \
-        -DENABLE_PYTHON_INTERFACE=OFF \
-        -DCMAKE_PREFIX_PATH="$MINISAT_INSTALL_DIR;$CMAKE_PREFIX_PATH_VALUE"
+        -DCMAKE_PREFIX_PATH="$minisat_install;$CMAKE_PREFIX_PATH_VALUE"
 
     log "Building STP"
     cmake --build "$stp_build" --parallel "$JOBS"
@@ -442,61 +280,10 @@ build_stp() {
     log "Using STP_DIR=$STP_DIR"
 }
 
-build_pin() {
-    local archive_path
-    local archive_basename
-    local extract_root
-    local extracted_dir
-
-    require_command curl
-    require_command tar
-
-    if [[ -x "$PIN_INSTALL_ROOT/pin" ]]; then
-        log "Using existing Intel Pin kit under $PIN_INSTALL_ROOT"
-    else
-        archive_basename="$(basename "$PIN_ARCHIVE_URL")"
-        archive_path="$DEPS_ROOT/downloads/$archive_basename"
-        extract_root="$DEPS_ROOT/extract-pin"
-
-        mkdir -p "$DEPS_ROOT/downloads"
-
-        if [[ ! -f "$archive_path" ]]; then
-            log "Downloading Intel Pin from $PIN_ARCHIVE_URL"
-            curl --fail --location --output "$archive_path" "$PIN_ARCHIVE_URL"
-        else
-            log "Reusing downloaded Intel Pin archive $archive_path"
-        fi
-
-        rm -rf "$extract_root"
-        mkdir -p "$extract_root"
-        log "Extracting Intel Pin into $PIN_INSTALL_ROOT"
-        tar -xzf "$archive_path" -C "$extract_root"
-
-        extracted_dir="$(find "$extract_root" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-        [[ -n "$extracted_dir" ]] || die "Failed to locate extracted Intel Pin directory under $extract_root"
-        [[ -x "$extracted_dir/pin" ]] || die "Extracted Intel Pin directory does not contain the pin launcher: $extracted_dir"
-
-        rm -rf "$PIN_INSTALL_ROOT"
-        mv "$extracted_dir" "$PIN_INSTALL_ROOT"
-        rm -rf "$extract_root"
-    fi
-
-    register_artifact intel_pin_root "$PIN_INSTALL_ROOT" directory
-    register_executable_artifact pin "$PIN_INSTALL_ROOT/pin"
-    if [[ -x "$PIN_INSTALL_ROOT/pin32" ]]; then
-        register_executable_artifact pin32 "$PIN_INSTALL_ROOT/pin32"
-    fi
-
-    export PIN_ROOT="$PIN_INSTALL_ROOT"
-    log "Intel Pin is available via PIN_ROOT=$PIN_ROOT"
-}
-
 build_minisat() {
     local minisat_src="$DEPS_ROOT/src/minisat"
     local minisat_build="$DEPS_ROOT/build/minisat"
     local minisat_install="$DEPS_ROOT/install/minisat"
-    local zlib_include="$CONDA_PREFIX/include"
-    local zlib_library="$CONDA_PREFIX/lib/libz.so"
 
     clone_or_update_repo https://github.com/stp/minisat.git "$minisat_src"
 
@@ -507,27 +294,18 @@ build_minisat() {
         -DCMAKE_INSTALL_PREFIX="$minisat_install" \
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_C_COMPILER="$CLANG_BIN" \
-        -DCMAKE_CXX_COMPILER="$CLANGXX_BIN" \
-        -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH_VALUE" \
-        -DZLIB_ROOT="$CONDA_PREFIX" \
-        -DZLIB_INCLUDE_DIR="$zlib_include" \
-        -DZLIB_LIBRARY="$zlib_library"
+        -DCMAKE_CXX_COMPILER="$CLANGXX_BIN"
 
     log "Building Minisat"
     cmake --build "$minisat_build" --parallel "$JOBS"
     log "Installing Minisat"
     cmake --install "$minisat_build"
 
-    MINISAT_INSTALL_DIR="$minisat_install"
-    export MINISAT_INSTALL_DIR
+    printf '%s\n' "$minisat_install"
 }
 
 build_klee_uclibc() {
     local klee_uclibc_src="$DEPS_ROOT/src/klee-uclibc"
-    local conda_cppflags="-I$CONDA_PREFIX/include"
-    local conda_ldflags="-L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib"
-    local conda_cpath="$CONDA_PREFIX/include"
-    local conda_library_path="$CONDA_PREFIX/lib"
 
     clone_or_update_repo "$KLEE_UCLIBC_REPO_URL" "$klee_uclibc_src"
 
@@ -535,39 +313,13 @@ build_klee_uclibc() {
         log "Configuring klee-uclibc"
         (
             cd "$klee_uclibc_src"
-            export CPPFLAGS="${CPPFLAGS:-} $conda_cppflags"
-            export CFLAGS="${CFLAGS:-} $conda_cppflags"
-            export LDFLAGS="${LDFLAGS:-} $conda_ldflags"
-            export CPATH="${CPATH:+$CPATH:}$conda_cpath"
-            export C_INCLUDE_PATH="${C_INCLUDE_PATH:+$C_INCLUDE_PATH:}$conda_cpath"
-            export LIBRARY_PATH="${LIBRARY_PATH:+$LIBRARY_PATH:}$conda_library_path"
-            export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}$conda_library_path"
             ./configure --make-llvm-lib \
                 --with-cc="$CLANG_BIN" \
                 --with-llvm-config="$LLVM_CONFIG_BIN"
         )
     fi
 
-    # The premade klee-uclibc config still needs its generated header refreshed
-    # before the main build. That target runs oldconfig internally, so feed it
-    # default answers here once instead of allowing the later `make` to stop
-    # for interactive Kconfig prompts.
-    set +o pipefail
-    yes '' | make -C "$klee_uclibc_src" include/bits/uClibc_config.h
-    local header_refresh_status=$?
-    set -o pipefail
-    if [[ "$header_refresh_status" -ne 0 && "$header_refresh_status" -ne 141 ]]; then
-        die "Failed to refresh klee-uclibc generated headers"
-    fi
-
     log "Building klee-uclibc"
-    CPPFLAGS="${CPPFLAGS:-} $conda_cppflags" \
-    CFLAGS="${CFLAGS:-} $conda_cppflags" \
-    LDFLAGS="${LDFLAGS:-} $conda_ldflags" \
-    CPATH="${CPATH:+$CPATH:}$conda_cpath" \
-    C_INCLUDE_PATH="${C_INCLUDE_PATH:+$C_INCLUDE_PATH:}$conda_cpath" \
-    LIBRARY_PATH="${LIBRARY_PATH:+$LIBRARY_PATH:}$conda_library_path" \
-    LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}$conda_library_path" \
     make -C "$klee_uclibc_src" -j"$JOBS"
 
     KLEE_UCLIBC_PATH_RESOLVED="$klee_uclibc_src"
@@ -593,7 +345,6 @@ configure_klee_project() {
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_C_COMPILER="$CLANG_BIN" \
         -DCMAKE_CXX_COMPILER="$CLANGXX_BIN" \
-        -DCMAKE_CXX_FLAGS="${KLEE_CXX_FLAGS:--include stdint.h}" \
         -DLLVM_DIR="$LLVM_DIR" \
         -DLLVMCC="$CLANG_BIN" \
         -DLLVMCXX="$CLANGXX_BIN" \
@@ -609,57 +360,6 @@ configure_klee_project() {
 
     log "Building $project_name"
     cmake --build "$project_build" --parallel "$JOBS"
-
-    register_klee_artifacts "$project_name"
-}
-
-cleanup_obsolete_workspace_wrappers() {
-    local wrapper_dir="$BUILD_ROOT/bin"
-
-    rm -f \
-        "$wrapper_dir/binsec" \
-        "$wrapper_dir/dune" \
-        "$wrapper_dir/klee-cf" \
-        "$wrapper_dir/klee-controlflow" \
-        "$wrapper_dir/klee-eager" \
-        "$wrapper_dir/klee-self-comp" \
-        "$wrapper_dir/ktest-tool" \
-        "$wrapper_dir/pin" \
-        "$wrapper_dir/pin32"
-    rmdir "$wrapper_dir" 2>/dev/null || true
-}
-
-register_klee_artifacts() {
-    local project_name="$1"
-    local target_path="$BUILD_ROOT/$project_name/bin/klee"
-    local ktest_tool_path="$BUILD_ROOT/$project_name/bin/ktest-tool"
-    local artifact_name=""
-
-    case "$project_name" in
-        klee-cf)
-            unregister_artifact klee-controlflow
-            artifact_name="klee-cf"
-            ;;
-        klee-eager)
-            artifact_name="klee-eager"
-            ;;
-        klee-self-comp)
-            artifact_name="klee-self-comp"
-            ;;
-    esac
-
-    if [[ -n "$artifact_name" ]]; then
-        register_executable_artifact "$artifact_name" "$target_path"
-        register_klee_tool_record \
-            "$artifact_name" \
-            "$target_path" \
-            "$ROOT_DIR/$project_name/include" \
-            "$BUILD_ROOT/$project_name/lib"
-    fi
-
-    if [[ -x "$ktest_tool_path" ]]; then
-        register_executable_artifact ktest-tool "$ktest_tool_path"
-    fi
 }
 
 build_klee_projects() {
@@ -691,24 +391,16 @@ build_llvm_plugin_project() {
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_C_COMPILER="$CLANG_BIN" \
         -DCMAKE_CXX_COMPILER="$CLANGXX_BIN" \
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DLLVM_DIR="$LLVM_DIR" \
         -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH_VALUE"
 
     log "Building $project_name"
     cmake --build "$project_build" --parallel "$JOBS"
-
-    case "$project_name" in
-        loop-limiter)
-            register_artifact loop_limiter_plugin "$project_build/libLoopLimiter.so" shared-library
-            ;;
-    esac
 }
 
 main() {
     local build_env=0
     local build_deps=0
-    local build_pin_target=0
     local build_binsec_target=0
     local build_klee_targets=0
     local build_extra_targets=0
@@ -719,7 +411,6 @@ main() {
         all)
             build_env=1
             build_deps=1
-            build_pin_target=1
             build_binsec_target=1
             build_klee_targets=1
             build_extra_targets=1
@@ -730,21 +421,14 @@ main() {
         deps)
             build_env=1
             build_deps=1
-            build_pin_target=1
-            ;;
-        pin)
-            build_env=1
-            build_pin_target=1
             ;;
         binsec)
             build_env=1
-            build_pin_target=1
             build_binsec_target=1
             ;;
         klee)
             build_env=1
             build_deps=1
-            build_pin_target=1
             build_klee_targets=1
             ;;
         extras)
@@ -757,9 +441,6 @@ main() {
     esac
 
     mkdir -p "$BUILD_ROOT" "$DEPS_ROOT"
-    ensure_build_manifest
-    cleanup_obsolete_workspace_wrappers
-    prune_missing_artifacts
 
     if [[ "$build_env" -eq 1 ]]; then
         ensure_conda_environment
@@ -775,18 +456,8 @@ main() {
         build_klee_uclibc
     fi
 
-    if [[ "$build_pin_target" -eq 1 ]]; then
-        build_pin
-    fi
-
     if [[ "$build_binsec_target" -eq 1 ]]; then
-        if command -v opam >/dev/null 2>&1; then
-            build_binsec
-        elif [[ "$MODE" == "binsec" ]]; then
-            die "BINSEC build requires opam, but opam is not available in PATH"
-        else
-            log "Skipping BINSEC build because opam is not available in PATH"
-        fi
+        build_binsec
     fi
 
     if [[ "$build_klee_targets" -eq 1 ]]; then
@@ -800,6 +471,7 @@ main() {
     fi
 
     if [[ "$build_extra_targets" -eq 1 ]]; then
+        build_llvm_plugin_project branch-recorder
         build_llvm_plugin_project loop-limiter
     fi
 
