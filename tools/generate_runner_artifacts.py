@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Generate benchmark-local runner artifacts from one runner-config preset.
 
-Benchmark build scripts call this helper to materialize the shared generated
-header and, when needed, Binsec cfg files. Keeping that logic here avoids
-duplicating preset parsing rules across many shell scripts.
+The shared Python benchmark builder calls this helper to materialize the shared
+generated header and, when needed, Binsec cfg files. Keeping that logic here
+avoids duplicating preset parsing rules across callers.
 """
 import argparse
 import os

@@ -4,43 +4,31 @@ code_path = "benchmarks/pycrypto"
 path_prefixes = ["benchmarks/pycrypto/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
-[benchmarks.builds.abacus]
-script = "benchmarks/pycrypto/build.sh"
-tool_flag = "--abacus"
-preset = "default"
-
-[benchmarks.builds.binsec]
-script = "benchmarks/pycrypto/build.sh"
-tool_flag = "--binsec"
-preset = "default"
-
-[benchmarks.builds.klee]
-script = "benchmarks/pycrypto/build.sh"
-tool_flag = "--klee"
-preset = "default"
-
-[benchmarks.build_aliases]
-klee_cf = "klee"
-klee_eager = "klee"
-klee_self_comp = "klee"
-
 [benchmarks.runner_profiles.default]
 config = "configs/runner/pycrypto_arc4_runner_config.toml"
 preset = "default"
 
+[benchmarks.build]
+preset = "default"
+common_flags = ["-g", "-O0", "-std=gnu89"]
+include_dirs = ["{repo_root}/include"]
+
+[benchmarks.build.tools.abacus]
+concrete_pubs = true
+
 [benchmarks.path_templates]
-abacus_executable = "{code_path}/abacus_{public_mode}_{artifact_suffix}"
-binsec_sse_script = "{code_path}/generated/{artifact_suffix}/binsec_{public_mode}.cfg"
-binsec_executable = "{code_path}/binsec_{public_mode}_{artifact_suffix}"
-klee_bitcode = "{code_path}/klee_{public_mode}_{artifact_suffix}.bc"
-klee_replay_script = "{code_path}/klee_{public_mode}_replay_{artifact_suffix}"
+abacus_executable = "{code_path}/abacus_{public_mode}_{target}"
+binsec_sse_script = "{code_path}/generated/{target}/binsec_{public_mode}.cfg"
+binsec_executable = "{code_path}/binsec_{public_mode}_{target}"
+klee_bitcode = "{code_path}/klee_{public_mode}_{target}.bc"
+klee_replay_script = "{code_path}/klee_{public_mode}_replay_{target}"
 
 [benchmarks.variants.default]
 
 [[benchmarks.targets]]
 target = "arc4"
-artifact_suffix = "arc4"
 runner_profile = "default"
+build_sources = ["arc4_wrapper.c"]
 secret_layout = "key:32"
 secret_inputs = ["key:32:key_buf"]
 klee_secret_inputs = ["key"]

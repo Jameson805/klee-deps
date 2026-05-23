@@ -4,35 +4,24 @@ code_path = "benchmarks/openssl_almeida"
 path_prefixes = ["benchmarks/openssl_almeida/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
-[benchmarks.builds.abacus]
-script = "benchmarks/openssl_almeida/build.sh"
-tool_flag = "--abacus"
-preset = "default"
-
-[benchmarks.builds.binsec]
-script = "benchmarks/openssl_almeida/build.sh"
-tool_flag = "--binsec"
-preset = "default"
-
-[benchmarks.builds.klee]
-script = "benchmarks/openssl_almeida/build.sh"
-tool_flag = "--klee"
-preset = "default"
-
-[benchmarks.build_aliases]
-klee_cf = "klee"
-klee_eager = "klee"
-klee_self_comp = "klee"
-
 [benchmarks.runner_profiles.default]
 config = "configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml"
 preset = "default"
+
+[benchmarks.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "{code_path}"]
+
+[benchmarks.build.tools.abacus]
+concrete_pubs = false
 
 [benchmarks.variants.default]
 
 [[benchmarks.targets]]
 target = "tls_rempad_luk13"
 runner_profile = "default"
+build_sources = ["tls_rempad_luk13_wrapper.c"]
 secret_layout = "data:63"
 secret_inputs = ["data:63:data_buf"]
 klee_secret_inputs = ["data"]

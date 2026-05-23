@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve benchmark-owned runner profiles for build scripts and tooling."""
+"""Resolve benchmark-owned runner profiles for the shared builder and tooling."""
 
 from __future__ import annotations
 

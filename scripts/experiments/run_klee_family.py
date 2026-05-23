@@ -196,15 +196,19 @@ def _filter_klee_cases(
     return filtered_cases
 
 
-def _load_klee_preprocess_steps(benchmark_definition, tool_id: str) -> list[dict[str, object]]:
-    """Load optional preprocessing steps for KLEE-family cases."""
-    raw_steps = benchmark_definition.extra_config.get("klee_preprocess_steps")
-    if raw_steps is not None:
-        return list(expect_array(raw_steps, f"{benchmark_definition.config_location}.klee_preprocess_steps"))
-
+def _load_klee_preprocess_profiles(benchmark_definition, tool_id: str) -> list[dict[str, object]]:
+    """Load optional KLEE preprocessing profiles for expanded benchmark cases."""
     location = benchmark_definition.config_location
-    preprocess_profiles = expect_table(benchmark_definition.extra_config.get("preprocess_profiles") or {}, f"{location}.preprocess_profiles")
-    steps: list[dict[str, object]] = []
+    tool_defaults = expect_table(
+        benchmark_definition.extra_config.get("tool_defaults") or {},
+        f"{location}.tool_defaults",
+    )
+    klee_defaults = expect_table(tool_defaults.get("klee") or {}, f"{location}.tool_defaults.klee")
+    preprocess_profiles = expect_table(
+        klee_defaults.get("preprocess_profiles") or {},
+        f"{location}.tool_defaults.klee.preprocess_profiles",
+    )
+    profiles: list[dict[str, object]] = []
 
     for expanded_case in expand_benchmark_cases(benchmark_definition, tool_id):
         preprocess_profile_id = optional_string(
@@ -214,7 +218,7 @@ def _load_klee_preprocess_steps(benchmark_definition, tool_id: str) -> list[dict
         )
         if not preprocess_profile_id:
             continue
-        preprocess_location = f"{location}.preprocess_profiles.{preprocess_profile_id}"
+        preprocess_location = f"{location}.tool_defaults.klee.preprocess_profiles.{preprocess_profile_id}"
         preprocess_table = expect_table(preprocess_profiles.get(preprocess_profile_id), preprocess_location)
         arguments = optional_string_list(preprocess_table, "arguments", preprocess_location)
         if not arguments:
@@ -232,12 +236,12 @@ def _load_klee_preprocess_steps(benchmark_definition, tool_id: str) -> list[dict
             "klee_bitcode",
             f"{benchmark_definition.code_path}/klee_{expanded_case.config_id}{expanded_case.target_suffix}.bc",
         )
-        steps.append(
+        profiles.append(
             {
                 "arguments": [argument.format(input=base_bitcode, output=output_bitcode) for argument in arguments]
             }
         )
-    return steps
+    return profiles
 
 
 def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
@@ -434,28 +438,41 @@ def run_benchmark(
         # parent has already chosen one benchmark/case pair for this process.
         with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
             local_context.log(f"temporary_workspace={workspace.root}")
-            build_command = [build.script, build.tool_flag]
-            build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
-            build_command.extend(build.extra_args)
+            build_command = [
+                "python",
+                "-m",
+                "tools.build_benchmark",
+                "--tool",
+                mode,
+                "--benchmark",
+                selector_text,
+                "--preset",
+                build.preset.format(sym_size=args.sym_size),
+            ]
             local_context.run(build_command, env=local_env, cwd=workspace.root)
-            step_entries = _load_klee_preprocess_steps(benchmark_definition, mode)
-            if step_entries:
+            preprocess_profiles = _load_klee_preprocess_profiles(benchmark_definition, mode)
+            if preprocess_profiles:
                 if mode not in benchmark_definition.tools:
-                    raise ValueError(f"{benchmark_definition.config_location}.klee_preprocess_steps requires {mode!r} in tools")
+                    raise ValueError(
+                        f"{benchmark_definition.config_location}.tool_defaults.klee.preprocess_profiles requires {mode!r} in tools"
+                    )
                 loop_limiter = Path(loop_limiter_plugin)
                 # Preprocessing stays explicit in the benchmark TOML because only a
                 # subset of cases need loop bounding and each benchmark blacklists a
                 # different set of helper routines.
-                for index, raw_step in enumerate(step_entries):
-                    step_table = expect_table(raw_step, f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}]")
+                for index, profile_entry in enumerate(preprocess_profiles):
+                    profile_table = expect_table(
+                        profile_entry,
+                        f"{benchmark_definition.config_location}.tool_defaults.klee.preprocess_steps[{index}]",
+                    )
                     arguments = optional_string_list(
-                        step_table,
+                        profile_table,
                         "arguments",
-                        f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}]",
+                        f"{benchmark_definition.config_location}.tool_defaults.klee.preprocess_steps[{index}]",
                     )
                     if not arguments:
                         raise ValueError(
-                            f"{benchmark_definition.config_location}.klee_preprocess_steps[{index}].arguments must not be empty"
+                            f"{benchmark_definition.config_location}.tool_defaults.klee.preprocess_steps[{index}].arguments must not be empty"
                         )
                     local_context.run(
                         [

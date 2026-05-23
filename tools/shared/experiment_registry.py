@@ -78,10 +78,7 @@ def normalized_case_output_metadata(case_table: dict[str, object], location: str
 
 @dataclass(frozen=True)
 class BenchmarkBuildConfig:
-    script: str
-    tool_flag: str
     preset: str
-    extra_args: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -98,8 +95,6 @@ class BenchmarkDefinition:
     code_path: str
     path_prefixes: tuple[str, ...]
     tools: frozenset[str]
-    builds: dict[str, BenchmarkBuildConfig]
-    build_aliases: dict[str, str]
     runner_profiles: dict[str, BenchmarkRunnerProfile]
     extra_config: dict[str, object]
 
@@ -108,7 +103,6 @@ class BenchmarkDefinition:
 class _ParsedVariant:
     variant_id: str
     tools: frozenset[str]
-    build_extra_args: tuple[str, ...]
     overrides: dict[str, object]
 
 
@@ -123,22 +117,16 @@ def definition(library_id: str, variant_id: str) -> BenchmarkDefinition:
 
 
 def build_for_tool(benchmark_definition: BenchmarkDefinition, tool_id: str) -> BenchmarkBuildConfig:
-    """Resolve the benchmark build configuration for a given tool.
-
-    Multiple tool ids may intentionally share one build key through the
-    benchmark descriptor's ``build_aliases`` table.
-    """
+    """Resolve the benchmark build configuration for a given tool."""
     if tool_id not in benchmark_definition.tools:
         raise ValueError(
             f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.variant_id)!r} does not support tool {tool_id!r}"
         )
-    build_id = benchmark_definition.build_aliases.get(tool_id, tool_id)
-    try:
-        return benchmark_definition.builds[build_id]
-    except KeyError as error:
-        raise ValueError(
-            f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.variant_id)!r} does not define build metadata for tool {tool_id!r}"
-        ) from error
+    build_location = f"{benchmark_definition.config_location}.build"
+    build_table = expect_table(benchmark_definition.extra_config.get("build"), build_location)
+    return BenchmarkBuildConfig(
+        preset=expect_string(build_table, "preset", build_location),
+    )
 
 
 def runner_profile_for_definition(
@@ -209,55 +197,6 @@ def supported_tool_ids() -> tuple[str, ...]:
     return tuple(sorted(_BENCHMARK_IDENTITIES_BY_TOOL))
 
 
-def _parse_build(build_id: str, raw_build: object, location: str) -> BenchmarkBuildConfig:
-    if not build_id:
-        raise ValueError(f"{location} contains an empty build key")
-    build_table = expect_table(raw_build, location)
-    return BenchmarkBuildConfig(
-        script=expect_string(build_table, "script", location),
-        tool_flag=expect_string(build_table, "tool_flag", location),
-        preset=expect_string(build_table, "preset", location),
-        extra_args=tuple(optional_string_list(build_table, "extra_args", location)),
-    )
-
-
-def _parse_builds(raw_builds: object, location: str) -> dict[str, BenchmarkBuildConfig]:
-    if raw_builds is None:
-        return {}
-    builds_table = expect_table(raw_builds, f"{location}.builds")
-    return {
-        build_id: _parse_build(build_id, raw_build, f"{location}.builds.{build_id}")
-        for build_id, raw_build in builds_table.items()
-    }
-
-
-def _parse_build_aliases(
-    raw_build_aliases: object,
-    tools: frozenset[str],
-    builds: dict[str, BenchmarkBuildConfig],
-    location: str,
-) -> dict[str, str]:
-    if raw_build_aliases is None:
-        return {}
-    aliases_table = expect_table(raw_build_aliases, f"{location}.build_aliases")
-    aliases: dict[str, str] = {}
-    for tool_id, raw_build_id in aliases_table.items():
-        if tool_id not in tools:
-            raise ValueError(f"{location}.build_aliases.{tool_id} is not listed in tools")
-        if tool_id in builds:
-            raise ValueError(
-                f"{location}.build_aliases.{tool_id} is redundant because builds.{tool_id} already exists"
-            )
-        if not isinstance(raw_build_id, str) or not raw_build_id:
-            raise ValueError(f"{location}.build_aliases.{tool_id} must be a non-empty string")
-        if raw_build_id not in builds:
-            raise ValueError(
-                f"{location}.build_aliases.{tool_id} references unknown build {raw_build_id!r}"
-            )
-        aliases[tool_id] = raw_build_id
-    return aliases
-
-
 def _parse_runner_profiles(
     raw_runner_profiles: object,
     location: str,
@@ -304,11 +243,10 @@ def _parse_variant(
     return _ParsedVariant(
         variant_id=variant_id,
         tools=variant_tools,
-        build_extra_args=tuple(optional_string_list(variant_table, "build_extra_args", location)),
         overrides={
             key: value
             for key, value in variant_table.items()
-            if key not in {"tools", "build_extra_args"}
+            if key not in {"tools"}
         },
     )
 
@@ -324,13 +262,6 @@ def _generated_definitions(
         for prefix in _expect_string_list(definition_table, "path_prefixes", location)
     )
     tools = frozenset(_expect_string_list(definition_table, "tools", location))
-    builds = _parse_builds(definition_table.get("builds"), location)
-    build_aliases = _parse_build_aliases(
-        definition_table.get("build_aliases"),
-        tools,
-        builds,
-        location,
-    )
     runner_profiles = _parse_runner_profiles(definition_table.get("runner_profiles"), location)
     variants_table = expect_table(definition_table.get("variants"), f"{location}.variants")
     if not variants_table:
@@ -347,8 +278,6 @@ def _generated_definitions(
             "code_path",
             "path_prefixes",
             "tools",
-            "builds",
-            "build_aliases",
             "runner_profiles",
             "variants",
         }
@@ -356,15 +285,6 @@ def _generated_definitions(
 
     definitions: list[BenchmarkDefinition] = []
     for parsed_variant in parsed_variants:
-        variant_builds = {
-            build_id: BenchmarkBuildConfig(
-                script=build.script,
-                tool_flag=build.tool_flag,
-                preset=build.preset,
-                extra_args=build.extra_args + parsed_variant.build_extra_args,
-            )
-            for build_id, build in builds.items()
-        }
         merged_definition_table = dict(definition_table)
         merged_definition_table.update(parsed_variant.overrides)
         merged_extra_config = {
@@ -380,8 +300,6 @@ def _generated_definitions(
                 code_path=code_path,
                 path_prefixes=path_prefixes,
                 tools=parsed_variant.tools,
-                builds=variant_builds,
-                build_aliases=build_aliases,
                 runner_profiles=runner_profiles,
                 extra_config=merged_extra_config,
             )
@@ -404,8 +322,6 @@ def _load_registry() -> tuple[
             "code_path",
             "path_prefixes",
             "tools",
-            "builds",
-            "build_aliases",
             "runner_profiles",
             "variants",
         }

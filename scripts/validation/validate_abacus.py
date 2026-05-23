@@ -42,10 +42,9 @@ class AbacusValidationCase:
 
     output_stem: str
     replay_executable: str
-    build_script: str
-    build_tool_flag: str
+    build_tool_id: str
+    benchmark_selector: str
     build_preset: str
-    build_extra_args: tuple[str, ...]
     library: str
 
 
@@ -66,6 +65,7 @@ def _build_case_index() -> dict[str, AbacusValidationCase]:
     for library_id, variant_id in selected_benchmarks("abacus", None):
         benchmark_definition = definition(library_id, variant_id)
         klee_build = build_for_tool(benchmark_definition, "klee_cf")
+        selector_text = f"{benchmark_definition.library_id}:{benchmark_definition.variant_id}"
         for expanded_case in expand_benchmark_cases(benchmark_definition, "abacus"):
             output_stem = canonical_case_id(
                 benchmark_definition.library_id,
@@ -84,10 +84,9 @@ def _build_case_index() -> dict[str, AbacusValidationCase]:
             cases_by_stem[output_stem] = AbacusValidationCase(
                 output_stem=output_stem,
                 replay_executable=replay_executable,
-                build_script=klee_build.script,
-                build_tool_flag=klee_build.tool_flag,
+                build_tool_id="klee_cf",
+                benchmark_selector=selector_text,
                 build_preset=klee_build.preset,
-                build_extra_args=klee_build.extra_args,
                 library=_validation_library_name(benchmark_definition.library_id),
             )
     return cases_by_stem
@@ -135,15 +134,19 @@ def _ensure_replay_executable(case: AbacusValidationCase, sym_size: int | None) 
         return replay_path
 
     build_command = [
-        str(REPO_ROOT / case.build_script),
-        case.build_tool_flag,
+        "python",
+        "-m",
+        "tools.build_benchmark",
+        "--tool",
+        case.build_tool_id,
+        "--benchmark",
+        case.benchmark_selector,
         "--preset",
         _resolve_preset_name(
             case.build_preset,
             sym_size,
             owner=f"ABACUS replay build preset for {case.output_stem}",
         ),
-        *case.build_extra_args,
     ]
     print(f"Replay executable not found: {replay_path}")
     print(f"$ {' '.join(build_command)}")

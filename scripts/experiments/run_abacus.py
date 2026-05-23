@@ -230,17 +230,21 @@ def run_benchmark(
         local_context.log("##########")
         with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
             local_context.log(f"temporary_workspace={workspace.root}")
-            build_command = [build.script, build.tool_flag]
-            build_command.extend(
-                [
-                    "--preset",
-                    _resolve_preset_name(
-                        build.preset,
-                        args.sym_size,
-                        owner=f"ABACUS build preset for {selector_text}",
-                    ),
-                ]
-            )
+            build_command = [
+                "python",
+                "-m",
+                "tools.build_benchmark",
+                "--tool",
+                "abacus",
+                "--benchmark",
+                selector_text,
+                "--preset",
+                _resolve_preset_name(
+                    build.preset,
+                    args.sym_size,
+                    owner=f"ABACUS build preset for {selector_text}",
+                ),
+            ]
             local_context.run(build_command, cwd=workspace.root)
 
             case_entries = _load_abacus_cases(benchmark_definition)

@@ -3,26 +3,21 @@ library = "openssl"
 code_path = "benchmarks/openssl-1.1.1q"
 path_prefixes = ["benchmarks/openssl-1.1.1q/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
-
-[benchmarks.builds.abacus]
-script = "benchmarks/openssl-1.1.1q/build.sh"
-tool_flag = "--abacus"
+[benchmarks.build]
 preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+prepare_commands = ["cp -f crypto/bn/bn_exp_orig.c crypto/bn/bn_exp.c"]
+build_dep_commands = [
+	"./Configure no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"make clean",
+	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j",
+]
 
-[benchmarks.builds.binsec]
-script = "benchmarks/openssl-1.1.1q/build.sh"
-tool_flag = "--binsec"
-preset = "size_{sym_size}"
-
-[benchmarks.builds.klee]
-script = "benchmarks/openssl-1.1.1q/build.sh"
-tool_flag = "--klee"
-preset = "size_{sym_size}"
-
-[benchmarks.build_aliases]
-klee_cf = "klee"
-klee_eager = "klee"
-klee_self_comp = "klee"
+[benchmarks.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = false
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
@@ -34,29 +29,58 @@ extra_args = ["--ctchecker-prefix", "crypto/bn"]
 secret_inputs = ["exp"]
 public_inputs = ["base", "mod"]
 
-[benchmarks.preprocess_profiles.lim_loop]
+[benchmarks.tool_defaults.klee.preprocess_profiles.lim_loop]
 arguments = ["-o", "{output}", "{input}"]
 
-[benchmarks.preprocess_profiles.lim_loop_break]
+[benchmarks.tool_defaults.klee.preprocess_profiles.lim_loop_break]
 arguments = ["-break", "-o", "{output}", "{input}"]
 
 [benchmarks.variants.default]
 
 [benchmarks.variants.sliced]
 tools = ["klee_cf"]
-build_extra_args = ["--sliced"]
+
+[benchmarks.variants.sliced.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+prepare_commands = ["cp -f crypto/bn/bn_exp_sliced.c crypto/bn/bn_exp.c"]
+build_dep_commands = [
+	"./Configure no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"make clean",
+	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j",
+]
+
+[benchmarks.variants.sliced.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = false
+
+[benchmarks.variants.sliced.tool_defaults.klee.preprocess_profiles.lim_loop]
+arguments = ["-o", "{output}", "{input}"]
+
+[benchmarks.variants.sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
+arguments = ["-break", "-o", "{output}", "{input}"]
 
 [[benchmarks.targets]]
 target = "recp"
+build_sources = ["klee_main.c"]
+defines = ["RECP"]
 
 [[benchmarks.targets]]
 target = "mont"
+build_sources = ["klee_main.c"]
+defines = ["MONT"]
 
 [[benchmarks.targets]]
 target = "mont_consttime"
+build_sources = ["klee_main.c"]
+defines = ["MONT_CONSTTIME"]
 
 [[benchmarks.targets]]
 target = "mont_word"
+build_sources = ["klee_main.c"]
+defines = ["MONT_WORD"]
 
 [[benchmarks.configs]]
 config = "fix_pub"

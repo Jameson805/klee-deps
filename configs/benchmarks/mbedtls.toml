@@ -4,32 +4,31 @@ code_path = "benchmarks/mbedtls-3.2.1"
 path_prefixes = ["benchmarks/mbedtls-3.2.1/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
-[benchmarks.builds.abacus]
-script = "benchmarks/mbedtls-3.2.1/build.sh"
-tool_flag = "--abacus"
-preset = "size_{sym_size}"
-
-[benchmarks.builds.binsec]
-script = "benchmarks/mbedtls-3.2.1/build.sh"
-tool_flag = "--binsec"
-preset = "size_{sym_size}"
-
-[benchmarks.builds.klee]
-script = "benchmarks/mbedtls-3.2.1/build.sh"
-tool_flag = "--klee"
-preset = "size_{sym_size}"
-
-[benchmarks.build_aliases]
-klee_cf = "klee"
-klee_eager = "klee"
-klee_self_comp = "klee"
-
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
 
 [benchmarks.path_templates]
-abacus_executable = "{code_path}/abacus_{public_mode}_modexp"
+abacus_executable = "{code_path}/abacus_{public_mode}_{target_output}"
+
+[benchmarks.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = [
+	"{code_path}/build/library/libmbedtls.a",
+	"{code_path}/build/library/libmbedx509.a",
+	"{code_path}/build/library/libmbedcrypto.a",
+]
+build_dep_commands = [
+	"rm -rf build",
+	"mkdir -p build",
+	"cd build && cmake -DENABLE_TESTING=Off -DCMAKE_C_COMPILER={cc} -DCMAKE_C_FLAGS=\"{dep_cflags}\" -DCMAKE_EXE_LINKER_FLAGS=\"{dep_ldflags}\" ..",
+	"cd build && cmake --build . -j",
+]
+
+[benchmarks.build.tools.abacus]
+concrete_pubs = false
 
 [benchmarks.tool_defaults.klee]
 code_path = "mbedtls-3.2.1"
@@ -38,19 +37,15 @@ public_inputs = ["base", "mod"]
 extra_args = ["--ctchecker-prefix", "library"]
 mod_exp_extra_args = ["--filename", "bignum.c", "--lines", "1968:2202"]
 
-[[benchmarks.klee_preprocess_steps]]
-arguments = ["-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub.bc"]
-
-[[benchmarks.klee_preprocess_steps]]
-arguments = ["-break", "-o", "benchmarks/mbedtls-3.2.1/klee_fix_pub_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_fix_pub.bc"]
-
-[[benchmarks.klee_preprocess_steps]]
-arguments = ["-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_lim_loop.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub.bc"]
-
-[[benchmarks.klee_preprocess_steps]]
-arguments = ["-break", "-o", "benchmarks/mbedtls-3.2.1/klee_var_pub_lim_loop_break.bc", "benchmarks/mbedtls-3.2.1/klee_var_pub.bc"]
+[benchmarks.tool_defaults.klee.preprocess_profiles.lim_loop_break]
+arguments = ["-break", "-o", "{output}", "{input}"]
 
 [benchmarks.variants.default]
+
+[[benchmarks.targets]]
+target = "modexp"
+runner_profile = "default"
+build_sources = ["klee_main.c"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -67,6 +62,7 @@ use_public_inputs = true
 config = "var_pub_lim_loop_break"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager"]
+preprocess = "lim_loop_break"
 use_public_inputs = true
 
 [benchmarks.variants.sliced]
@@ -79,9 +75,14 @@ public_inputs = ["base", "mod"]
 extra_args = ["--ctchecker-prefix", "library"]
 mod_exp_extra_args = ["--filename", "bignum.c", "--lines", "1968:2202"]
 
-[benchmarks.variants.sliced.path_templates]
-klee_bitcode = "{code_path}/klee_{config}_sliced.bc"
-klee_replay_script = "{code_path}/klee_{public_mode}_replay_sliced"
+[benchmarks.variants.sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
+arguments = ["-break", "-o", "{output}", "{input}"]
+
+[[benchmarks.variants.sliced.targets]]
+target = "modexp"
+runner_profile = "default"
+build_sources = ["klee_main.c", "bignum_sliced.c"]
+defines = ["USE_SLICED"]
 
 [[benchmarks.variants.sliced.configs]]
 config = "fix_pub"

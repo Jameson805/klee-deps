@@ -71,7 +71,7 @@ The script expects a working `conda` installation on the host and uses the activ
 At a high level, the repository works like this:
 
 1. A benchmark descriptor under `configs/benchmarks/` declares which tools support a benchmark variant and how that benchmark should be built.
-2. A benchmark-local `build.sh` materializes artifacts for one tool mode using the shared runner contract in `include/runner.h` plus generated artifacts from `tools/generate_runner_artifacts.py`.
+2. The shared Python benchmark builder at `python -m tools.build_benchmark` materializes artifacts for one tool mode from the benchmark descriptor plus generated artifacts from `tools/generate_runner_artifacts.py`.
 3. A runner under `scripts/experiments/` expands benchmark cases, launches the tool, and converts raw output into the shared JSON schema from `tools/shared/result_schema.py`.
 4. Campaign orchestration scripts run many exact configurations and write explicit metadata describing every run and every merged CSV column.
 5. Postprocessing scripts in `tools/postprocess/` merge, filter, summarize, and plot those exact configurations.
@@ -87,8 +87,9 @@ The important boundary is:
 
 Important repository areas:
 
-- `benchmarks/`: benchmark code, wrappers, and benchmark-local build scripts
+- `benchmarks/`: benchmark code, wrappers, and generated benchmark artifacts
 - `configs/benchmarks/`: benchmark descriptors keyed by `library` plus explicit `variant` entries
+- `tools/build_benchmark.py`: shared config-driven benchmark build entrypoint
 - `configs/runner/`: runner config inputs used to generate benchmark-local headers and Binsec cfg files
 - `scripts/experiments/`: per-tool runners and campaign orchestration
 - `tools/shared/`: shared registry, metadata, result schema, and campaign discovery
@@ -173,20 +174,11 @@ code_path = "benchmarks/example"
 path_prefixes = ["benchmarks/example/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 
-[benchmarks.builds.klee]
-script = "benchmarks/example/build.sh"
-tool_flag = "--klee"
+[benchmarks.build]
 preset = "default"
 
-[benchmarks.builds.binsec]
-script = "benchmarks/example/build.sh"
-tool_flag = "--binsec"
-preset = "default"
-
-[benchmarks.build_aliases]
-klee_cf = "klee"
-klee_eager = "klee"
-klee_self_comp = "klee"
+[benchmarks.build.tools.binsec]
+link_flags = []
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/example_runner.toml"
@@ -210,19 +202,20 @@ Notes:
 
 - benchmark identity is now always `library_id + variant_id`
 - variants are explicit and required
-- build aliases are the supported way for multiple tool ids to share one benchmark-local build mode
+- the shared builder derives the benchmark selector from `library` plus `variant`
+- tool-specific build quirks live under `build.tools.<tool>`
 - runner profiles are benchmark-owned because the benchmark decides which wrapper config/preset pairs are valid
 
-### 2. Add benchmark-local build support
+### 2. Add shared build metadata
 
-Create or update `benchmarks/<name>/build.sh` so it understands the `tool_flag` values from the descriptor and calls:
+Populate `build`, `targets`, and `configs` in the benchmark TOML so the shared builder has enough information to compile the benchmark and materialize runner artifacts.
 
 ```bash
-python -m tools.generate_runner_artifacts ...
-python -m tools.resolve_runner_profile ...
+python -m tools.build_benchmark --tool klee_cf --benchmark example:default --preset default
+python -m tools.resolve_runner_profile --library example --variant default --field config
 ```
 
-The current design keeps runner-config resolution and artifact generation out of shell logic as much as possible.
+The current design keeps benchmark-specific compile rules in TOML and leaves shell logic in the shared builder only.
 
 ### 3. Make sure the existing runners can consume it
 
@@ -282,7 +275,7 @@ This is the current simplification path for new tools. A new runner should not c
 For each benchmark that supports the tool:
 
 - add the tool id to the benchmark-level `tools` list
-- add `benchmarks.builds.<build_id>` metadata, or add a `build_aliases` entry if the tool can reuse another build
+- add or extend `benchmarks.build.tools.<tool>` metadata only when that tool needs build-specific flags or behavior
 - add any genuinely tool-specific extra config only if the runner cannot derive its cases from the shared matrix
 
 ### 5. Add campaign support if needed

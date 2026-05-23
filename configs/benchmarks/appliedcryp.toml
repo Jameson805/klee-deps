@@ -4,26 +4,6 @@ code_path = "benchmarks/appliedCryp"
 path_prefixes = ["benchmarks/appliedCryp/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
-[benchmarks.builds.abacus]
-script = "benchmarks/appliedCryp/build.sh"
-tool_flag = "--abacus"
-preset = "default"
-
-[benchmarks.builds.binsec]
-script = "benchmarks/appliedCryp/build.sh"
-tool_flag = "--binsec"
-preset = "default"
-
-[benchmarks.builds.klee]
-script = "benchmarks/appliedCryp/build.sh"
-tool_flag = "--klee"
-preset = "default"
-
-[benchmarks.build_aliases]
-klee_cf = "klee"
-klee_eager = "klee"
-klee_self_comp = "klee"
-
 [benchmarks.runner_profiles.3way]
 config = "configs/runner/appliedcryp_3way_runner_config.toml"
 preset = "default"
@@ -36,35 +16,43 @@ preset = "default"
 config = "configs/runner/appliedcryp_loki91_runner_config.toml"
 preset = "default"
 
+[benchmarks.build]
+preset = "default"
+common_flags = ["-g", "-O0", "-std=gnu89"]
+include_dirs = ["{repo_root}/include"]
+
+[benchmarks.build.tools.abacus]
+concrete_pubs = true
+
 [benchmarks.path_templates]
-abacus_executable = "{code_path}/abacus_{public_mode}_{artifact_suffix}"
-binsec_sse_script = "{code_path}/generated/{artifact_suffix}/binsec_{public_mode}.cfg"
-binsec_executable = "{code_path}/binsec_{public_mode}_{artifact_suffix}"
-klee_bitcode = "{code_path}/klee_{public_mode}_{artifact_suffix}.bc"
-klee_replay_script = "{code_path}/klee_{public_mode}_replay_{artifact_suffix}"
+abacus_executable = "{code_path}/abacus_{public_mode}_{target}"
+binsec_sse_script = "{code_path}/generated/{target}/binsec_{public_mode}.cfg"
+binsec_executable = "{code_path}/binsec_{public_mode}_{target}"
+klee_bitcode = "{code_path}/klee_{public_mode}_{target}.bc"
+klee_replay_script = "{code_path}/klee_{public_mode}_replay_{target}"
 
 [benchmarks.variants.default]
 
 [[benchmarks.targets]]
 target = "3way"
-artifact_suffix = "3way"
 runner_profile = "3way"
+build_sources = ["3way_wrapper.c"]
 secret_layout = "key:12,data:12"
 secret_inputs = ["key:12:key_buf", "data:12:data_buf"]
 klee_secret_inputs = ["key", "data"]
 
 [[benchmarks.targets]]
 target = "des"
-artifact_suffix = "des"
 runner_profile = "des"
+build_sources = ["des_wrapper.c"]
 secret_layout = "key:24,data:8"
 secret_inputs = ["key:24:key_buf", "data:8:data_buf"]
 klee_secret_inputs = ["key", "data"]
 
 [[benchmarks.targets]]
 target = "loki91"
-artifact_suffix = "loki91"
 runner_profile = "loki91"
+build_sources = ["loki91_wrapper.c"]
 secret_layout = "key:24,data:8"
 secret_inputs = ["key:24:key_buf", "data:8:data_buf"]
 klee_secret_inputs = ["key", "data"]

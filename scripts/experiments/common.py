@@ -36,9 +36,8 @@ _TRANSIENT_BENCHMARK_DIR_NAMES = {"build"}
 class BenchmarkWorkspace:
     """Temporary workspace that copies one benchmark and symlinks the rest.
 
-    The benchmark build scripts expect the repository layout around them to stay
-    intact because they derive `repo_root` from their own path. To isolate one
-    benchmark without cloning the whole repository, runners create a temporary
+    The shared benchmark builder still compiles in-place inside each benchmark's
+    source tree, so runners isolate one benchmark by creating a temporary
     workspace that mirrors the repo tree, copies only the target benchmark
     subtree, and symlinks all other top-level paths back to the original repo.
     """
@@ -688,7 +687,6 @@ class ExpandedBenchmarkCase:
     target_id: str
     config_id: str
     public_mode: str
-    artifact_suffix: str
     target_location: str
     config_location: str
     target_table: dict[str, object]
@@ -696,8 +694,16 @@ class ExpandedBenchmarkCase:
     path_templates: dict[str, object]
 
     @property
+    def output_target(self) -> str:
+        if not self.target_id:
+            return self.target_id
+        if self.variant_id == "default":
+            return self.target_id
+        return f"{self.target_id}_{self.variant_id}"
+
+    @property
     def target_suffix(self) -> str:
-        return f"_{self.target_id}" if self.target_id else ""
+        return f"_{self.output_target}" if self.output_target else ""
 
 
 def matches_case_exclusion(
@@ -766,7 +772,6 @@ def expand_benchmark_cases(benchmark_definition, tool_id: str) -> list[ExpandedB
             parsed_targets.append(
                 (
                     target_id,
-                    optional_string(target_table, "artifact_suffix", target_location) or target_id,
                     set(optional_string_list(target_table, "tools", target_location) or benchmark_definition.tools),
                     target_location,
                     target_table,
@@ -775,7 +780,7 @@ def expand_benchmark_cases(benchmark_definition, tool_id: str) -> list[ExpandedB
 
     cases: list[ExpandedBenchmarkCase] = []
     benchmark_tools = set(benchmark_definition.tools)
-    for target_id, artifact_suffix, target_tools, target_location, target_table in parsed_targets:
+    for target_id, target_tools, target_location, target_table in parsed_targets:
         for config_index, raw_config in enumerate(configs):
             config_location = f"{location}.configs[{config_index}]"
             config_table = expect_table(raw_config, config_location)
@@ -803,7 +808,6 @@ def expand_benchmark_cases(benchmark_definition, tool_id: str) -> list[ExpandedB
                     target_id=target_id,
                     config_id=config_id,
                     public_mode=expect_string(config_table, "public_mode", config_location),
-                    artifact_suffix=artifact_suffix,
                     target_location=target_location,
                     config_location=config_location,
                     target_table=target_table,
@@ -838,9 +842,9 @@ def resolve_case_template(
         library=benchmark_definition.library_id,
         variant=expanded_case.variant_id,
         target=expanded_case.target_id,
+        target_output=expanded_case.output_target,
         config=config_id or expanded_case.config_id,
         public_mode=public_mode or expanded_case.public_mode,
-        artifact_suffix=expanded_case.artifact_suffix,
     )
 
 

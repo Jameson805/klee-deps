@@ -256,8 +256,17 @@ def run_benchmark(
         local_context.log("##########")
         with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
             local_context.log(f"temporary_workspace={workspace.root}")
-            build_command = [build.script, build.tool_flag]
-            build_command.extend(["--preset", build.preset.format(sym_size=args.sym_size)])
+            build_command = [
+                "python",
+                "-m",
+                "tools.build_benchmark",
+                "--tool",
+                "binsec",
+                "--benchmark",
+                selector_text,
+                "--preset",
+                build.preset.format(sym_size=args.sym_size),
+            ]
             local_context.run(build_command, cwd=workspace.root)
 
             case_entries = _load_binsec_cases(benchmark_definition)

@@ -4,26 +4,6 @@ code_path = "benchmarks/bearssl"
 path_prefixes = ["benchmarks/bearssl/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
-[benchmarks.builds.abacus]
-script = "benchmarks/bearssl/build.sh"
-tool_flag = "--abacus"
-preset = "default"
-
-[benchmarks.builds.binsec]
-script = "benchmarks/bearssl/build.sh"
-tool_flag = "--binsec"
-preset = "default"
-
-[benchmarks.builds.klee]
-script = "benchmarks/bearssl/build.sh"
-tool_flag = "--klee"
-preset = "default"
-
-[benchmarks.build_aliases]
-klee_cf = "klee"
-klee_eager = "klee"
-klee_self_comp = "klee"
-
 [benchmarks.runner_profiles.aes_big]
 config = "configs/runner/bearssl_aes_big_runner_config.toml"
 preset = "default"
@@ -32,27 +12,45 @@ preset = "default"
 config = "configs/runner/bearssl_des_tab_runner_config.toml"
 preset = "default"
 
+[benchmarks.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "bearssl-0.6/inc", "bearssl-0.6/src"]
+
+[benchmarks.build.tools.abacus]
+concrete_pubs = false
+
 [benchmarks.path_templates]
-abacus_executable = "{code_path}/abacus_{public_mode}_{artifact_suffix}"
-binsec_sse_script = "{code_path}/generated/{artifact_suffix}/binsec_{public_mode}.cfg"
-binsec_executable = "{code_path}/binsec_{public_mode}_{artifact_suffix}"
-klee_bitcode = "{code_path}/klee_{public_mode}_{artifact_suffix}.bc"
-klee_replay_script = "{code_path}/klee_{public_mode}_replay_{artifact_suffix}"
+abacus_executable = "{code_path}/abacus_{public_mode}_{target}"
+binsec_sse_script = "{code_path}/generated/{target}/binsec_{public_mode}.cfg"
+binsec_executable = "{code_path}/binsec_{public_mode}_{target}"
+klee_bitcode = "{code_path}/klee_{public_mode}_{target}.bc"
+klee_replay_script = "{code_path}/klee_{public_mode}_replay_{target}"
 
 [benchmarks.variants.default]
 
 [[benchmarks.targets]]
 target = "aes_big"
-artifact_suffix = "binsec_aes_big"
 runner_profile = "aes_big"
+build_sources = [
+	"aes_big_wrapper.c",
+	"bearssl-0.6/src/symcipher/aes_big_cbcenc.c",
+	"bearssl-0.6/src/symcipher/aes_big_enc.c",
+	"bearssl-0.6/src/symcipher/aes_common.c",
+]
 secret_layout = "skey:48,data:32"
 secret_inputs = ["skey:48:skey_buf", "data:32:data_buf"]
 klee_secret_inputs = ["skey", "data"]
 
 [[benchmarks.targets]]
 target = "des_tab"
-artifact_suffix = "appliedcryp_des"
 runner_profile = "des_tab"
+build_sources = [
+	"des_tab_wrapper.c",
+	"bearssl-0.6/src/symcipher/des_tab_cbcenc.c",
+	"bearssl-0.6/src/symcipher/des_tab.c",
+	"bearssl-0.6/src/symcipher/des_support.c",
+]
 secret_layout = "skey:256,data:16"
 secret_inputs = ["skey:256:skey_buf", "data:16:data_buf"]
 klee_secret_inputs = ["skey", "data"]
