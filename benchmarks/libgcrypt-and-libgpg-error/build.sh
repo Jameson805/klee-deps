@@ -27,7 +27,7 @@ usage() {
     echo "  --skip-deps    Skip building libgpg-error and libgcrypt"
     echo "  --sliced       Build libgcrypt-1.10.1-sliced instead of libgcrypt-1.10.1"
     echo "  --klee         Build KLEE bitcode and Replay binaries"
-    echo "  --binsec       Build BINSEC binaries"
+    echo "  --binsec       Build BINSEC binaries (native arch)"
     echo "  --abacus       Build Abacus binaries"
     echo "  --preset NAME  Select the preset to materialize into generated runner artifacts"
 }
@@ -149,7 +149,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     CFLAGS=( -g -O0 )
     LDFLAGS=()
     ARCH_FLAGS=()
-    if [[ "$MODE" == "binsec" || "$MODE" == "abacus" ]]; then
+    if [[ "$MODE" == "abacus" ]]; then
         CFLAGS+=( -m32 )
         LDFLAGS+=( -m32 )
         ARCH_FLAGS+=( --host=i686-pc-linux-gnu )
@@ -220,12 +220,12 @@ fi
 
 if [[ "$MODE" == "binsec" ]]; then
     # BINSEC builds
-    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub_modexp
-    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_modexp
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DBINSEC klee_main.c "${libs[@]}" -o binsec_var_pub_modexp
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_modexp
 
     # Replay binaries for BINSEC (built separately; REPLAY and BINSEC are mutually exclusive)
-    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY klee_main.c "${libs[@]}" -o binsec_var_pub_replay_modexp
-    clang "${flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_replay_modexp
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY klee_main.c "${libs[@]}" -o binsec_var_pub_replay_modexp
+    clang "${flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o binsec_fix_pub_replay_modexp
 
     # clang "${flags[@]}" -static -DUSE_SLICED -DBINSEC klee_main.c powm_sliced.c "${libs[@]}" -o binsec_var_pub_modexp_sliced
     # clang "${flags[@]}" -static -DUSE_SLICED -DBINSEC -DCONCRETE_PUBS klee_main.c powm_sliced.c "${libs[@]}" -o binsec_fix_pub_modexp_sliced

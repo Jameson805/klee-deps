@@ -23,7 +23,7 @@ usage() {
     echo "  --skip-deps    Skip building OpenSSL (Configure/make)"
     echo "  --sliced       Link crypto/bin/bn_exp.c -> crypto/bin/bn_exp_sliced.c (default: -> bn_exp_orig.c)"
     echo "  --klee         Build KLEE bitcode and Replay binaries"
-    echo "  --binsec       Build BINSEC binaries"
+    echo "  --binsec       Build BINSEC binaries (native arch)"
     echo "  --abacus       Build Abacus binaries"
     echo "  --preset NAME  Select the preset to materialize into generated runner artifacts"
 }
@@ -151,7 +151,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     CFLAGS=( -g -O0 )
     LDFLAGS=( )
     ARCH_FLAGS=( linux-generic64 )
-    if [[ "$MODE" == "binsec" || "$MODE" == "abacus" ]]; then
+    if [[ "$MODE" == "abacus" ]]; then
         CFLAGS+=( -m32 )
         LDFLAGS+=( -m32 )
         ARCH_FLAGS=( linux-generic32 )
@@ -209,12 +209,12 @@ for algo in "${algos[@]}"; do
 
     if [[ "$MODE" == "binsec" ]]; then
         # BINSEC builds
-        clang "${tool_flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DBINSEC klee_main.c "${libs[@]}" -o "binsec_var_pub_${algo}"
-        clang "${tool_flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_${algo}"
+        clang "${tool_flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DBINSEC klee_main.c "${libs[@]}" -o "binsec_var_pub_${algo}"
+        clang "${tool_flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DBINSEC -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_${algo}"
 
         # Replay binaries for BINSEC (built separately; REPLAY and BINSEC are mutually exclusive)
-        clang "${tool_flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DREPLAY klee_main.c "${libs[@]}" -o "binsec_var_pub_replay_${algo}"
-        clang "${tool_flags[@]}" -m32 -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_replay_${algo}"
+        clang "${tool_flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DREPLAY klee_main.c "${libs[@]}" -o "binsec_var_pub_replay_${algo}"
+        clang "${tool_flags[@]}" -static "${NOIND_EXE_FLAGS[@]}" -D${macro} -DREPLAY -DCONCRETE_PUBS klee_main.c "${libs[@]}" -o "binsec_fix_pub_replay_${algo}"
     fi
 
     if [[ "$MODE" == "abacus" ]]; then

@@ -26,7 +26,7 @@ Builds the pycrypto ARC4 benchmark wrapper for the requested mode.
 
 Modes:
     --klee        Build KLEE executables and bitcode
-  --binsec      Build BINSEC executables (32-bit)
+    --binsec      Build BINSEC executables (native arch)
   --abacus      Build Abacus executables (32-bit)
 
 Options:
@@ -175,14 +175,14 @@ build_binsec_mode() {
     local var_replay="binsec_var_pub_replay_arc4"
     local fix_replay="binsec_fix_pub_replay_arc4"
 
-    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+    clang -g -O0 -static "${NOIND_EXE_FLAGS[@]}" \
         -DBINSEC "${flags[@]}" "$wrapper_source" -o "$var_exe"
 
-    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+    clang -g -O0 -static "${NOIND_EXE_FLAGS[@]}" \
         -DBINSEC -DCONCRETE_PUBS "${flags[@]}" "$wrapper_source" -o "$fix_exe"
-    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+    clang -g -O0 -static "${NOIND_EXE_FLAGS[@]}" \
         -DREPLAY "${flags[@]}" "$wrapper_source" -o "$var_replay"
-    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+    clang -g -O0 -static "${NOIND_EXE_FLAGS[@]}" \
         -DREPLAY -DCONCRETE_PUBS "${flags[@]}" "$wrapper_source" -o "$fix_replay"
 }
 

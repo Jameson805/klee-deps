@@ -26,7 +26,7 @@ Builds the OpenSSL Almeida tls-rempad-luk13 benchmark wrapper for the requested 
 
 Modes:
     --klee        Build KLEE executables and bitcode
-  --binsec      Build BINSEC executables (32-bit)
+    --binsec      Build BINSEC executables (native arch)
   --abacus      Build Abacus executables (32-bit)
 
 Options:
@@ -165,14 +165,14 @@ build_binsec_mode() {
     generate_runner_artifacts
     flags=("${common_flags[@]}" -I "$generated_dir")
 
-    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+    clang -g -O0 -static "${NOIND_EXE_FLAGS[@]}" \
         -DBINSEC "${flags[@]}" "$wrapper_source" -o binsec_var_pub_tls_rempad_luk13
-    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+    clang -g -O0 -static "${NOIND_EXE_FLAGS[@]}" \
         -DBINSEC -DCONCRETE_PUBS "${flags[@]}" "$wrapper_source" -o binsec_fix_pub_tls_rempad_luk13
 
-    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+    clang -g -O0 -static "${NOIND_EXE_FLAGS[@]}" \
         -DREPLAY "${flags[@]}" "$wrapper_source" -o binsec_var_pub_replay_tls_rempad_luk13
-    clang -g -O0 -m32 -static "${NOIND_EXE_FLAGS[@]}" \
+    clang -g -O0 -static "${NOIND_EXE_FLAGS[@]}" \
         -DREPLAY -DCONCRETE_PUBS "${flags[@]}" "$wrapper_source" -o binsec_fix_pub_replay_tls_rempad_luk13
 }
 
