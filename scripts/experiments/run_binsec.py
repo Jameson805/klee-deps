@@ -85,14 +85,14 @@ def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
                     benchmark_definition,
                     expanded_case,
                     "binsec_sse_script",
-                    f"{benchmark_definition.code_path}/generated/binsec_{expanded_case.public_mode}.cfg",
+                    f"{benchmark_definition.code_path}/generated/{expanded_case.output_target}/binsec_{expanded_case.public_mode}.cfg",
                 ),
                 "stats_file": f"{canonical_case_id(benchmark_definition.library_id, benchmark_definition.variant_id, expanded_case.target_id, expanded_case.config_id)}.toml",
                 "executable": resolve_case_template(
                     benchmark_definition,
                     expanded_case,
                     "binsec_executable",
-                    f"{benchmark_definition.code_path}/binsec_{expanded_case.config_id}{expanded_case.target_suffix}",
+                    f"{benchmark_definition.code_path}/artifacts/binsec/{expanded_case.output_target}/{expanded_case.public_mode}",
                 ),
                 "source_column_suffix": expanded_case.public_mode,
                 "public_mode": expanded_case.public_mode,
@@ -386,10 +386,9 @@ def run_case(
 
     replay_path = None
     executable_name = executable_path.name
-    # The benchmark config points at the binary BINSEC analyzes. Replay binaries
-    # follow the long-standing naming convention derived here so the TOML does
-    # not need to repeat both paths for every case.
-    if executable_name in ("binsec_fix_pub", "binsec_var_pub"):
+    if executable_name in ("fix_pub", "var_pub"):
+        replay_path = executable_path.with_name(f"{executable_name}_replay")
+    elif executable_name in ("binsec_fix_pub", "binsec_var_pub"):
         replay_path = executable_path.with_name(f"{executable_name}_replay")
     elif executable_name.startswith("binsec_fix_pub_"):
         replay_path = executable_path.with_name(

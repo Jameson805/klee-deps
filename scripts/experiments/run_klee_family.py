@@ -143,7 +143,7 @@ def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, objec
                 benchmark_definition,
                 expanded_case,
                 "klee_bitcode",
-                f"{benchmark_definition.code_path}/klee_{expanded_case.config_id}{expanded_case.target_suffix}.bc",
+                f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.config_id}.bc",
             ),
             "result_name": canonical_case_id(
                 benchmark_definition.library_id,
@@ -155,7 +155,7 @@ def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, objec
                 benchmark_definition,
                 expanded_case,
                 "klee_replay_script",
-                f"{benchmark_definition.code_path}/klee_{expanded_case.public_mode}_replay{expanded_case.target_suffix}",
+                f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}_replay",
             ),
             "code_path": code_path,
             "replay_opts": _format_replay_opts(secret_inputs, public_inputs, expanded_case.public_mode),
@@ -227,14 +227,14 @@ def _load_klee_preprocess_profiles(benchmark_definition, tool_id: str) -> list[d
             benchmark_definition,
             expanded_case,
             "klee_bitcode",
-            f"{benchmark_definition.code_path}/klee_{expanded_case.public_mode}{expanded_case.target_suffix}.bc",
+            f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}.bc",
             config_id=expanded_case.public_mode,
         )
         output_bitcode = resolve_case_template(
             benchmark_definition,
             expanded_case,
             "klee_bitcode",
-            f"{benchmark_definition.code_path}/klee_{expanded_case.config_id}{expanded_case.target_suffix}.bc",
+            f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.config_id}.bc",
         )
         profiles.append(
             {

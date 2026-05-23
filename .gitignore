@@ -17,17 +17,9 @@ klee-out-*/
 build/
 obj-*/
 
-klee_main
-klee_fix_pub*
-klee_var_pub*
-klee_fix_pub_replay*
-klee_var_pub_replay*
-binsec_fix_pub*
-binsec_var_pub*
-runner_config.generated.h
-abacus_fix_pub*
-self_comp_fix_pub*
-self_comp_var_pub*
+# Standardized benchmark build outputs
+benchmarks/**/artifacts/
+benchmarks/**/generated/
 
 results/
 

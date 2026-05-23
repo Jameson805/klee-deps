@@ -71,7 +71,7 @@ def _load_abacus_cases(benchmark_definition) -> list[dict[str, object]]:
                 benchmark_definition,
                 expanded_case,
                 "abacus_executable",
-                f"{benchmark_definition.code_path}/abacus_{expanded_case.config_id}{expanded_case.target_suffix}",
+                f"{benchmark_definition.code_path}/artifacts/abacus/{expanded_case.output_target}/{expanded_case.public_mode}",
             ),
             "outfile": f"{canonical_case_id(benchmark_definition.library_id, benchmark_definition.variant_id, expanded_case.target_id, expanded_case.config_id)}.txt",
             "source_column_suffix": expanded_case.public_mode,

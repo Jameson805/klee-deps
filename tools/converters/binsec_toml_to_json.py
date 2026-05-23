@@ -628,7 +628,7 @@ def main(argv: list[str]) -> int:
     p.add_argument(
         "--replay-executable",
         default=None,
-        help="Path to the REPLAY executable used by reproduce_positives.py (e.g., benchmarks/libgcrypt-and-libgpg-error/klee_fix_pub_replay).",
+        help="Path to the REPLAY executable used by reproduce_positives.py (e.g., benchmarks/libgcrypt-and-libgpg-error/artifacts/klee/modexp/fix_pub_replay).",
     )
     p.add_argument(
         "--reproduce",

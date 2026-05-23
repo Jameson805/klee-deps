@@ -25,11 +25,11 @@ include_dirs = ["{repo_root}/include"]
 concrete_pubs = true
 
 [benchmarks.path_templates]
-abacus_executable = "{code_path}/abacus_{public_mode}_{target}"
-binsec_sse_script = "{code_path}/generated/{target}/binsec_{public_mode}.cfg"
-binsec_executable = "{code_path}/binsec_{public_mode}_{target}"
-klee_bitcode = "{code_path}/klee_{public_mode}_{target}.bc"
-klee_replay_script = "{code_path}/klee_{public_mode}_replay_{target}"
+abacus_executable = "{code_path}/artifacts/abacus/{target_output}/{public_mode}"
+binsec_sse_script = "{code_path}/generated/{target_output}/binsec_{public_mode}.cfg"
+binsec_executable = "{code_path}/artifacts/binsec/{target_output}/{public_mode}"
+klee_bitcode = "{code_path}/artifacts/klee/{target_output}/{config}.bc"
+klee_replay_script = "{code_path}/artifacts/klee/{target_output}/{public_mode}_replay"
 
 [benchmarks.variants.default]
 

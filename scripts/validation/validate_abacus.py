@@ -77,7 +77,7 @@ def _build_case_index() -> dict[str, AbacusValidationCase]:
                 benchmark_definition,
                 expanded_case,
                 "klee_replay_script",
-                f"{benchmark_definition.code_path}/klee_{expanded_case.public_mode}_replay{expanded_case.target_suffix}",
+                f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}_replay",
             )
             if output_stem in cases_by_stem:
                 raise ValueError(f"duplicate ABACUS validation case id: {output_stem}")

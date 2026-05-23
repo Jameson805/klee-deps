@@ -104,6 +104,10 @@ def _output_target(target_id: str, variant_id: str) -> str:
     return f"{target_id}_{variant_id}"
 
 
+def _artifact_dir(code_path: Path, mode: str, output_target: str) -> Path:
+    return code_path / "artifacts" / mode / output_target
+
+
 def _tool_build_config(build_table: dict[str, object], mode: str, location: str) -> dict[str, object]:
     tools_table = expect_table(build_table.get("tools") or {}, f"{location}.tools")
     raw_mode_table = tools_table.get(mode)
@@ -269,6 +273,8 @@ def main(argv: list[str] | None = None) -> int:
             preset=args.preset,
             mode=mode,
         )
+        artifact_dir = _artifact_dir(code_path, mode, output_target)
+        artifact_dir.mkdir(parents=True, exist_ok=True)
 
         flags = [
             *common_flags,
@@ -287,10 +293,10 @@ def main(argv: list[str] | None = None) -> int:
                 f"-Wl,-rpath={klee_layout.runtime_lib_dir}",
                 "-lkleeRuntest",
             ]
-            var_exe = f"klee_var_pub_{output_target}"
-            fix_exe = f"klee_fix_pub_{output_target}"
-            var_replay = f"klee_var_pub_replay_{output_target}"
-            fix_replay = f"klee_fix_pub_replay_{output_target}"
+            var_exe = artifact_dir / "var_pub"
+            fix_exe = artifact_dir / "fix_pub"
+            var_replay = artifact_dir / "var_pub_replay"
+            fix_replay = artifact_dir / "fix_pub_replay"
 
             _run(["wllvm", *flags, *klee_flags, *klee_link_flags, *define_flags, "-DKLEE_CF", *sources, *rendered_link_libraries, "-o", var_exe], cwd=code_path)
             _run(["extract-bc", var_exe], cwd=code_path)
@@ -299,10 +305,10 @@ def main(argv: list[str] | None = None) -> int:
             _run(["clang", *flags, *noind_flags, *klee_link_flags, *define_flags, "-DREPLAY", *sources, *rendered_link_libraries, "-o", var_replay], cwd=code_path)
             _run(["clang", *flags, *noind_flags, *klee_link_flags, *define_flags, "-DREPLAY", "-DCONCRETE_PUBS", *sources, *rendered_link_libraries, "-o", fix_replay], cwd=code_path)
         elif mode == "binsec":
-            var_exe = f"binsec_var_pub_{output_target}"
-            fix_exe = f"binsec_fix_pub_{output_target}"
-            var_replay = f"binsec_var_pub_replay_{output_target}"
-            fix_replay = f"binsec_fix_pub_replay_{output_target}"
+            var_exe = artifact_dir / "var_pub"
+            fix_exe = artifact_dir / "fix_pub"
+            var_replay = artifact_dir / "var_pub_replay"
+            fix_replay = artifact_dir / "fix_pub_replay"
 
             _run(["clang", *flags, "-static", *noind_flags, *binsec_link_flags, *define_flags, "-DBINSEC", *sources, *rendered_link_libraries, "-o", var_exe], cwd=code_path)
             _run(["clang", *flags, "-static", *noind_flags, *binsec_link_flags, *define_flags, "-DBINSEC", "-DCONCRETE_PUBS", *sources, *rendered_link_libraries, "-o", fix_exe], cwd=code_path)
@@ -312,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
             abacus_defs = ["-DABACUS"]
             if abacus_concrete_pubs:
                 abacus_defs.append("-DCONCRETE_PUBS")
-            _run(["gcc", *flags, "-m32", *noind_flags, *abacus_link_flags, *define_flags, *abacus_defs, *sources, *rendered_link_libraries, "-o", f"abacus_fix_pub_{output_target}"], cwd=code_path)
+            _run(["gcc", *flags, "-m32", *noind_flags, *abacus_link_flags, *define_flags, *abacus_defs, *sources, *rendered_link_libraries, "-o", artifact_dir / "fix_pub"], cwd=code_path)
 
         built_targets += 1
 
