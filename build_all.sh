@@ -155,6 +155,10 @@ configure_toolchain() {
     require_command cmake
     require_command make
 
+    local conda_include_dir="${CONDA_PREFIX:-}/include"
+    local conda_lib_dir="${CONDA_PREFIX:-}/lib"
+    local pkg_config_entries=()
+
     LLVM_CONFIG_BIN="${LLVM_CONFIG_BIN:-$(resolve_tool llvm-config-16 llvm-config || true)}"
     CLANG_BIN="${LLVMCC:-$(resolve_tool clang-16 clang || true)}"
     CLANGXX_BIN="${LLVMCXX:-$(resolve_tool clang++-16 clang++ || true)}"
@@ -171,6 +175,29 @@ configure_toolchain() {
     export CLANGXX_BIN
     export LLVM_DIR
     export CMAKE_PREFIX_PATH_VALUE
+
+    if [[ -n "${CONDA_PREFIX:-}" && -d "$conda_include_dir" ]]; then
+        export CPPFLAGS="-I$conda_include_dir ${CPPFLAGS:-}"
+        export CFLAGS="-I$conda_include_dir ${CFLAGS:-}"
+        export CXXFLAGS="-I$conda_include_dir ${CXXFLAGS:-}"
+    fi
+
+    if [[ -n "${CONDA_PREFIX:-}" && -d "$conda_lib_dir" ]]; then
+        export LDFLAGS="-L$conda_lib_dir ${LDFLAGS:-}"
+        export LIBRARY_PATH="$conda_lib_dir${LIBRARY_PATH:+:$LIBRARY_PATH}"
+
+        if [[ -d "$conda_lib_dir/pkgconfig" ]]; then
+            pkg_config_entries+=("$conda_lib_dir/pkgconfig")
+        fi
+    fi
+
+    if [[ -n "${CONDA_PREFIX:-}" && -d "$CONDA_PREFIX/share/pkgconfig" ]]; then
+        pkg_config_entries+=("$CONDA_PREFIX/share/pkgconfig")
+    fi
+
+    if [[ ${#pkg_config_entries[@]} -gt 0 ]]; then
+        export PKG_CONFIG_PATH="$(IFS=:; printf '%s' "${pkg_config_entries[*]}")${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    fi
 
     log "Using LLVM_DIR=$LLVM_DIR"
     log "Using clang=$CLANG_BIN"
