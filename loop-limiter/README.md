@@ -72,17 +72,17 @@ Example (simple instrumentation, always call klee_silent_exit on bound):
 opt \
   -load ./build/libLoopLimiter.so \
   -load-pass-plugin=./build/libLoopLimiter.so \
-  -passes=loop-limiter \
+  -passes='loop-simplify,loop-limiter' \
   -max-iterations=5 \
   input.bc -o input_instrumented.bc
 ```
 
-Example (use break mode to attempt branching to after-loop targets when possible):
+Example (use break mode on loops that can be canonicalized by loop-simplify):
 ```bash
 opt \
   -load ./build/libLoopLimiter.so \
   -load-pass-plugin=./build/libLoopLimiter.so \
-  -passes=loop-limiter \
+  -passes='loop-simplify,loop-limiter' \
   -max-iterations=5 \
   -break \
   input.bc -o input_instrumented.bc
@@ -97,13 +97,13 @@ Filtering functions
 3. Inspect the instrumented IR:
    llvm-dis-13 input_instrumented.bc
 
-4. Run KLEE on instrumented bitcode as you normally would. When a loop reaches the configured maximum the pass will have inserted a klee_silent_exit(1) (or branched out of the loop when --break could select a valid after-loop target), so KLEE will end that path or continue after the loop.
+4. Run KLEE on instrumented bitcode as you normally would. When a loop reaches the configured maximum the pass will either use the loop's existing canonical exit edge (`--break`) or insert `klee_silent_exit(1)`.
 
 Tips
 --------------
 - Change MaxIterations with the `-max-iterations` command-line option passed to opt (this option is required).
 - Target specific function(s) with `--whitelist` or skip specific functions with `--blacklist`. These two options cannot be used together.
-- Use `--break` to attempt to branch out of the loop instead of calling klee_silent_exit when a suitable after-loop target is found.
+- Use `--break` only with `loop-simplify`. The current implementation conservatively rewrites only loops whose header has a conditional branch with exactly one in-loop successor and one out-of-loop successor. Other loops emit a warning and fall back to `klee_silent_exit`.
 - If a loop is skipped you'll see a warning printed to errs() identifying the function and the reason.
 - If you need to support more complex loops (loops without preheaders, or irreducible loops) you must:
   - canonicalize loops (e.g., run passes that create preheaders),

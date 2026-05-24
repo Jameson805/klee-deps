@@ -3,10 +3,10 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Analysis/PostDominators.h"
 #include "llvm/Support/Error.h"
 #include <string>
 #include <atomic>
@@ -136,6 +136,36 @@ struct LoopLimiter : public PassInfoMixin<LoopLimiter> {
         continue;
       }
 
+      bool UseBreakMode = BreakMode;
+      BranchInst *CanonicalExitBranch = nullptr;
+      BasicBlock *LoopSuccessor = nullptr;
+      BasicBlock *ExitSuccessor = nullptr;
+      if (BreakMode) {
+        // Conservatively reuse the loop's existing canonical exit edge after
+        // loop-simplify. The older synthetic "jump after the loop" rewrite
+        // could bypass PHIs on real benchmarks such as OpenSSL.
+        auto *HeaderBranch = dyn_cast<BranchInst>(Header->getTerminator());
+        if (!HeaderBranch || !HeaderBranch->isConditional()) {
+          errs() << "warning: loop in function '" << F.getName()
+                 << "' cannot be break-instrumented conservatively because the loop header is not conditionally exiting; falling back to klee_silent_exit\n";
+          UseBreakMode = false;
+        } else {
+          BasicBlock *Succ0 = HeaderBranch->getSuccessor(0);
+          BasicBlock *Succ1 = HeaderBranch->getSuccessor(1);
+          bool Succ0InLoop = L->contains(Succ0);
+          bool Succ1InLoop = L->contains(Succ1);
+          if (Succ0InLoop == Succ1InLoop) {
+            errs() << "warning: loop in function '" << F.getName()
+                   << "' cannot be break-instrumented conservatively because the loop header does not have exactly one in-loop and one out-of-loop successor after loop-simplify; falling back to klee_silent_exit\n";
+            UseBreakMode = false;
+          } else {
+            CanonicalExitBranch = HeaderBranch;
+            LoopSuccessor = Succ0InLoop ? Succ0 : Succ1;
+            ExitSuccessor = Succ0InLoop ? Succ1 : Succ0;
+          }
+        }
+      }
+
       // Instrument this loop:
       Changed = true;
       StatChangedLoops.fetch_add(1);
@@ -149,55 +179,45 @@ struct LoopLimiter : public PassInfoMixin<LoopLimiter> {
       Builder.SetInsertPoint(Preheader->getTerminator());
       Builder.CreateStore(Builder.getInt32(0), Counter);
 
-      // 2. Decide after-loop target BEFORE changing the CFG.
-      BasicBlock *AfterTarget = nullptr;
-      SmallVector<BasicBlock*, 4> ExitBlocks;
-      L->getExitBlocks(ExitBlocks);
-      if (BreakMode) {
-        // Try to find a sensible after-loop target:
-        // 1) prefer unique exit block
-        // 2) otherwise use nearest common post-dominator of all exit blocks
-        // 3) otherwise fall back to klee_silent_exit (with a warning)
-        AfterTarget = L->getUniqueExitBlock();
-        if (!AfterTarget && !ExitBlocks.empty()) {
-          PostDominatorTree &PDT = FAM.getResult<PostDominatorTreeAnalysis>(F);
-          BasicBlock *Common = ExitBlocks[0];
-          for (unsigned i = 1; i < ExitBlocks.size(); ++i) {
-            Common = PDT.findNearestCommonDominator(Common, ExitBlocks[i]);
-            if (!Common) break;
-          }
-          if (Common && !L->contains(Common))
-            AfterTarget = Common;
+      if (UseBreakMode) {
+        // Keep the original loop exit structure and only widen the exit
+        // predicate with the loop bound check.
+        Builder.SetInsertPoint(CanonicalExitBranch);
+        Value *CurrentCount = Builder.CreateLoad(Type::getInt32Ty(Context), Counter, "counter.val");
+        Value *Limit = Builder.getInt32(static_cast<int>(MaxIterations));
+        Value *Compare = Builder.CreateICmpSGE(CurrentCount, Limit, "bound.check");
+        Value *OriginalCondition = CanonicalExitBranch->getCondition();
+        BasicBlock *TrueSuccessor = CanonicalExitBranch->getSuccessor(0);
+        BasicBlock *FalseSuccessor = CanonicalExitBranch->getSuccessor(1);
+
+        Value *NewCondition = nullptr;
+        if (CanonicalExitBranch->getSuccessor(0) == ExitSuccessor) {
+          NewCondition = Builder.CreateOr(OriginalCondition, Compare, "loop.exit.or.bound");
+        } else {
+          Value *NotCompare = Builder.CreateNot(Compare, "bound.check.not");
+          NewCondition = Builder.CreateAnd(OriginalCondition, NotCompare, "loop.stay.and.not.bound");
         }
-      }
 
-      // 3. Create new basic blocks for the if-then structure (now we can safely modify CFG)
-      BasicBlock *ExitBB = BasicBlock::Create(Context, "klee.exit.bb", &F);
-      BasicBlock *ContinueBB = Header->splitBasicBlock(Header->getFirstNonPHI(), "loop.body.bb");
-
-      // 4. Populate the exit block
-      Builder.SetInsertPoint(ExitBB);
-      if (BreakMode && AfterTarget) {
-        // branch to the selected AfterTarget (which was chosen before CFG edits)
-        Builder.CreateBr(AfterTarget);
-      } else if (BreakMode && !AfterTarget) {
-        errs() << "warning: loop in function '" << F.getName()
-               << "' has no unique exit or valid post-dominator; inserting klee_silent_exit\n";
-        Builder.CreateCall(ExitFunc, {ConstantInt::get(Type::getInt32Ty(Context), 1)});
-        Builder.CreateUnreachable();
+        CanonicalExitBranch->eraseFromParent();
+        Builder.SetInsertPoint(Header);
+        Builder.CreateCondBr(NewCondition, TrueSuccessor, FalseSuccessor);
       } else {
+        // Create a synthetic exit path only when we terminate the path locally.
+        BasicBlock *ExitBB = BasicBlock::Create(Context, "klee.exit.bb", &F);
+        BasicBlock *ContinueBB = Header->splitBasicBlock(Header->getFirstNonPHI(), "loop.body.bb");
+
+        Builder.SetInsertPoint(ExitBB);
         Builder.CreateCall(ExitFunc, {ConstantInt::get(Type::getInt32Ty(Context), 1)});
         Builder.CreateUnreachable();
+
+        Header->getTerminator()->eraseFromParent();
+        Builder.SetInsertPoint(Header);
+
+        Value *CurrentCount = Builder.CreateLoad(Type::getInt32Ty(Context), Counter, "counter.val");
+        Value *Limit = Builder.getInt32(static_cast<int>(MaxIterations));
+        Value *Compare = Builder.CreateICmpSGE(CurrentCount, Limit, "bound.check");
+        Builder.CreateCondBr(Compare, ExitBB, ContinueBB);
       }
-
-      // 5. Modify the original header to add the conditional branch
-      Header->getTerminator()->eraseFromParent(); // Erase the old unconditional branch
-      Builder.SetInsertPoint(Header);
-
-      Value *CurrentCount = Builder.CreateLoad(Type::getInt32Ty(Context), Counter, "counter.val");
-      Value *Limit = Builder.getInt32(static_cast<int>(MaxIterations));
-      Value *Compare = Builder.CreateICmpSGE(CurrentCount, Limit, "bound.check"); // check for >=
-      Builder.CreateCondBr(Compare, ExitBB, ContinueBB);
 
       // 6. Increment the counter in every latch before the back-edge is taken.
       for (BasicBlock *Latch : Latches) {
