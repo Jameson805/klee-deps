@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Convert BINSEC per-case outputs into the shared JSON result schema.
+
+The converter consumes one stats TOML plus the matching worker log and relies
+on explicit input-layout metadata from the caller instead of inferring replay
+semantics from filenames.
+"""
 
 import argparse
 import json
@@ -64,17 +70,10 @@ def _is_sep_line(s: str) -> bool:
     return bool(s) and all(ch == "=" for ch in s)
 
 
-def parse_output_log(path: str, title: str | None) -> dict[int, LeakInfo]:
-    """Parse BINSEC output.log and return map: address(int) -> LeakInfo.
-
-    If title is provided, only parses leak lines within the section labeled:
-        =======
-        <title>
-        =======
-    """
+def parse_output_log(path: str) -> dict[int, LeakInfo]:
+    """Parse a per-case BINSEC worker log and return address(int) -> LeakInfo."""
 
     leaks: dict[int, LeakInfo] = {}
-    current_title: str | None = None
 
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
@@ -83,23 +82,13 @@ def parse_output_log(path: str, title: str | None) -> dict[int, LeakInfo]:
     while i < len(lines):
         line = lines[i].rstrip("\n")
 
-        # Detect section headers emitted by run_binsec.sh
-        if _is_sep_line(line) and i + 2 < len(lines):
-            maybe_title = lines[i + 1].rstrip("\n").strip()
-            maybe_sep2 = lines[i + 2].rstrip("\n")
-            if _is_sep_line(maybe_sep2):
-                current_title = maybe_title
-                i += 3
-                continue
-
         m = _CHECKCT_RE.match(line.strip())
         if m:
-            if title is None or current_title == title:
-                addr = int(m.group("addr"), 16)
-                leaks[addr] = LeakInfo(
-                    leak_type=m.group("kind"),
-                    seconds=float(m.group("secs")),
-                )
+            addr = int(m.group("addr"), 16)
+            leaks[addr] = LeakInfo(
+                leak_type=m.group("kind"),
+                seconds=float(m.group("secs")),
+            )
         i += 1
 
     return leaks
@@ -468,44 +457,11 @@ def build_rows(
 
     return rows
 
-
-def default_title_for_toml_name(toml_path: str) -> str | None:
-    name = os.path.basename(toml_path)
-    mapping = {
-        "mbedtls_fix_pub.toml": "Mbed TLS 3.2.1 (Fix Pub)",
-        "mbedtls_var_pub.toml": "Mbed TLS 3.2.1 (Var Pub)",
-        "libgcrypt_fix_pub.toml": "Libgcrypt 1.10.1 (Fix Pub)",
-        "libgcrypt_var_pub.toml": "Libgcrypt 1.10.1 (Var Pub)",
-        "bearssl_aes_big.toml": "BearSSL 0.6 aes_big",
-        "bearssl_des_tab.toml": "BearSSL 0.6 des_tab",
-        "openssl_almeida_tls_rempad_luk13_fix_pub.toml": "OpenSSL Almeida tls-rempad-luk13 (Fix Pub)",
-        "openssl_almeida_tls_rempad_luk13_var_pub.toml": "OpenSSL Almeida tls-rempad-luk13 (Var Pub)",
-        "appliedcryp_3way.toml": "appliedCryp 3-WAY",
-        "appliedcryp_des.toml": "appliedCryp DES",
-        "appliedcryp_loki91.toml": "appliedCryp LOKI91",
-        "ghostrider_findmax.toml": "Ghostrider findmax",
-        "ghostrider_matmul.toml": "Ghostrider matmul",
-        "libg_des.toml": "libg DES",
-        "pycrypto_arc4.toml": "PyCrypto ARC4",
-    }
-    if name in mapping:
-        return mapping[name]
-
-    m = re.match(r"openssl_(?P<algo>[a-z0-9_]+)_(?P<kind>fix_pub|var_pub)\.toml$", name)
-    if m:
-        algo = m.group("algo")
-        kind = "Fix Pub" if m.group("kind") == "fix_pub" else "Var Pub"
-        return f"OpenSSL 1.1.1q {algo} ({kind})"
-
-    return None
-
-
 def convert_binsec_toml(
     *,
     toml_path: str,
     output_log: str,
     executable: str,
-    sym_size: int = 4,
     secret_inputs: list[str] | None = None,
     public_inputs: list[str] | None = None,
     replay_executable: str | None = None,
@@ -513,26 +469,22 @@ def convert_binsec_toml(
     reproduce_module: str | None = None,
     reproduce_timeout: int = 1200,
     output_path: str | None = None,
-    title: str | None = None,
     code_path: str | None = None,
     library: str,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, object]:
-    title = title or default_title_for_toml_name(toml_path)
-    needs_publics = bool(re.search(r"_var_pub\.toml$", os.path.basename(toml_path)))
-    secret_layouts = _parse_input_layouts(secret_inputs or [], [("exp", sym_size, "exp_buf")], "secret")
-    public_layouts = _parse_input_layouts(
-        public_inputs or [],
-        [("base", sym_size, "base_buf"), ("mod", sym_size, "mod_buf")] if needs_publics else [],
-        "public",
-    )
+    """Convert one BINSEC case using explicit replay layouts and per-case worker output."""
+    secret_layouts = _parse_input_layouts(secret_inputs or [], [], "secret")
+    public_layouts = _parse_input_layouts(public_inputs or [], [], "public")
 
     reproduce_module = reproduce_module or ("tools.postprocess.reproduce_positives" if reproduce else None)
     if reproduce and not replay_executable:
         raise ValueError("replay_executable is required when reproduce=True")
+    if reproduce and not secret_layouts:
+        raise ValueError("secret_inputs are required when reproduce=True")
 
     insecure_addrs, models = parse_binsec_toml(toml_path)
-    leaks = parse_output_log(output_log, title=title)
+    leaks = parse_output_log(output_log)
     rows = build_rows(
         insecure_addrs=insecure_addrs,
         models=models,
@@ -608,22 +560,16 @@ def main(argv: list[str]) -> int:
         help="Path to the analyzed BINSEC executable (used for addr->source) (e.g., benchmarks/libgcrypt-and-libgpg-error/binsec_fix_pub)",
     )
     p.add_argument(
-        "--sym-size",
-        type=int,
-        default=4,
-        help="Symbol size in bytes (SYM_SIZE), used for reproduction input encoding (default: 4).",
-    )
-    p.add_argument(
         "--secret-input",
         action="append",
         default=[],
-        help="Replay/model mapping name:bytes:model_key (repeatable). Defaults to exp:<sym-size>:exp_buf.",
+        help="Replay/model mapping name:bytes:model_key (repeatable).",
     )
     p.add_argument(
         "--public-input",
         action="append",
         default=[],
-        help="Replay/model mapping name:bytes:model_key (repeatable). Defaults to base/mod for var_pub TOMLs.",
+        help="Replay/model mapping name:bytes:model_key (repeatable).",
     )
     p.add_argument(
         "--replay-executable",
@@ -648,14 +594,6 @@ def main(argv: list[str]) -> int:
         help="Timeout seconds for each reproduction attempt (default: 1200).",
     )
     p.add_argument("--out", required=True, help="Output JSON path")
-    p.add_argument(
-        "--title",
-        default=None,
-        help=(
-            "Section title inside output.log to scope timing extraction (e.g., 'Libgcrypt 1.10.1 (Fix Pub)'). "
-            "If omitted, uses a heuristic based on --toml filename, else scans entire log."
-        ),
-    )
     p.add_argument(
         "--code-path",
         default=None,
@@ -682,7 +620,6 @@ def main(argv: list[str]) -> int:
             toml_path=args.toml,
             output_log=args.output_log,
             executable=args.executable,
-            sym_size=args.sym_size,
             secret_inputs=args.secret_input,
             public_inputs=args.public_input,
             replay_executable=args.replay_executable,
@@ -690,7 +627,6 @@ def main(argv: list[str]) -> int:
             reproduce_module=args.reproduce_module,
             reproduce_timeout=args.reproduce_timeout,
             output_path=args.out,
-            title=args.title,
             code_path=args.code_path,
             library=args.library,
         )

@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Convert one ABACUS worker log into the shared JSON result schema.
+
+This converter stays benchmark-agnostic at the schema layer, but it requires
+explicit runner metadata so ABACUS secret layouts and reference seeds come from
+the benchmark-owned runner config instead of filename heuristics.
+"""
 
 import argparse
 import json
@@ -158,6 +164,7 @@ def _bytes_to_int(values: list[int]) -> int:
 
 
 def _load_abacus_secret_layout(runner_config_path: str, preset_name: str) -> list[dict[str, Any]]:
+    """Load ABACUS secret ordering, widths, and reference seeds from one preset."""
     try:
         runner_config = load_runner_config(runner_config_path)
     except ValueError as exc:
@@ -237,32 +244,22 @@ def convert_abacus_log(
     log_path: str,
     executable_path: str,
     output_path: str | None = None,
-    sym_size: int = 4,
     runner_config: str | None = None,
     preset_name: str | None = None,
     code_root: str | None = None,
     library: str,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Convert one ABACUS log using explicit runner metadata for secret layout recovery."""
     if not os.path.isfile(log_path):
         raise FileNotFoundError(f"log not found: {log_path}")
 
-    runner_config_path = runner_config
-    if runner_config_path is None:
-        runner_config_path = os.path.abspath(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "..",
-                "configs",
-                "runner",
-                "modexp_runner_config.toml",
-            )
-        )
-    else:
-        runner_config_path = os.path.abspath(runner_config_path)
+    if not runner_config:
+        raise ValueError("runner_config is required")
+    if not preset_name:
+        raise ValueError("preset_name is required")
 
-    preset_name = preset_name or f"size_{sym_size}"
+    runner_config_path = os.path.abspath(runner_config)
     secret_layout = _load_abacus_secret_layout(runner_config_path, preset_name)
 
     with open(log_path, "r", encoding="utf-8", errors="replace") as handle:
@@ -412,13 +409,6 @@ def convert_abacus_log(
             for entry in secret_layout
         },
     }
-    if len(secret_layout) == 1 and secret_layout[0]["name"] == "exp":
-        payload["notes"]["abacus_reference_secret"] = {
-            "source": f"Loaded from {runner_config_path} preset {preset_name}",
-            "preset": preset_name,
-            "sym_size": sym_size,
-            "exp": secret_layout[0]["seed_value"],
-        }
 
     if output_path:
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
@@ -439,16 +429,21 @@ def main(argv: list[str]) -> int:
     p.add_argument("--log", required=True, help="Path to Abacus per-case log")
     p.add_argument("--executable", required=True, help="Path to the analyzed executable")
     p.add_argument("--out", required=True, help="Output JSON path")
-    p.add_argument("--sym-size", type=int, default=4, help="SYM_SIZE bytes (default: 4)")
+    p.add_argument(
+        "--sym-size",
+        type=int,
+        default=4,
+        help="Symbol byte size passed to reproduce_positives.py when --reproduce is enabled (default: 4)",
+    )
     p.add_argument(
         "--runner-config",
-        default=None,
-        help="Optional runner config path used to recover ABACUS secret layouts and reference seeds",
+        required=True,
+        help="Runner config path used to recover ABACUS secret layouts and reference seeds",
     )
     p.add_argument(
         "--preset-name",
-        default=None,
-        help="Optional preset name inside --runner-config (defaults to size_<sym-size> for legacy modexp)",
+        required=True,
+        help="Preset name inside --runner-config used to recover ABACUS secret layouts and reference seeds",
     )
     p.add_argument(
         "--code-root",
@@ -511,7 +506,6 @@ def main(argv: list[str]) -> int:
             log_path=args.log,
             executable_path=args.executable,
             output_path=args.out,
-            sym_size=args.sym_size,
             runner_config=args.runner_config,
             preset_name=args.preset_name,
             code_root=args.code_root,

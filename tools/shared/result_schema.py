@@ -146,10 +146,10 @@ def make_result_row(
     optional_fields: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate and build one normalized result row."""
-    if not isinstance(filename, str) or not filename:
-        raise TypeError("filename must be a non-empty str")
-    if not isinstance(line, int) or isinstance(line, bool):
-        raise TypeError("line must be an int")
+    if filename is not None and (not isinstance(filename, str) or not filename):
+        raise TypeError("filename must be None or a non-empty str")
+    if line is not None and (not isinstance(line, int) or isinstance(line, bool)):
+        raise TypeError("line must be None or an int")
     if not isinstance(non_ct_time, float):
         raise TypeError("non_ct_time must be a float")
     if not isinstance(counterexamples, dict):
