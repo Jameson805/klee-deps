@@ -56,7 +56,8 @@ class AbacusBucket:
 
 def resolve_host_path(path: str | Path) -> Path:
     """Resolve a host path from config, keeping repo-relative behavior."""
-    return Path(resolve_repo_path(path)).expanduser().resolve()
+    expanded = Path(os.path.expandvars(os.fspath(path))).expanduser()
+    return Path(resolve_repo_path(expanded)).resolve()
 
 
 def container_path_for_host_path(host_path: Path, container_workdir: Path) -> Path:
@@ -386,7 +387,7 @@ def main(argv: list[str] | None = None) -> int:
         if not isinstance(abacus_root_raw, str) or not abacus_root_raw:
             raise SystemExit("campaign.abacus_root must be a non-empty string")
         abacus_root = resolve_host_path(abacus_root_raw)
-        tmp_dir = tmp_dir_raw
+        tmp_dir = str(resolve_host_path(tmp_dir_raw))
 
     if not abacus_root.is_dir():
         raise SystemExit(f"abacus root path does not exist: {abacus_root}")

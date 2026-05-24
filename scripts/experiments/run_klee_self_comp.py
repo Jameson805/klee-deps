@@ -7,7 +7,7 @@ from scripts.experiments.common import CampaignTool
 from scripts.experiments.run_klee_family import main_for_mode
 
 
-CAMPAIGN_TOOL = CampaignTool(tool_id="klee_self_comp", module_name=__name__)
+CAMPAIGN_TOOL = CampaignTool(tool_id="klee_self_comp", module_name=__name__, case_parallel_arg="--max-parallel-cases")
 
 
 def main(argv: list[str] | None = None) -> int:

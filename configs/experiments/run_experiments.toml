@@ -5,7 +5,6 @@ temp_dir = "/datapool/theta-lin-experiments/tmp"
 output = "/datapool/theta-lin-experiments/20260505"
 run_time = "2h"
 klee_root = "/home/theta-lin/klee/build/bin"
-pin_root = "/datapool/theta-lin/pin-external-4.2-99776-g21d818fa2-gcc-linux"
 sliced_map_csv = "configs/postprocess/sliced_map.csv"
 filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 ideal_config_selection_csv = "configs/postprocess/ideal_config_selection.csv"
@@ -44,124 +43,124 @@ binsec_16 = true
 tag = "KLEE CF Default 4"
 tool = "klee_cf"
 destination = "klee_cf_default_4"
-args = ["{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "4"]
 
 [run_definitions.klee_cf_default_16]
 tag = "KLEE CF Default 16"
 tool = "klee_cf"
 destination = "klee_cf_default_16"
-args = ["{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "16"]
 
 [run_definitions.klee_cf_dfs_4]
 tag = "KLEE CF DFS 4"
 tool = "klee_cf"
 destination = "klee_cf_dfs_4"
-args = ["{run_time}", "--sym-size", "4", "--search", "dfs", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "4", "--search", "dfs"]
 
 [run_definitions.klee_cf_dfs_16]
 tag = "KLEE CF DFS 16"
 tool = "klee_cf"
 destination = "klee_cf_dfs_16"
-args = ["{run_time}", "--sym-size", "16", "--search", "dfs", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "16", "--search", "dfs"]
 
 [run_definitions.klee_cf_rand_path_dfs_4]
 tag = "KLEE CF Rand Path DFS 4"
 tool = "klee_cf"
 destination = "klee_cf_rand_path_dfs_4"
-args = ["{run_time}", "--sym-size", "4", "--search", "random-path,dfs", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "4", "--search", "random-path,dfs"]
 
 [run_definitions.klee_cf_rand_path_dfs_16]
 tag = "KLEE CF Rand Path DFS 16"
 tool = "klee_cf"
 destination = "klee_cf_rand_path_dfs_16"
-args = ["{run_time}", "--sym-size", "16", "--search", "random-path,dfs", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "16", "--search", "random-path,dfs"]
 
 [run_definitions.klee_cf_no_conc_4]
 tag = "KLEE CF NO CONC 4"
 tool = "klee_cf"
 destination = "klee_cf_no_conc_4"
-args = ["{run_time}", "--sym-size", "4", "--concretize-on-solver-timeout", "false", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "4", "--concretize-on-solver-timeout", "false"]
 
 [run_definitions.klee_eager_default_4]
 tag = "KLEE Eager Default 4"
 tool = "klee_eager"
 destination = "klee_eager_default_4"
-args = ["{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "4"]
 
 [run_definitions.klee_eager_default_16]
 tag = "KLEE Eager Default 16"
 tool = "klee_eager"
 destination = "klee_eager_default_16"
-args = ["{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "16"]
 
 [run_definitions.klee_eager_dfs_4]
 tag = "KLEE Eager DFS 4"
 tool = "klee_eager"
 destination = "klee_eager_dfs_4"
-args = ["{run_time}", "--sym-size", "4", "--search", "dfs", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "4", "--search", "dfs"]
 
 [run_definitions.klee_eager_dfs_16]
 tag = "KLEE Eager DFS 16"
 tool = "klee_eager"
 destination = "klee_eager_dfs_16"
-args = ["{run_time}", "--sym-size", "16", "--search", "dfs", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "16", "--search", "dfs"]
 
 [run_definitions.klee_eager_rand_path_dfs_4]
 tag = "KLEE Eager Rand Path DFS 4"
 tool = "klee_eager"
 destination = "klee_eager_rand_path_dfs_4"
-args = ["{run_time}", "--sym-size", "4", "--search", "random-path,dfs", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "4", "--search", "random-path,dfs"]
 
 [run_definitions.klee_eager_rand_path_dfs_16]
 tag = "KLEE Eager Rand Path DFS 16"
 tool = "klee_eager"
 destination = "klee_eager_rand_path_dfs_16"
-args = ["{run_time}", "--sym-size", "16", "--search", "random-path,dfs", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "16", "--search", "random-path,dfs"]
 
 [run_definitions.klee_self_comp_default_4]
 tag = "KLEE Self-Comp Default 4"
 tool = "klee_self_comp"
 destination = "klee_self_comp_default_4"
-args = ["{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "4"]
 
 [run_definitions.klee_self_comp_default_16]
 tag = "KLEE Self-Comp Default 16"
 tool = "klee_self_comp"
 destination = "klee_self_comp_default_16"
-args = ["{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "16"]
 
 [run_definitions.klee_self_comp_dfs_4]
 tag = "KLEE Self-Comp DFS 4"
 tool = "klee_self_comp"
 destination = "klee_self_comp_dfs_4"
-args = ["{run_time}", "--search", "dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--search", "dfs", "--sym-size", "4"]
 
 [run_definitions.klee_self_comp_dfs_16]
 tag = "KLEE Self-Comp DFS 16"
 tool = "klee_self_comp"
 destination = "klee_self_comp_dfs_16"
-args = ["{run_time}", "--search", "dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--search", "dfs", "--sym-size", "16"]
 
 [run_definitions.klee_self_comp_rand_path_dfs_4]
 tag = "KLEE Self-Comp Rand Path DFS 4"
 tool = "klee_self_comp"
 destination = "klee_self_comp_rand_path_dfs_4"
-args = ["{run_time}", "--search", "random-path,dfs", "--sym-size", "4", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--search", "random-path,dfs", "--sym-size", "4"]
 
 [run_definitions.klee_self_comp_rand_path_dfs_16]
 tag = "KLEE Self-Comp Rand Path DFS 16"
 tool = "klee_self_comp"
 destination = "klee_self_comp_rand_path_dfs_16"
-args = ["{run_time}", "--search", "random-path,dfs", "--sym-size", "16", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--search", "random-path,dfs", "--sym-size", "16"]
 
 [run_definitions.binsec_4]
 tag = "Binsec 4"
 tool = "binsec"
 destination = "binsec_4"
-args = ["{run_time}", "--sym-size", "4", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "4"]
 
 [run_definitions.binsec_16]
 tag = "Binsec 16"
 tool = "binsec"
 destination = "binsec_16"
-args = ["{run_time}", "--sym-size", "16", "--pin-root", "{pin_root}"]
+args = ["{run_time}", "--sym-size", "16"]
