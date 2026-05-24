@@ -1,23 +1,23 @@
 [[benchmarks]]
 library = "openssl"
 code_path = "benchmarks/openssl-1.1.1q"
-path_prefixes = ["benchmarks/openssl-1.1.1q/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 [benchmarks.build]
 preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include", "include"]
 link_libraries = ["libcrypto.a"]
+variables = { openssl_arch = "linux-generic64" }
 prepare_commands = ["cp -f crypto/bn/bn_exp_orig.c crypto/bn/bn_exp.c"]
 build_dep_commands = [
-	"./Configure no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
-	"make clean",
-	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j",
+	"./Configure --debug no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
 ]
 
 [benchmarks.build.tools.abacus]
 link_flags = ["-pthread", "-ldl"]
 concrete_pubs = false
+variables = { openssl_arch = "linux-generic32" }
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
@@ -45,16 +45,17 @@ preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include", "include"]
 link_libraries = ["libcrypto.a"]
+variables = { openssl_arch = "linux-generic64" }
 prepare_commands = ["cp -f crypto/bn/bn_exp_sliced.c crypto/bn/bn_exp.c"]
 build_dep_commands = [
-	"./Configure no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
-	"make clean",
-	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j",
+	"./Configure --debug no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
 ]
 
 [benchmarks.variants.sliced.build.tools.abacus]
 link_flags = ["-pthread", "-ldl"]
 concrete_pubs = false
+variables = { openssl_arch = "linux-generic32" }
 
 [benchmarks.variants.sliced.tool_defaults.klee.preprocess_profiles.lim_loop]
 arguments = ["-o", "{output}", "{input}"]
@@ -64,22 +65,22 @@ arguments = ["-break", "-o", "{output}", "{input}"]
 
 [[benchmarks.targets]]
 target = "recp"
-build_sources = ["klee_main.c"]
+build_sources = ["modexp_wrapper.c"]
 defines = ["RECP"]
 
 [[benchmarks.targets]]
 target = "mont"
-build_sources = ["klee_main.c"]
+build_sources = ["modexp_wrapper.c"]
 defines = ["MONT"]
 
 [[benchmarks.targets]]
 target = "mont_consttime"
-build_sources = ["klee_main.c"]
+build_sources = ["modexp_wrapper.c"]
 defines = ["MONT_CONSTTIME"]
 
 [[benchmarks.targets]]
 target = "mont_word"
-build_sources = ["klee_main.c"]
+build_sources = ["modexp_wrapper.c"]
 defines = ["MONT_WORD"]
 
 [[benchmarks.configs]]

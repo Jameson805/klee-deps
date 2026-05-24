@@ -18,10 +18,12 @@ import resource
 import signal
 import shlex
 import shutil
+import time
 from scripts.experiments.common import (
     ExperimentContext,
     LaunchedProcess,
     REPO_ROOT,
+    cleanup_launched_process,
     expand_benchmark_cases,
     execute_output_captured_worker,
     expect_array,
@@ -31,10 +33,8 @@ from scripts.experiments.common import (
     optional_string,
     optional_string_list,
     prepare_benchmark_workspace,
-    resolve_case_template,
     resolve_repo_path,
     terminate_processes,
-    wait_for_processes,
 )
 from tools.shared.tool_artifacts import resolve_artifact_path, resolve_klee_tool_layout
 
@@ -139,24 +139,14 @@ def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, objec
                 expanded_case.config_id,
             ),
             "config_id": expanded_case.config_id,
-            "bitcode": resolve_case_template(
-                benchmark_definition,
-                expanded_case,
-                "klee_bitcode",
-                f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.config_id}.bc",
-            ),
+            "bitcode": f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.config_id}.bc",
             "result_name": canonical_case_id(
                 benchmark_definition.library_id,
                 benchmark_definition.variant_id,
                 expanded_case.target_id,
                 expanded_case.config_id,
             ),
-            "replay_script": resolve_case_template(
-                benchmark_definition,
-                expanded_case,
-                "klee_replay_script",
-                f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}_replay",
-            ),
+            "replay_script": f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}_replay",
             "code_path": code_path,
             "replay_opts": _format_replay_opts(secret_inputs, public_inputs, expanded_case.public_mode),
             "source_column_suffix": expanded_case.public_mode,
@@ -223,19 +213,8 @@ def _load_klee_preprocess_profiles(benchmark_definition, tool_id: str) -> list[d
         arguments = optional_string_list(preprocess_table, "arguments", preprocess_location)
         if not arguments:
             raise ValueError(f"{preprocess_location}.arguments must not be empty")
-        base_bitcode = resolve_case_template(
-            benchmark_definition,
-            expanded_case,
-            "klee_bitcode",
-            f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}.bc",
-            config_id=expanded_case.public_mode,
-        )
-        output_bitcode = resolve_case_template(
-            benchmark_definition,
-            expanded_case,
-            "klee_bitcode",
-            f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.config_id}.bc",
-        )
+        base_bitcode = f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}.bc"
+        output_bitcode = f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.config_id}.bc"
         profiles.append(
             {
                 "arguments": [argument.format(input=base_bitcode, output=output_bitcode) for argument in arguments]
@@ -281,6 +260,11 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
             + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in selected_benchmarks(mode, None))
         ),
     )
+    parser.add_argument(
+        "--max-parallel-cases",
+        type=int,
+        help="Maximum number of per-case workers this runner may execute concurrently",
+    )
     args = parser.parse_args(argv)
 
     if args.loop_max_iterations < 0:
@@ -291,6 +275,8 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         raise SystemExit(f"Error: sym_size must be a non-negative integer (got '{args.sym_size}')")
     if args.max_memory < 0:
         raise SystemExit(f"Error: max_memory must be a non-negative integer (got '{args.max_memory}')")
+    if args.max_parallel_cases is not None and args.max_parallel_cases <= 0:
+        raise SystemExit("Error: max_parallel_cases must be a positive integer when set")
 
     try:
         benchmarks = selected_benchmarks(mode, args.benchmarks)
@@ -339,6 +325,32 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         context.log("##########")
 
         launched_runs: list[LaunchedProcess] = []
+        launch_failures = 0
+
+        def reap_finished(*, block_until_one: bool) -> int:
+            overall = 0
+            while True:
+                finished: list[LaunchedProcess] = []
+                for launched in launched_runs:
+                    launched.process.join(timeout=0)
+                    if launched.process.exitcode is not None:
+                        finished.append(launched)
+
+                if finished:
+                    for launched in finished:
+                        return_code = launched.process.exitcode if launched.process.exitcode is not None else 1
+                        status = "done" if return_code == 0 else f"failed with exit code {return_code}"
+                        print(f"[{launched.tag}] {status}; log: {launched.log_path}")
+                        if return_code != 0:
+                            overall = 1
+                        launched.reader.join()
+                        cleanup_launched_process(launched)
+                        launched_runs.remove(launched)
+                    return overall
+
+                if not block_until_one:
+                    return overall
+                time.sleep(0.2)
 
         def handle_signal(signum: int, _frame: object) -> None:
             print("interrupted, stopping KLEE case workers", file=os.sys.stderr)
@@ -379,6 +391,8 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
                     context.log(
                         f"[{worker_tag}] starting; output root: {results_dir}; log: {worker_log_path}"
                     )
+                    while args.max_parallel_cases is not None and len(launched_runs) >= args.max_parallel_cases:
+                        launch_failures |= reap_finished(block_until_one=True)
                     launched_runs.append(
                         launch_output_captured_process(
                             worker_tag,
@@ -399,7 +413,9 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
                             verbose=args.verbose,
                         )
                     )
-            if wait_for_processes(launched_runs) != 0:
+            while launched_runs:
+                launch_failures |= reap_finished(block_until_one=True)
+            if launch_failures != 0:
                 raise SystemExit(1)
         except BaseException:
             terminate_processes(launched_runs)
@@ -480,7 +496,7 @@ def run_benchmark(
                             "-load",
                             str(loop_limiter),
                             f"-load-pass-plugin={loop_limiter}",
-                            "-passes=loop-limiter",
+                            "-passes=loop-simplify,loop-limiter",
                             f"-max-iterations={args.loop_max_iterations}",
                             *arguments,
                         ],

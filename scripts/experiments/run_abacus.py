@@ -28,7 +28,6 @@ from scripts.experiments.common import (
     launch_output_captured_process,
     optional_string,
     prepare_benchmark_workspace,
-    resolve_case_template,
     resolve_repo_path,
     terminate_processes,
     wait_for_processes,
@@ -67,12 +66,7 @@ def _load_abacus_cases(benchmark_definition) -> list[dict[str, object]]:
     cases: list[dict[str, object]] = []
     for expanded_case in expand_benchmark_cases(benchmark_definition, "abacus"):
         case = {
-            "executable": resolve_case_template(
-                benchmark_definition,
-                expanded_case,
-                "abacus_executable",
-                f"{benchmark_definition.code_path}/artifacts/abacus/{expanded_case.output_target}/{expanded_case.public_mode}",
-            ),
+            "executable": f"{benchmark_definition.code_path}/artifacts/abacus/{expanded_case.output_target}/{expanded_case.public_mode}",
             "outfile": f"{canonical_case_id(benchmark_definition.library_id, benchmark_definition.variant_id, expanded_case.target_id, expanded_case.config_id)}.txt",
             "source_column_suffix": expanded_case.public_mode,
             "public_mode": expanded_case.public_mode,
@@ -337,7 +331,6 @@ def run_case(
             log_path=str(case_log),
             executable_path=str(executable_path),
             output_path=str(case_json),
-            sym_size=sym_size,
             runner_config=runner_config,
             preset_name=preset_name,
             code_root=str(workspace.resolve_code_path(benchmark_definition.code_path)),

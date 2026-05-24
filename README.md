@@ -64,7 +64,7 @@ Useful narrower invocations:
 ./build_all.sh extras
 ```
 
-The script expects a working `conda` installation on the host and uses the active conda environment to provide LLVM 16, Clang 16, CMake, Ninja, OPAM, Dune, GMP, and the Python packages used by the rest of the repository. BINSEC itself is built from source in a workspace-local OPAM root under `build/opam-root`.
+The script expects a working `conda` installation on the host and uses the active conda environment to provide LLVM 16, Clang 16, CMake, Ninja, OPAM, GMP, and the Python packages used by the rest of the repository. BINSEC itself is built from source in a workspace-local OPAM root under `build/opam-root`, and that local opam switch also provides `dune`.
 
 ## Overview
 
@@ -171,7 +171,6 @@ Minimal shape:
 [[benchmarks]]
 library = "example"
 code_path = "benchmarks/example"
-path_prefixes = ["benchmarks/example/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 
 [benchmarks.build]
@@ -219,7 +218,7 @@ The current design keeps benchmark-specific compile rules in TOML and leaves she
 
 ### 3. Make sure the existing runners can consume it
 
-If the benchmark follows the shared `targets + configs + tools + exclusions + path_templates` pattern, the current runners can usually expand it without new shared code. The recent `expand_benchmark_cases` helper in `scripts/experiments/common.py` exists specifically to keep new benchmarks on that path.
+If the benchmark follows the shared `targets + configs + tools + exclusions` pattern, the current runners can usually expand it without new shared code. The recent `expand_benchmark_cases` helper in `scripts/experiments/common.py` exists specifically to keep new benchmarks on that path.
 
 If one tool needs genuinely benchmark-specific extra data, keep that extra data narrow and runner-local under `BenchmarkDefinition.extra_config` instead of pushing that field into the shared registry schema.
 
@@ -266,7 +265,6 @@ If the tool is just a thin mode wrapper, follow the `run_klee_cf.py`, `run_klee_
 For tools that fit the common benchmark matrix, use the shared helper in `scripts/experiments/common.py`:
 
 - `expand_benchmark_cases(...)`
-- `resolve_case_template(...)`
 
 This is the current simplification path for new tools. A new runner should not copy the old nested `targets x configs x exclusions` parsing loops unless its input model truly falls outside the shared matrix.
 

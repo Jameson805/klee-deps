@@ -1,15 +1,11 @@
 [[benchmarks]]
 library = "mbedtls"
 code_path = "benchmarks/mbedtls-3.2.1"
-path_prefixes = ["benchmarks/mbedtls-3.2.1/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
-
-[benchmarks.path_templates]
-abacus_executable = "{code_path}/artifacts/abacus/{target_output}/{public_mode}"
 
 [benchmarks.build]
 preset = "size_{sym_size}"
@@ -24,7 +20,7 @@ build_dep_commands = [
 	"rm -rf build",
 	"mkdir -p build",
 	"cd build && cmake -DENABLE_TESTING=Off -DCMAKE_C_COMPILER={cc} -DCMAKE_C_FLAGS=\"{dep_cflags}\" -DCMAKE_EXE_LINKER_FLAGS=\"{dep_ldflags}\" ..",
-	"cd build && cmake --build . -j",
+	"cd build && cmake --build . -j {make_jobs}",
 ]
 
 [benchmarks.build.tools.abacus]
@@ -45,7 +41,7 @@ arguments = ["-break", "-o", "{output}", "{input}"]
 [[benchmarks.targets]]
 target = "modexp"
 runner_profile = "default"
-build_sources = ["klee_main.c"]
+build_sources = ["modexp_wrapper.c"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -81,7 +77,7 @@ arguments = ["-break", "-o", "{output}", "{input}"]
 [[benchmarks.variants.sliced.targets]]
 target = "modexp"
 runner_profile = "default"
-build_sources = ["klee_main.c", "bignum_sliced.c"]
+build_sources = ["modexp_wrapper.c", "bignum_sliced.c"]
 defines = ["USE_SLICED"]
 
 [[benchmarks.variants.sliced.configs]]
@@ -96,4 +92,5 @@ use_public_inputs = true
 [[benchmarks.variants.sliced.configs]]
 config = "var_pub_lim_loop_break"
 public_mode = "var_pub"
+preprocess = "lim_loop_break"
 use_public_inputs = true

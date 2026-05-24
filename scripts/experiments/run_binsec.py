@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Run BINSEC experiments and normalize their output.
 
-Refactored to improve clarity and maintainability.
 The runner keeps benchmark-specific metadata in TOML, but the execution flow is
-always the same: build the benchmark, run BINSEC once per configured case, then
-convert the stats file into the shared JSON format and replay positives when a
-matching replay binary exists.
+fixed: build the benchmark, run BINSEC once per configured case, then convert
+the stats file into the shared JSON format and replay positives when a matching
+replay binary exists.
 """
 
 from __future__ import annotations
@@ -16,12 +15,14 @@ from pathlib import Path
 import shutil
 import signal
 import sys
+import time
 
 from scripts.experiments.common import (
     CampaignTool,
     ExperimentContext,
     LaunchedProcess,
     REPO_ROOT,
+    cleanup_launched_process,
     expand_benchmark_cases,
     duration_to_seconds,
     execute_output_captured_worker,
@@ -32,10 +33,8 @@ from scripts.experiments.common import (
     optional_string,
     optional_string_list,
     prepare_benchmark_workspace,
-    resolve_case_template,
     resolve_repo_path,
     terminate_processes,
-    wait_for_processes,
 )
 from tools.shared.tool_artifacts import resolve_executable_path
 
@@ -52,7 +51,7 @@ from tools.shared.experiment_registry import (
 )
 
 
-CAMPAIGN_TOOL = CampaignTool(tool_id="binsec", module_name=__name__)
+CAMPAIGN_TOOL = CampaignTool(tool_id="binsec", module_name=__name__, case_parallel_arg="--max-parallel-cases")
 
 
 def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
@@ -81,19 +80,9 @@ def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
                     expanded_case.target_id,
                     expanded_case.config_id,
                 ),
-                "sse_script": resolve_case_template(
-                    benchmark_definition,
-                    expanded_case,
-                    "binsec_sse_script",
-                    f"{benchmark_definition.code_path}/generated/{expanded_case.output_target}/binsec_{expanded_case.public_mode}.cfg",
-                ),
+                "sse_script": f"{benchmark_definition.code_path}/generated/{expanded_case.output_target}/binsec_{expanded_case.public_mode}.cfg",
                 "stats_file": f"{canonical_case_id(benchmark_definition.library_id, benchmark_definition.variant_id, expanded_case.target_id, expanded_case.config_id)}.toml",
-                "executable": resolve_case_template(
-                    benchmark_definition,
-                    expanded_case,
-                    "binsec_executable",
-                    f"{benchmark_definition.code_path}/artifacts/binsec/{expanded_case.output_target}/{expanded_case.public_mode}",
-                ),
+                "executable": f"{benchmark_definition.code_path}/artifacts/binsec/{expanded_case.output_target}/{expanded_case.public_mode}",
                 "source_column_suffix": expanded_case.public_mode,
                 "public_mode": expanded_case.public_mode,
                 "sliced": expanded_case.variant_id == "sliced",
@@ -128,6 +117,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tmp-dir", default="/tmp", help="Parent directory for temporary benchmark workspaces")
     parser.add_argument("--results-dir", default="results/binsec_results", help="Directory where run outputs are written")
     parser.add_argument(
+        "--max-parallel-cases",
+        type=int,
+        help="Maximum number of per-case workers this runner may execute concurrently",
+    )
+    parser.add_argument(
         "--benchmarks",
         help=(
             "Comma-separated benchmark groups to run. Valid: "
@@ -149,6 +143,8 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("Error: fml solver name must be non-empty")
     if not args.smt_solver:
         raise SystemExit("Error: smt solver name must be non-empty")
+    if args.max_parallel_cases is not None and args.max_parallel_cases <= 0:
+        raise SystemExit("Error: max_parallel_cases must be a positive integer when set")
 
     try:
         benchmarks = selected_benchmarks("binsec", args.benchmarks)
@@ -182,6 +178,32 @@ def main(argv: list[str] | None = None) -> int:
         context.log("##########")
 
         launched_runs: list[LaunchedProcess] = []
+        launch_failures = 0
+
+        def reap_finished(*, block_until_one: bool) -> int:
+            overall = 0
+            while True:
+                finished: list[LaunchedProcess] = []
+                for launched in launched_runs:
+                    launched.process.join(timeout=0)
+                    if launched.process.exitcode is not None:
+                        finished.append(launched)
+
+                if finished:
+                    for launched in finished:
+                        return_code = launched.process.exitcode if launched.process.exitcode is not None else 1
+                        status = "done" if return_code == 0 else f"failed with exit code {return_code}"
+                        print(f"[{launched.tag}] {status}; log: {launched.log_path}")
+                        if return_code != 0:
+                            overall = 1
+                        launched.reader.join()
+                        cleanup_launched_process(launched)
+                        launched_runs.remove(launched)
+                    return overall
+
+                if not block_until_one:
+                    return overall
+                time.sleep(0.2)
 
         def handle_signal(signum: int, _frame: object) -> None:
             print("interrupted, stopping BINSEC case workers", file=sys.stderr)
@@ -217,6 +239,8 @@ def main(argv: list[str] | None = None) -> int:
                     context.log(
                         f"[{title}] starting; output root: {results_dir}; log: {worker_log_path}"
                     )
+                    while args.max_parallel_cases is not None and len(launched_runs) >= args.max_parallel_cases:
+                        launch_failures |= reap_finished(block_until_one=True)
                     launched_runs.append(
                         launch_output_captured_process(
                             title,
@@ -226,7 +250,9 @@ def main(argv: list[str] | None = None) -> int:
                             verbose=args.verbose,
                         )
                     )
-            if wait_for_processes(launched_runs) != 0:
+            while launched_runs:
+                launch_failures |= reap_finished(block_until_one=True)
+            if launch_failures != 0:
                 raise SystemExit(1)
         except BaseException:
             terminate_processes(launched_runs)
@@ -406,7 +432,6 @@ def run_case(
                     toml_path=str(stats_path),
                     output_log=str(results_dir / "_worker_logs" / f"{Path(stats_file).stem}.log"),
                     executable=str(executable_path),
-                    sym_size=args.sym_size,
                     secret_inputs=secret_inputs,
                     public_inputs=public_inputs,
                     replay_executable=str(replay_path),

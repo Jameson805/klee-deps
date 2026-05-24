@@ -95,6 +95,7 @@ class CampaignTool:
     benchmark_arg: str | None = "--benchmarks"
     results_dir_arg: str | None = "--results-dir"
     tmp_dir_arg: str | None = "--tmp-dir"
+    case_parallel_arg: str | None = None
 
     def build_worker_argv(
         self,
@@ -103,6 +104,7 @@ class CampaignTool:
         benchmark_csv: str | None,
         results_dir: Path,
         tmp_dir: str,
+        case_parallelism: int | None = None,
     ) -> list[str]:
         """Append the standard campaign-managed CLI arguments for one worker."""
         argv = list(base_args)
@@ -112,6 +114,8 @@ class CampaignTool:
             argv.extend([self.results_dir_arg, str(results_dir)])
         if self.benchmark_arg is not None and benchmark_csv:
             argv.extend([self.benchmark_arg, benchmark_csv])
+        if self.case_parallel_arg is not None and case_parallelism is not None:
+            argv.extend([self.case_parallel_arg, str(case_parallelism)])
         return argv
 
 
@@ -691,7 +695,6 @@ class ExpandedBenchmarkCase:
     config_location: str
     target_table: dict[str, object]
     config_table: dict[str, object]
-    path_templates: dict[str, object]
 
     @property
     def output_target(self) -> str:
@@ -748,10 +751,6 @@ def expand_benchmark_cases(benchmark_definition, tool_id: str) -> list[ExpandedB
     raw_target_entries = benchmark_definition.extra_config.get("targets")
     configs = expect_array(benchmark_definition.extra_config.get("configs"), f"{location}.configs")
     exclusions = expect_array(benchmark_definition.extra_config.get("exclusions") or [], f"{location}.exclusions")
-    path_templates = expect_table(
-        benchmark_definition.extra_config.get("path_templates") or {},
-        f"{location}.path_templates",
-    )
 
     parsed_targets: list[tuple[str, str, set[str], str, dict[str, object]]] = []
     if raw_target_entries is None:
@@ -812,40 +811,9 @@ def expand_benchmark_cases(benchmark_definition, tool_id: str) -> list[ExpandedB
                     config_location=config_location,
                     target_table=target_table,
                     config_table=config_table,
-                    path_templates=path_templates,
                 )
             )
     return cases
-
-
-def resolve_case_template(
-    benchmark_definition,
-    expanded_case: ExpandedBenchmarkCase,
-    template_key: str,
-    default_value: str,
-    *,
-    code_path: str | None = None,
-    config_id: str | None = None,
-    public_mode: str | None = None,
-) -> str:
-    """Resolve one benchmark path template for an expanded case."""
-    raw_template = optional_string(
-        expanded_case.path_templates,
-        template_key,
-        f"{benchmark_definition.config_location}.path_templates",
-    )
-    if not raw_template:
-        return default_value
-    return raw_template.format(
-        code_path=code_path or benchmark_definition.code_path,
-        selector=f"{benchmark_definition.library_id}:{benchmark_definition.variant_id}",
-        library=benchmark_definition.library_id,
-        variant=expanded_case.variant_id,
-        target=expanded_case.target_id,
-        target_output=expanded_case.output_target,
-        config=config_id or expanded_case.config_id,
-        public_mode=public_mode or expanded_case.public_mode,
-    )
 
 
 @dataclass

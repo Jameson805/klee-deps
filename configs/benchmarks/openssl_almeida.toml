@@ -1,7 +1,6 @@
 [[benchmarks]]
 library = "openssl_almeida"
 code_path = "benchmarks/openssl_almeida"
-path_prefixes = ["benchmarks/openssl_almeida/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
 [benchmarks.runner_profiles.default]

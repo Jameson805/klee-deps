@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#include "generated/runner_config.generated.h"
+#include "generated/tls_rempad_luk13/runner_config.generated.h"
 #include "tls1_cbc_remove_padding_lucky13.c"
 
 static uint32_t load_u32(const unsigned char *buf) {

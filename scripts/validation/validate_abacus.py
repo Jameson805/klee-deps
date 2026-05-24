@@ -17,7 +17,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from scripts.experiments.common import REPO_ROOT, expand_benchmark_cases, resolve_case_template
+from scripts.experiments.common import REPO_ROOT, expand_benchmark_cases
 from tools.postprocess.reproduce_positives import reproduce_abacus_json_positives
 from tools.shared.experiment_registry import (
     build_for_tool,
@@ -73,12 +73,7 @@ def _build_case_index() -> dict[str, AbacusValidationCase]:
                 expanded_case.target_id,
                 expanded_case.config_id,
             )
-            replay_executable = resolve_case_template(
-                benchmark_definition,
-                expanded_case,
-                "klee_replay_script",
-                f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}_replay",
-            )
+            replay_executable = f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}_replay"
             if output_stem in cases_by_stem:
                 raise ValueError(f"duplicate ABACUS validation case id: {output_stem}")
             cases_by_stem[output_stem] = AbacusValidationCase(

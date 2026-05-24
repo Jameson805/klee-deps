@@ -1,7 +1,6 @@
 [[benchmarks]]
 library = "appliedcryp"
 code_path = "benchmarks/appliedCryp"
-path_prefixes = ["benchmarks/appliedCryp/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
 [benchmarks.runner_profiles.3way]
@@ -23,13 +22,6 @@ include_dirs = ["{repo_root}/include"]
 
 [benchmarks.build.tools.abacus]
 concrete_pubs = true
-
-[benchmarks.path_templates]
-abacus_executable = "{code_path}/artifacts/abacus/{target_output}/{public_mode}"
-binsec_sse_script = "{code_path}/generated/{target_output}/binsec_{public_mode}.cfg"
-binsec_executable = "{code_path}/artifacts/binsec/{target_output}/{public_mode}"
-klee_bitcode = "{code_path}/artifacts/klee/{target_output}/{config}.bc"
-klee_replay_script = "{code_path}/artifacts/klee/{target_output}/{public_mode}_replay"
 
 [benchmarks.variants.default]
 

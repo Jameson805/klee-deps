@@ -1,29 +1,27 @@
 [[benchmarks]]
 library = "libgcrypt"
 code_path = "benchmarks/libgcrypt-and-libgpg-error"
-path_prefixes = ["benchmarks/libgcrypt-and-libgpg-error/"]
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
 
-[benchmarks.path_templates]
-abacus_executable = "{code_path}/artifacts/abacus/{target_output}/{public_mode}"
-
 [benchmarks.build]
 preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
 link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1" }
 prepare_commands = ["mkdir -p generated/modexp"]
 build_dep_commands = [
-	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j && make install",
-	"cd {libgcrypt_dir} && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j && make install",
+	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
+	"cd {libgcrypt_dir} && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
 ]
 
 [benchmarks.build.tools.abacus]
 concrete_pubs = false
+variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
 
 [benchmarks.tool_defaults.klee]
 code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi"
@@ -39,7 +37,7 @@ arguments = ["-break", "-o", "{output}", "{input}"]
 [[benchmarks.targets]]
 target = "modexp"
 runner_profile = "default"
-build_sources = ["klee_main.c"]
+build_sources = ["modexp_wrapper.c"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -67,14 +65,16 @@ preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
 link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1-sliced" }
 prepare_commands = ["mkdir -p generated/modexp_sliced"]
 build_dep_commands = [
-	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j && make install",
-	"cd libgcrypt-1.10.1-sliced && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j && make install",
+	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
+	"cd libgcrypt-1.10.1-sliced && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
 ]
 
 [benchmarks.variants.sliced.build.tools.abacus]
 concrete_pubs = false
+variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
 
 [benchmarks.variants.sliced.tool_defaults.klee]
 code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi"
@@ -88,7 +88,7 @@ arguments = ["-break", "-o", "{output}", "{input}"]
 [[benchmarks.variants.sliced.targets]]
 target = "modexp"
 runner_profile = "default"
-build_sources = ["klee_main.c", "powm_sliced.c"]
+build_sources = ["modexp_wrapper.c", "powm_sliced.c"]
 defines = ["USE_SLICED"]
 
 [[benchmarks.variants.sliced.configs]]
@@ -103,4 +103,5 @@ use_public_inputs = true
 [[benchmarks.variants.sliced.configs]]
 config = "var_pub_lim_loop_break"
 public_mode = "var_pub"
+preprocess = "lim_loop_break"
 use_public_inputs = true

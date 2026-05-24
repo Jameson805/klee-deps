@@ -93,7 +93,6 @@ class BenchmarkDefinition:
     library_id: str
     variant_id: str
     code_path: str
-    path_prefixes: tuple[str, ...]
     tools: frozenset[str]
     runner_profiles: dict[str, BenchmarkRunnerProfile]
     extra_config: dict[str, object]
@@ -187,7 +186,7 @@ def definition_for_path(path: str) -> BenchmarkDefinition | None:
     """Best-effort path-to-benchmark lookup used by converters and replay."""
     normalized_path = path.replace("\\", "/")
     for benchmark_definition in _BENCHMARK_DEFINITIONS:
-        if any(prefix in normalized_path for prefix in benchmark_definition.path_prefixes):
+        if benchmark_definition.code_path.replace("\\", "/") in normalized_path:
             return benchmark_definition
     return None
 
@@ -257,10 +256,6 @@ def _generated_definitions(
 ) -> list[BenchmarkDefinition]:
     library_id = expect_string(definition_table, "library", location)
     code_path = expect_string(definition_table, "code_path", location)
-    path_prefixes = tuple(
-        prefix.replace("\\", "/")
-        for prefix in _expect_string_list(definition_table, "path_prefixes", location)
-    )
     tools = frozenset(_expect_string_list(definition_table, "tools", location))
     runner_profiles = _parse_runner_profiles(definition_table.get("runner_profiles"), location)
     variants_table = expect_table(definition_table.get("variants"), f"{location}.variants")
@@ -276,7 +271,6 @@ def _generated_definitions(
         {
             "library",
             "code_path",
-            "path_prefixes",
             "tools",
             "runner_profiles",
             "variants",
@@ -298,7 +292,6 @@ def _generated_definitions(
                 library_id=library_id,
                 variant_id=parsed_variant.variant_id,
                 code_path=code_path,
-                path_prefixes=path_prefixes,
                 tools=parsed_variant.tools,
                 runner_profiles=runner_profiles,
                 extra_config=merged_extra_config,
@@ -320,7 +313,6 @@ def _load_registry() -> tuple[
         {
             "library",
             "code_path",
-            "path_prefixes",
             "tools",
             "runner_profiles",
             "variants",
