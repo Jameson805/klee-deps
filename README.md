@@ -6,7 +6,7 @@ The current pipeline is organized around one design rule: benchmark wrappers and
 
 ## Building The Toolchain
 
-The repository now includes a root build flow for the local KLEE toolchain and the loop-limiter LLVM plugin:
+The repository now includes a root build flow for the local KLEE toolchain plus the loop-limiter LLVM plugin:
 
 ```bash
 ./build_all.sh all
@@ -17,15 +17,14 @@ That flow does the following:
 1. Creates or updates a conda environment from `environment-build.yml`.
 2. Initializes the KLEE git submodules if needed.
 3. Builds STP and `klee-uclibc` under `build/deps/`.
-4. Downloads Intel Pin under `build/deps/pin` and registers the real Pin binaries in `build/tool-paths.json`.
-5. Installs `opam` in the conda environment, then clones and builds BINSEC in a local opam switch under `build/deps/src/binsec` and registers the real `binsec` plus `dune` executables in `build/tool-paths.json`.
-6. Configures and builds every top-level `klee-*` submodule under `build/<project>/`.
-7. Builds `loop-limiter` under the same top-level build root.
+4. Installs `opam` in the conda environment, then clones and builds BINSEC in a workspace-local opam switch under `build/deps/src/binsec` and registers the real `binsec` plus `dune` executables in `build/tool-paths.json`.
+5. Configures and builds every top-level `klee-*` submodule under `build/<project>/`.
+6. Builds `loop-limiter` under the same top-level build root.
 
-For direct manual use, the build step records workspace-local tool artifacts in
-`build/tool-paths.json`. KLEE variants are registered in the manifest with
-distinct ids, while activation exposes convenience shell functions for each
-variant name:
+For direct manual use, the build step records workspace-local executable
+artifacts for BINSEC in `build/tool-paths.json`. The activation helper also
+supports manifest-backed aliases for tool ids whose real executable name
+differs, such as KLEE variants when those records are present in the manifest:
 
 ```bash
 source ./activate-workspace.sh
@@ -38,13 +37,13 @@ Those names stay workspace-local via the manifest, so separate worktrees can
 expose different KLEE builds without overwriting each other inside a shared
 conda environment.
 
-BINSEC and Pin follow the same manifest-first rule after `./build_all.sh binsec`,
-`./build_all.sh pin`, or `./build_all.sh all`. The activation helper reads
-`build/tool-paths.json`, prepends directories for direct executable artifacts,
-defines shell aliases for manifest ids whose real binary name differs, and when
-BINSEC is present enters the local opam switch for the shell session. When Intel
-Pin is installed by the root build, activation also exports `PIN_ROOT` to the
-workspace-local Pin kit under `build/deps/pin`.
+BINSEC follows that manifest-first rule after `./build_all.sh binsec` or
+`./build_all.sh all`. The activation helper reads `build/tool-paths.json`,
+prepends directories for direct executable artifacts, defines shell aliases for
+manifest ids whose real binary name differs, and when BINSEC is present enters
+the local opam switch for the shell session. If a manifest also contains an
+`intel_pin_root` directory artifact, activation exports `PIN_ROOT` to that
+workspace-local Pin kit.
 
 To opt into the shared conda environment plus the current workspace's manifest-
 backed tool activation for one shell session, source:
@@ -58,13 +57,12 @@ Useful narrower invocations:
 ```bash
 ./build_all.sh env
 ./build_all.sh deps
-./build_all.sh pin
 ./build_all.sh binsec
 ./build_all.sh klee --project klee-cf
 ./build_all.sh extras
 ```
 
-The script expects a working `conda` installation on the host and uses the active conda environment to provide LLVM 16, Clang 16, CMake, Ninja, OPAM, GMP, and the Python packages used by the rest of the repository. BINSEC itself is built from source in a workspace-local OPAM root under `build/opam-root`, and that local opam switch also provides `dune`.
+The script expects a working `conda` installation on the host and uses the active conda environment to provide LLVM 16, Clang 16, CMake, Ninja, OPAM, GMP, and the Python packages used by the rest of the repository. BINSEC itself is built from source in a workspace-local OPAM root under `build/opam-root`, and that local opam switch also provides `dune`. `build_all.sh` and `activate-workspace.sh` both set `OPAM_ROOT` and `BINSEC_ROOT` to workspace-local paths so a fresh clone can build without extra shared-directory setup.
 
 ## Overview
 

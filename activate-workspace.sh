@@ -11,9 +11,9 @@ fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_NAME="${ENV_NAME:-klee-deps-build}"
-BUILD_MANIFEST="${BUILD_MANIFEST:-$ROOT_DIR/build/tool-paths.json}"
-OPAM_ROOT_DEFAULT="$ROOT_DIR/build/opam-root"
-BINSEC_SWITCH_ROOT="$ROOT_DIR/build/deps/src/binsec"
+BUILD_MANIFEST="$ROOT_DIR/build/tool-paths.json"
+OPAM_ROOT="$ROOT_DIR/build/opam-root"
+BINSEC_ROOT="$ROOT_DIR/build/deps/src/binsec"
 PIN_ROOT_VALUE=""
 
 if ! command -v conda >/dev/null 2>&1; then
@@ -111,7 +111,7 @@ raise SystemExit(0 if path.is_file() else 1)
 PY
     then
         unset OPAMSWITCH OPAMROOT OPAMNOENVNOTICE
-        eval "$(opam env --root "$OPAM_ROOT_DEFAULT" --set-root --set-switch --switch "$BINSEC_SWITCH_ROOT" --shell=bash)"
+        eval "$(opam env --root "$OPAM_ROOT" --set-root --set-switch --switch "$BINSEC_ROOT" --shell=bash)"
     fi
 
     PIN_ROOT_VALUE="$({

@@ -26,6 +26,8 @@ dependencies:
   - llvmdev=16
   - clang=16
   - clangxx=16
+  - libcxx
+  - libcxxabi
   - pip
   - pip:
       - lit
