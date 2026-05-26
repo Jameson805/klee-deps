@@ -1,8 +1,9 @@
 [campaign]
-num_copies = 10
-max_parallel_workers = 10
-temp_dir = "/datapool/theta-lin-experiments/tmp"
-output = "/datapool/theta-lin-experiments/20260502_new_klee_self_comp"
+# num_copies = 10
+num_copies = 1
+max_parallel_workers = 96
+temp_dir = "/scratch/$USER/$SLURM_JOB_ID"
+output = "/work/yl925/klee-deps/new_self_comp"
 run_time = "2h"
 klee_root = "/home/theta-lin/klee/build/bin"
 sliced_map_csv = "configs/postprocess/sliced_map.csv"
