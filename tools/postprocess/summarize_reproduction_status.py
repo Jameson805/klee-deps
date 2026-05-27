@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+from functools import lru_cache
 import json
+import math
 import os
 import sys
 from collections.abc import Mapping, Sequence
@@ -21,17 +23,20 @@ from tools.postprocess.csv_to_latex_table import escape_latex
 from tools.postprocess.filter_merged_results import load_filters, location_matches
 from tools.postprocess.selection_helpers import load_selected_configurations
 from tools.shared.configuration_metadata import build_column_metadata, load_run_metadata
+from tools.shared.experiment_registry import _BENCHMARK_DEFINITIONS, canonical_case_id
 from tools.shared.result_schema import (
     KIND_BRANCH,
     KIND_MEMORY,
     REPRODUCED_STATUSES,
     STATUS_IDENTICAL_TRACE,
+    STATUS_KIND_MISMATCH,
     STATUS_LOCATION_MISMATCH,
     STATUS_NOT_REPRODUCED,
     STATUS_SUCCESS,
     STATUS_TIMEOUT,
     normalize_result_kind,
 )
+from scripts.experiments.common import expand_benchmark_cases
 
 
 INCONSISTENT_STATUS = "inconsistent_across_repetitions"
@@ -41,6 +46,7 @@ STATUS_COLUMNS = [
     STATUS_TIMEOUT,
     STATUS_IDENTICAL_TRACE,
     STATUS_LOCATION_MISMATCH,
+    STATUS_KIND_MISMATCH,
     STATUS_NOT_REPRODUCED,
     INCONSISTENT_STATUS,
 ]
@@ -61,6 +67,11 @@ OUTPUT_COLUMNS = [
 SIDE_CHANNEL_BRANCH = KIND_BRANCH
 SIDE_CHANNEL_MEMORY = KIND_MEMORY
 SIDE_CHANNEL_COLUMNS = [SIDE_CHANNEL_BRANCH, SIDE_CHANNEL_MEMORY]
+AUTOMATIC_SELECTION_MERGED_CSV_CANDIDATES = (
+    "filtered_merged_results.csv",
+    "merged_results.csv",
+    "all_merged_results.csv",
+)
 
 
 def _empty_status_counts() -> dict[str, int]:
@@ -87,6 +98,35 @@ def _by_library_output_prefix(output_path: Path) -> Path:
     return selected_output_path.with_name(
         f"{selected_output_path.stem}_by_library"
     ).with_suffix("")
+
+
+@lru_cache(maxsize=1)
+def _target_key_by_result_stem() -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for benchmark_definition in _BENCHMARK_DEFINITIONS:
+        for tool_id in benchmark_definition.tools:
+            for expanded_case in expand_benchmark_cases(benchmark_definition, tool_id):
+                result_stem = canonical_case_id(
+                    benchmark_definition.library_id,
+                    benchmark_definition.variant_id,
+                    expanded_case.target_id,
+                    expanded_case.config_id,
+                )
+                mapping.setdefault(result_stem, expanded_case.target_id)
+    return mapping
+
+
+def _resolve_target_key(json_path: Path, case_metadata: Mapping[str, Any]) -> str:
+    explicit_target = case_metadata.get("target_key")
+    if isinstance(explicit_target, str) and explicit_target.strip():
+        return explicit_target.strip()
+    return _target_key_by_result_stem().get(json_path.stem, "")
+
+
+def _benchmark_label(library: str, target: str) -> str:
+    if not target:
+        return library
+    return f"{library}:{target}"
 
 
 def _basename_only(path_value: str) -> str:
@@ -264,7 +304,8 @@ def collect_reproduction_status_counts(
     list[str],
     dict[str, dict[str, int]],
     dict[str, dict[str, dict[str, int]]],
-    dict[str, dict[str, dict[str, dict[str, int]]]],
+    dict[str, dict[tuple[str, str], dict[str, dict[str, int]]]],
+    dict[str, set[tuple[str, str]]],
     dict[str, dict[str, Any]],
 ]:
     """Collect reproduction-status counts for each exact configuration column."""
@@ -277,10 +318,11 @@ def collect_reproduction_status_counts(
     ordered_configurations: list[str] = []
     counts_by_configuration: dict[str, dict[str, int]] = {}
     counts_by_configuration_and_library: dict[str, dict[str, dict[str, int]]] = {}
-    counts_by_configuration_library_and_kind: dict[
+    counts_by_configuration_library_target_and_kind: dict[
         str,
-        dict[str, dict[str, dict[str, int]]],
+        dict[tuple[str, str], dict[str, dict[str, int]]],
     ] = {}
+    observed_library_targets_by_configuration: dict[str, set[tuple[str, str]]] = {}
     configuration_metadata: dict[str, dict[str, Any]] = {}
     run_metadata_by_name = load_run_metadata(root_dir)
 
@@ -306,8 +348,14 @@ def collect_reproduction_status_counts(
                 ordered_configurations.append(configuration)
                 counts_by_configuration[configuration] = _empty_status_counts()
                 counts_by_configuration_and_library[configuration] = {}
-                counts_by_configuration_library_and_kind[configuration] = {}
+                counts_by_configuration_library_target_and_kind[configuration] = {}
+                observed_library_targets_by_configuration[configuration] = set()
                 configuration_metadata[configuration] = metadata
+
+            target_key = _resolve_target_key(entry, case_metadata)
+            observed_library_targets_by_configuration[configuration].add(
+                (library_hint, target_key)
+            )
 
             for row_number, row in enumerate(rows, start=1):
                 library, filename, line, column, context = _resolve_location(
@@ -326,8 +374,8 @@ def collect_reproduction_status_counts(
                     library,
                     _empty_status_counts(),
                 )
-                kind_counts = counts_by_configuration_library_and_kind[configuration].setdefault(
-                    library,
+                kind_counts = counts_by_configuration_library_target_and_kind[configuration].setdefault(
+                    (library, target_key),
                     _empty_side_channel_status_counts(),
                 )
                 bucket = _resolve_status_bucket(row.get("reproduced_status"), context=context)
@@ -343,7 +391,8 @@ def collect_reproduction_status_counts(
         ordered_configurations,
         counts_by_configuration,
         counts_by_configuration_and_library,
-        counts_by_configuration_library_and_kind,
+        counts_by_configuration_library_target_and_kind,
+        observed_library_targets_by_configuration,
         configuration_metadata,
     )
 
@@ -400,6 +449,7 @@ def summarize_reproduction_statuses(
         counts_by_configuration,
         _,
         _,
+        _,
         configuration_metadata,
     ) = collect_reproduction_status_counts(
         root_dir,
@@ -439,11 +489,170 @@ def _load_selected_configurations(
     return selected_rows
 
 
-def _load_selection_rows(
-    selection_csv: Path,
+def _default_display_label(comparison_tool: str) -> str:
+    known_labels = {
+        "abacus": "Abacus",
+        "binsec": "BINSEC",
+        "klee_cf": "KLEE-CF",
+        "klee_cf_sliced": "KLEE-CF sliced",
+        "klee_eager": "KLEE-Eager",
+        "klee_self_comp": "KLEE Self-Comp",
+    }
+    label = known_labels.get(comparison_tool)
+    if label is not None:
+        return label
+    return comparison_tool.replace("_", "-")
+
+
+def _default_plot_groups(*, comparison_tool: str, tool_family: str) -> str:
+    if comparison_tool == "klee_cf":
+        return "internal|external"
+    if comparison_tool.startswith("klee") or tool_family.startswith("klee"):
+        return "internal"
+    return "external"
+
+
+def _parse_positive_time(raw_value: Any) -> float | None:
+    if raw_value is None:
+        return None
+    text = str(raw_value).strip()
+    if not text:
+        return None
+    try:
+        value = float(text)
+    except ValueError:
+        return None
+    if not math.isfinite(value) or value <= 0:
+        return None
+    return value
+
+
+def _load_last_times_by_configuration(
+    root_dir: Path,
+    configurations: Sequence[str],
+) -> tuple[dict[str, float], Path | None]:
+    last_times: dict[str, float] = {
+        configuration: float("-inf") for configuration in configurations
+    }
+
+    for candidate_name in AUTOMATIC_SELECTION_MERGED_CSV_CANDIDATES:
+        candidate_path = root_dir / candidate_name
+        if not candidate_path.is_file():
+            continue
+
+        with candidate_path.open("r", newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames:
+                continue
+
+            available_columns = [
+                configuration
+                for configuration in configurations
+                if configuration in reader.fieldnames
+            ]
+            if not available_columns:
+                continue
+
+            for row in reader:
+                for configuration in available_columns:
+                    parsed_time = _parse_positive_time(row.get(configuration))
+                    if parsed_time is None:
+                        continue
+                    if parsed_time > last_times[configuration]:
+                        last_times[configuration] = parsed_time
+
+        finalized_last_times = {
+            configuration: (
+                observed_last_time
+                if math.isfinite(observed_last_time)
+                else float("inf")
+            )
+            for configuration, observed_last_time in last_times.items()
+        }
+        return finalized_last_times, candidate_path
+
+    return {configuration: float("inf") for configuration in configurations}, None
+
+
+def _automatic_selected_configurations(
     summary_rows: Sequence[Mapping[str, Any]],
+    *,
+    root_dir: Path,
 ) -> list[dict[str, Any]]:
-    selected_configurations = _load_selected_configurations(selection_csv, summary_rows)
+    if not summary_rows:
+        return []
+
+    configurations = [str(row["configuration"]).strip() for row in summary_rows]
+    last_times, timing_source_path = _load_last_times_by_configuration(
+        root_dir,
+        configurations,
+    )
+
+    if timing_source_path is not None:
+        print(
+            f"Automatic selection tie-breaks use last-discovery times from {timing_source_path}"
+        )
+    else:
+        print(
+            "Automatic selection could not find merged timing CSV columns under "
+            f"{root_dir}; tie-breaks after total counts will use source column names."
+        )
+
+    best_by_tool: dict[str, tuple[int, float, str, dict[str, Any]]] = {}
+    tool_order: list[str] = []
+    for row in summary_rows:
+        summary_row = dict(row)
+        source_column = str(summary_row["configuration"]).strip()
+        comparison_tool = str(summary_row["comparison_tool"]).strip()
+        tool_family = str(summary_row.get("tool_family", comparison_tool)).strip()
+        total = int(summary_row["total_filtered_positives"])
+        last_time = float(last_times.get(source_column, float("inf")))
+        selected_row = {
+            **summary_row,
+            "source_column": source_column,
+            "display_label": _default_display_label(comparison_tool),
+            "plot_groups": _default_plot_groups(
+                comparison_tool=comparison_tool,
+                tool_family=tool_family,
+            ),
+            "summary_row": dict(summary_row),
+        }
+        for status_name in STATUS_COLUMNS:
+            selected_row[status_name] = int(selected_row[status_name])
+
+        previous = best_by_tool.get(comparison_tool)
+        should_replace = False
+        if previous is None:
+            should_replace = True
+        else:
+            previous_total, previous_last_time, previous_source_column, _ = previous
+            if total > previous_total:
+                should_replace = True
+            elif total == previous_total and last_time < previous_last_time:
+                should_replace = True
+            elif (
+                total == previous_total
+                and last_time == previous_last_time
+                and source_column < previous_source_column
+            ):
+                should_replace = True
+
+        if should_replace:
+            if previous is None:
+                tool_order.append(comparison_tool)
+            best_by_tool[comparison_tool] = (
+                total,
+                last_time,
+                source_column,
+                selected_row,
+            )
+
+    return [best_by_tool[tool_name][3] for tool_name in tool_order]
+
+
+def _selected_rows_from_configurations(
+    selected_configurations: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
     return [
         {
             "configuration": str(selected_configuration["display_label"]),
@@ -458,6 +667,14 @@ def _load_selection_rows(
         }
         for selected_configuration in selected_configurations
     ]
+
+
+def _load_selection_rows(
+    selection_csv: Path,
+    summary_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    selected_configurations = _load_selected_configurations(selection_csv, summary_rows)
+    return _selected_rows_from_configurations(selected_configurations)
 
 
 def _nonzero_status_columns(selected_rows: Sequence[Mapping[str, Any]]) -> list[str]:
@@ -578,10 +795,11 @@ def _selected_configuration_group_order(
 
 def _selected_by_library_rows(
     selected_configurations: Sequence[Mapping[str, Any]],
-    counts_by_configuration_library_and_kind: Mapping[
+    counts_by_configuration_library_target_and_kind: Mapping[
         str,
-        Mapping[str, Mapping[str, Mapping[str, int]]],
+        Mapping[tuple[str, str], Mapping[str, Mapping[str, int]]],
     ],
+    observed_library_targets_by_configuration: Mapping[str, set[tuple[str, str]]],
 ) -> tuple[list[str], list[str], list[dict[str, str]], list[int]] | None:
     if not selected_configurations:
         raise SystemExit("Selection CSV is empty")
@@ -590,21 +808,22 @@ def _selected_by_library_rows(
         selected_configurations
     )
     label_map = _build_unique_display_labels(selected_configurations)
-    libraries = sorted(
+    library_targets = sorted(
         {
-            library
+            library_target
             for selected_configuration in ordered_configurations
-            for library in counts_by_configuration_library_and_kind.get(
+            for library_target in observed_library_targets_by_configuration.get(
                 str(selected_configuration["source_column"]),
-                {},
+                set(),
             )
         }
     )
-    if not libraries:
+    if not library_targets:
         return None
 
     csv_fieldnames = [
         "library",
+        "target",
         *[
             fieldname
             for selected_configuration in ordered_configurations
@@ -615,20 +834,24 @@ def _selected_by_library_rows(
         ],
     ]
     latex_fieldnames = [
-        "library",
+        "benchmark",
         *[
             label_map[str(selected_configuration["source_column"])]
             for selected_configuration in ordered_configurations
         ],
     ]
     rows: list[dict[str, str]] = []
-    for library in libraries:
-        row: dict[str, str] = {"library": library}
+    for library, target in library_targets:
+        row: dict[str, str] = {
+            "library": library,
+            "target": target,
+            "benchmark": _benchmark_label(library, target),
+        }
         for selected_configuration in ordered_configurations:
             source_column = str(selected_configuration["source_column"])
             label = label_map[source_column]
-            library_counts = counts_by_configuration_library_and_kind.get(source_column, {}).get(
-                library,
+            library_counts = counts_by_configuration_library_target_and_kind.get(source_column, {}).get(
+                (library, target),
                 {},
             )
             branch_successes = int(
@@ -683,7 +906,7 @@ def _selected_by_library_rows_to_latex(
         r"    \midrule",
     ]
     for row in rows:
-        cells = [escape_latex(str(row["library"]))]
+        cells = [escape_latex(str(row["benchmark"]))]
         cells.extend(escape_latex(str(row[fieldname])) for fieldname in fieldnames[1:])
         lines.append("    " + " & ".join(cells) + r" \\")
     lines.extend([
@@ -709,16 +932,18 @@ def _write_selected_by_library_latex(
 
 def write_selected_by_library_outputs(
     selected_configurations: Sequence[Mapping[str, Any]],
-    counts_by_configuration_library_and_kind: Mapping[
+    counts_by_configuration_library_target_and_kind: Mapping[
         str,
-        Mapping[str, Mapping[str, Mapping[str, int]]],
+        Mapping[tuple[str, str], Mapping[str, Mapping[str, int]]],
     ],
+    observed_library_targets_by_configuration: Mapping[str, set[tuple[str, str]]],
     *,
     output_prefix: Path,
 ) -> tuple[Path, Path] | None:
     selected_rows = _selected_by_library_rows(
         selected_configurations,
-        counts_by_configuration_library_and_kind,
+        counts_by_configuration_library_target_and_kind,
+        observed_library_targets_by_configuration,
     )
     if selected_rows is None:
         return None
@@ -778,7 +1003,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--selection-csv",
         help=(
             "Optional best-of selection CSV with comparison_tool, source_column, and optional display_label; "
-            "writes reduced CSV and LaTeX outputs."
+            "overrides automatic best-per-tool selection."
         ),
     )
     parser.add_argument(
@@ -793,15 +1018,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--by-library-selection-tables",
         action="store_true",
         help=(
-            "Write one per-library success-count CSV and LaTeX table for the selected configurations, "
-            "ordered as KLEE-CF, other internal KLEE-based tools, then external tools. "
-            "Requires --selection-csv."
+            "Write one per-library-plus-target success-count CSV and LaTeX table for the selected configurations, "
+            "ordered as KLEE-CF, other internal KLEE-based tools, then external tools."
         ),
     )
     parser.add_argument(
         "--by-library-output-prefix",
         help=(
-            "Optional output prefix for the per-library selection table; writes PREFIX.csv and PREFIX.tex."
+            "Optional output prefix for the per-library-plus-target selection table; writes PREFIX.csv and PREFIX.tex."
         ),
     )
     return parser
@@ -811,15 +1035,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.by_library_selection_tables and not args.selection_csv:
-        parser.error("--by-library-selection-tables requires --selection-csv")
-
     output_path = Path(args.output)
     (
         ordered_configurations,
         counts_by_configuration,
         counts_by_configuration_and_library,
-        counts_by_configuration_library_and_kind,
+        counts_by_configuration_library_target_and_kind,
+        observed_library_targets_by_configuration,
         configuration_metadata,
     ) = collect_reproduction_status_counts(
         Path(args.root_dir),
@@ -845,53 +1067,51 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.selection_csv),
             summary_rows,
         )
+    else:
+        selected_configurations = _automatic_selected_configurations(
+            summary_rows,
+            root_dir=Path(args.root_dir),
+        )
         if selected_configurations:
-            selected_rows = [
-                {
-                    "configuration": str(selected_configuration["display_label"]),
-                    **{
-                        status_name: int(selected_configuration[status_name])
-                        for status_name in STATUS_COLUMNS
-                    },
-                    TOTAL_COLUMN: sum(
-                        int(selected_configuration[status_name])
-                        for status_name in STATUS_COLUMNS
-                    ),
-                }
-                for selected_configuration in selected_configurations
-            ]
-            selected_output_path = (
-                Path(args.selected_output)
-                if args.selected_output
-                else _selected_output_path(output_path)
+            print(
+                "No --selection-csv provided; using automatically selected best configuration per comparison tool."
             )
-            selected_latex_output_path = (
-                Path(args.selected_latex_output)
-                if args.selected_latex_output
-                else _selected_latex_output_path(output_path)
-            )
-            csv_path = _write_selected_csv(selected_rows, selected_output_path)
-            latex_path = _write_selected_latex(selected_rows, selected_latex_output_path)
-            print(f"Wrote {csv_path}")
-            print(f"Wrote {latex_path}")
 
-            if args.by_library_selection_tables:
-                by_library_output_prefix = (
-                    Path(args.by_library_output_prefix)
-                    if args.by_library_output_prefix
-                    else _by_library_output_prefix(output_path)
-                )
-                selected_by_library_outputs = write_selected_by_library_outputs(
-                    selected_configurations,
-                    counts_by_configuration_library_and_kind,
-                    output_prefix=by_library_output_prefix,
-                )
-                if selected_by_library_outputs is None:
-                    print("Skipping by-library selection tables: selected configurations have no filtered library counts")
-                else:
-                    grouped_csv_path, grouped_latex_path = selected_by_library_outputs
-                    print(f"Wrote {grouped_csv_path}")
-                    print(f"Wrote {grouped_latex_path}")
+    if selected_configurations:
+        selected_rows = _selected_rows_from_configurations(selected_configurations)
+        selected_output_path = (
+            Path(args.selected_output)
+            if args.selected_output
+            else _selected_output_path(output_path)
+        )
+        selected_latex_output_path = (
+            Path(args.selected_latex_output)
+            if args.selected_latex_output
+            else _selected_latex_output_path(output_path)
+        )
+        csv_path = _write_selected_csv(selected_rows, selected_output_path)
+        latex_path = _write_selected_latex(selected_rows, selected_latex_output_path)
+        print(f"Wrote {csv_path}")
+        print(f"Wrote {latex_path}")
+
+        if args.by_library_selection_tables:
+            by_library_output_prefix = (
+                Path(args.by_library_output_prefix)
+                if args.by_library_output_prefix
+                else _by_library_output_prefix(output_path)
+            )
+            selected_by_library_outputs = write_selected_by_library_outputs(
+                selected_configurations,
+                counts_by_configuration_library_target_and_kind,
+                observed_library_targets_by_configuration,
+                output_prefix=by_library_output_prefix,
+            )
+            if selected_by_library_outputs is None:
+                print("Skipping by-library selection tables: selected configurations have no filtered library-plus-target counts")
+            else:
+                grouped_csv_path, grouped_latex_path = selected_by_library_outputs
+                print(f"Wrote {grouped_csv_path}")
+                print(f"Wrote {grouped_latex_path}")
 
     return 0
 
