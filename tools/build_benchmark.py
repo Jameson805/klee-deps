@@ -6,8 +6,15 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
+
+from capstone import CS_ARCH_X86, CS_MODE_32, CS_MODE_64, Cs
+from capstone.x86 import X86_OP_MEM, X86_REG_RIP
+from elftools.elf.elffile import ELFFile
+from elftools.elf.relocation import RelocationSection
+from elftools.elf.sections import SymbolTableSection
 
 from scripts.experiments.common import (
     REPO_ROOT,
@@ -25,6 +32,265 @@ def _run(command: list[str], *, cwd: Path) -> None:
     rendered_command = [os.fspath(part) for part in command]
     print(f"$ {' '.join(rendered_command)}", flush=True)
     subprocess.run(rendered_command, cwd=cwd, check=True)
+
+
+_REPLACE_SYMBOL_RE = re.compile(r"^replace <([^>]+)>")
+_HALT_SYMBOL_RE = re.compile(r"^halt at <([^>]+)>")
+
+
+def _normalize_elf_symbol(name: str) -> str:
+    """Strip ELF version suffixes from symbol names."""
+    if "@" in name:
+        return name.split("@", 1)[0]
+    return name
+
+
+def _elf_disassembler(binary_path: Path) -> tuple[ELFFile, Cs, object]:
+    """Open one ELF and return the file handle alongside a matching x86 disassembler."""
+    binary_file = binary_path.open("rb")
+    elf = ELFFile(binary_file)
+    if elf.get_machine_arch() != "x64" and elf.get_machine_arch() != "x86":
+        binary_file.close()
+        raise ValueError(f"unsupported ELF machine for BINSEC hook discovery: {elf.get_machine_arch()}")
+    md = Cs(CS_ARCH_X86, CS_MODE_64 if elf.elfclass == 64 else CS_MODE_32)
+    md.detail = True
+    return elf, md, binary_file
+
+
+def _iter_symbol_tables(elf: ELFFile) -> list[SymbolTableSection]:
+    return [section for section in elf.iter_sections() if isinstance(section, SymbolTableSection)]
+
+
+def _relocation_symbol_map(elf: ELFFile) -> dict[int, str]:
+    """Map relocation target addresses to their referenced symbol names."""
+    mapping: dict[int, str] = {}
+    for section in elf.iter_sections():
+        if not isinstance(section, RelocationSection):
+            continue
+        symtab = elf.get_section(section["sh_link"])
+        if not isinstance(symtab, SymbolTableSection):
+            continue
+        for relocation in section.iter_relocations():
+            symbol_index = relocation.entry.r_info_sym
+            if symbol_index == 0:
+                continue
+            symbol = symtab.get_symbol(symbol_index)
+            symbol_name = _normalize_elf_symbol(symbol.name)
+            if symbol_name:
+                mapping[relocation["r_offset"]] = symbol_name
+    return mapping
+
+
+def _defined_elf_symbols(binary_path: Path) -> set[str]:
+    """Return symbols that are actually defined in the ELF."""
+    symbols: set[str] = set()
+    elf, _, binary_file = _elf_disassembler(binary_path)
+    try:
+        for symtab in _iter_symbol_tables(elf):
+            for symbol in symtab.iter_symbols():
+                if symbol["st_shndx"] == "SHN_UNDEF":
+                    continue
+                name = _normalize_elf_symbol(symbol.name)
+                if name:
+                    symbols.add(name)
+    finally:
+        binary_file.close()
+    return symbols
+
+
+def _relocated_elf_symbols(binary_path: Path) -> set[str]:
+    """Return symbols that appear in relocation records and must be resolved."""
+    elf, _, binary_file = _elf_disassembler(binary_path)
+    try:
+        return set(_relocation_symbol_map(elf).values())
+    finally:
+        binary_file.close()
+
+
+def _plt_elf_symbol_sections(binary_path: Path) -> dict[str, str]:
+    """Return PLT symbol names mapped to the section that contains their stub."""
+    symbols: dict[str, str] = {}
+    elf, disassembler, binary_file = _elf_disassembler(binary_path)
+    try:
+        relocation_symbols = _relocation_symbol_map(elf)
+        for section_name in (".plt", ".plt.got", ".plt.sec"):
+            section = elf.get_section_by_name(section_name)
+            if section is None:
+                continue
+            for instruction in disassembler.disasm(section.data(), section["sh_addr"]):
+                if instruction.mnemonic != "jmp" or not instruction.operands:
+                    continue
+                operand = instruction.operands[0]
+                if operand.type != X86_OP_MEM:
+                    continue
+                memory = operand.mem
+                target_address: int | None = None
+                if memory.base == X86_REG_RIP:
+                    target_address = instruction.address + instruction.size + memory.disp
+                elif memory.base == 0 and memory.index == 0:
+                    target_address = memory.disp
+                if target_address is None:
+                    continue
+                symbol_name = relocation_symbols.get(target_address)
+                if symbol_name:
+                    symbols[f"{symbol_name}@plt"] = section_name
+    finally:
+        binary_file.close()
+    return symbols
+
+
+def _plt_elf_symbols(binary_path: Path) -> set[str]:
+    """Return symbols that have a PLT entry in the ELF."""
+    return set(_plt_elf_symbol_sections(binary_path))
+
+
+def _replacement_symbols(binary_path: Path) -> set[str]:
+    """Return the symbols for which BINSEC replacement blocks are meaningful."""
+    return _defined_elf_symbols(binary_path) | _relocated_elf_symbols(binary_path)
+
+
+def _configured_binsec_hook_symbols(config_path: Path) -> set[str]:
+    """Return symbols explicitly handled by the generated BINSEC config."""
+    configured: set[str] = set()
+    for line in config_path.read_text(encoding="utf-8").splitlines():
+        replace_match = _REPLACE_SYMBOL_RE.match(line)
+        if replace_match:
+            configured.add(replace_match.group(1))
+            continue
+        halt_match = _HALT_SYMBOL_RE.match(line)
+        if halt_match:
+            configured.add(halt_match.group(1))
+    return configured
+
+
+def _configured_binsec_hook_symbols_from_lines(lines: list[str]) -> set[str]:
+    """Return symbols handled by an in-memory BINSEC config."""
+    configured: set[str] = set()
+    for line in lines:
+        replace_match = _REPLACE_SYMBOL_RE.match(line)
+        if replace_match:
+            configured.add(replace_match.group(1))
+            continue
+        halt_match = _HALT_SYMBOL_RE.match(line)
+        if halt_match:
+            configured.add(halt_match.group(1))
+    return configured
+
+
+def _insert_binsec_runtime_failure_stubs(lines: list[str], stub_symbols: list[str]) -> list[str]:
+    """Insert loud runtime failure stubs for unresolved PLT symbols before global directives."""
+    if not stub_symbols:
+        return lines
+
+    insert_at = len(lines)
+    for index, line in enumerate(lines):
+        if line.startswith("explore "):
+            insert_at = index
+            break
+
+    stub_lines: list[str] = []
+    for symbol in stub_symbols:
+        stub_lines.extend(
+            [
+                f"replace <{symbol}> by",
+                "  assert 0x0<1> = 0x1<1>",
+                "  halt",
+                "end",
+                "",
+            ]
+        )
+    if stub_lines and stub_lines[-1] == "":
+        stub_lines.pop()
+
+    return [*lines[:insert_at], *stub_lines, *lines[insert_at:]]
+
+
+def _runtime_haltable_plt_symbols(binary_path: Path, configured_symbols: set[str]) -> list[str]:
+    """Return unresolved PLT symbols that BINSEC can reliably resolve in halt directives."""
+    haltable_sections = {".plt", ".plt.sec"}
+    plt_sections = _plt_elf_symbol_sections(binary_path)
+    return sorted(
+        symbol
+        for symbol, section_name in plt_sections.items()
+        if symbol not in configured_symbols and section_name in haltable_sections
+    )
+
+
+def _warn_unhooked_binsec_plt_symbols(config_path: Path, binary_path: Path) -> None:
+    """Warn about imported PLT entries that BINSEC may reach without a replacement."""
+    plt_symbols = _plt_elf_symbols(binary_path)
+    configured_symbols = _configured_binsec_hook_symbols(config_path)
+    missing_symbols = sorted(symbol for symbol in plt_symbols if symbol not in configured_symbols)
+    if not missing_symbols:
+        return
+
+    preview = ", ".join(missing_symbols[:12])
+    if len(missing_symbols) > 12:
+        preview += f", ... (+{len(missing_symbols) - 12} more)"
+    print(
+        "WARNING: generated BINSEC config does not handle some PLT imports for "
+        f"{binary_path.name}: {preview}. Starting BINSEC from <main> can fall into "
+        "an unresolved PLT resolver path if one of these is called.",
+        flush=True,
+    )
+
+
+def _resolve_binsec_symbol(symbol_name: str, *, symbols: set[str], plt_symbols: set[str]) -> str | None:
+    """Prefer a PLT hook when available, otherwise keep the raw symbol if resolvable."""
+    plt_name = f"{symbol_name}@plt"
+    if plt_name in plt_symbols:
+        return plt_name
+    if symbol_name in symbols:
+        return symbol_name
+    return None
+
+
+def _rewrite_binsec_config(config_path: Path, binary_path: Path) -> None:
+    """Rewrite shared BINSEC cfg directives to match the built ELF symbol surface."""
+    symbols = _replacement_symbols(binary_path)
+    plt_symbols = _plt_elf_symbols(binary_path)
+    lines = config_path.read_text(encoding="utf-8").splitlines()
+    rewritten: list[str] = []
+    index = 0
+    while index < len(lines):
+        replace_match = _REPLACE_SYMBOL_RE.match(lines[index])
+        if replace_match:
+            symbol_name = replace_match.group(1)
+            resolved_name = _resolve_binsec_symbol(symbol_name, symbols=symbols, plt_symbols=plt_symbols)
+            block_end = index + 1
+            while block_end < len(lines) and lines[block_end] != "end":
+                block_end += 1
+            if block_end >= len(lines):
+                raise ValueError(f"unterminated replacement block for {symbol_name!r} in {config_path}")
+
+            if resolved_name is not None:
+                rewritten.append(lines[index].replace(f"<{symbol_name}>", f"<{resolved_name}>", 1))
+                rewritten.extend(lines[index + 1 : block_end + 1])
+            index = block_end + 1
+            continue
+
+        halt_match = _HALT_SYMBOL_RE.match(lines[index])
+        if halt_match:
+            symbol_name = halt_match.group(1)
+            resolved_name = _resolve_binsec_symbol(symbol_name, symbols=symbols, plt_symbols=plt_symbols)
+            if resolved_name is not None:
+                rewritten.append(lines[index].replace(f"<{symbol_name}>", f"<{resolved_name}>", 1))
+            index += 1
+            continue
+
+        rewritten.append(lines[index])
+        index += 1
+
+    configured_symbols = _configured_binsec_hook_symbols_from_lines(rewritten)
+    unresolved_plt_symbols = _runtime_haltable_plt_symbols(binary_path, configured_symbols)
+    rewritten = _insert_binsec_runtime_failure_stubs(rewritten, unresolved_plt_symbols)
+    config_path.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
+
+
+def _prune_binsec_replacements(config_path: Path, binary_path: Path) -> None:
+    """Drop replacement blocks for symbols that are absent from the built ELF."""
+    _rewrite_binsec_config(config_path, binary_path)
+    _warn_unhooked_binsec_plt_symbols(config_path, binary_path)
 
 
 def _render(value: str, *, code_path: Path, target_id: str, output_target: str) -> str:
@@ -280,7 +546,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             os.environ.pop("OBJCOPY", None)
 
-    noind_flags = ["-fno-pie", "-fno-plt", "-no-pie" if mode == "abacus" else "-Wl,-no-pie"]
+    noind_flags = ["-fno-pie", "-no-pie" if mode == "abacus" else "-Wl,-no-pie"]
+    if mode != "binsec":
+        noind_flags.insert(1, "-fno-plt")
     dep_cc = "clang"
     if mode == "abacus":
         dep_cc = "gcc"
@@ -292,7 +560,9 @@ def main(argv: list[str] | None = None) -> int:
     if mode == "abacus":
         dep_cflags.append("-m32")
         dep_ldflags.append("-m32")
-    dep_cflags.extend(["-fno-pie", "-fno-plt"])
+    dep_cflags.append("-fno-pie")
+    if mode != "binsec":
+        dep_cflags.append("-fno-plt")
     dep_ldflags.append("-no-pie" if mode == "abacus" else "-Wl,-no-pie")
 
     klee_layout = None
@@ -397,11 +667,15 @@ def main(argv: list[str] | None = None) -> int:
             fix_exe = artifact_dir / "fix_pub"
             var_replay = artifact_dir / "var_pub_replay"
             fix_replay = artifact_dir / "fix_pub_replay"
+            var_cfg = generated_dir / "binsec_var_pub.cfg"
+            fix_cfg = generated_dir / "binsec_fix_pub.cfg"
 
-            _run(["clang", *final_flags, "-static", *binsec_link_flags, *define_flags, "-DBINSEC", *sources, *rendered_link_libraries, "-o", var_exe], cwd=code_path)
-            _run(["clang", *final_flags, "-static", *binsec_link_flags, *define_flags, "-DBINSEC", "-DCONCRETE_PUBS", *sources, *rendered_link_libraries, "-o", fix_exe], cwd=code_path)
-            _run(["clang", *final_flags, "-static", *binsec_link_flags, *define_flags, "-DREPLAY", *sources, *rendered_link_libraries, "-o", var_replay], cwd=code_path)
-            _run(["clang", *final_flags, "-static", *binsec_link_flags, *define_flags, "-DREPLAY", "-DCONCRETE_PUBS", *sources, *rendered_link_libraries, "-o", fix_replay], cwd=code_path)
+            _run(["clang", *final_flags, *binsec_link_flags, *define_flags, "-DBINSEC", *sources, *rendered_link_libraries, "-o", var_exe], cwd=code_path)
+            _run(["clang", *final_flags, *binsec_link_flags, *define_flags, "-DBINSEC", "-DCONCRETE_PUBS", *sources, *rendered_link_libraries, "-o", fix_exe], cwd=code_path)
+            _run(["clang", *final_flags, *binsec_link_flags, *define_flags, "-DREPLAY", *sources, *rendered_link_libraries, "-o", var_replay], cwd=code_path)
+            _run(["clang", *final_flags, *binsec_link_flags, *define_flags, "-DREPLAY", "-DCONCRETE_PUBS", *sources, *rendered_link_libraries, "-o", fix_replay], cwd=code_path)
+            _prune_binsec_replacements(var_cfg, var_exe)
+            _prune_binsec_replacements(fix_cfg, fix_exe)
         else:
             abacus_defs = ["-DABACUS"]
             if abacus_concrete_pubs:

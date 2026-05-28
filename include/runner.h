@@ -21,9 +21,10 @@
 #include "klee/klee.h"
 #endif
 
+#ifdef REPLAY
 /*
- * These helpers stay as explicit loops instead of libc calls so the analysis
- * backends see simple byte-wise effects instead of summarized library behavior.
+ * Replay uses file-backed test vectors; keep the byte copies explicit so the
+ * non-replay backends do not inherit unnecessary libc dependencies.
  */
 int load_bytes(const char *filename, void *buf, size_t size) {
     FILE *f = fopen(filename, "rb");
@@ -41,6 +42,7 @@ int load_bytes(const char *filename, void *buf, size_t size) {
     fclose(f);
     return 1;
 }
+#endif
 
 void runner_copy_bytes(void *dst_void, const void *src_void, size_t size) {
     unsigned char *dst = (unsigned char *)dst_void;
@@ -97,7 +99,10 @@ abacus_make_symbolic(char *name, void *addr, uint32_t length) {
  * implementations, not redefine the generic interface shape.
  */
 int runner_apply_preset(void);
+
+#ifdef REPLAY
 int runner_load_replay_inputs(int argc, char *argv[]);
+#endif
 
 #if defined(KLEE_CF)
 void runner_apply_klee_assumptions(void);
@@ -132,8 +137,14 @@ RUNNER_MAIN_SIGNATURE {
 
 #ifdef CONCRETE_PUBS
     if (!runner_apply_preset()) {
+#ifdef REPLAY
         fprintf(stderr, "ERROR: failed to apply generated preset defaults\n");
+#endif
+    #ifdef BINSEC
+        exit(1);
+    #else
         return 1;
+    #endif
     }
 #else
 #ifdef KLEE_CF
@@ -142,7 +153,11 @@ RUNNER_MAIN_SIGNATURE {
 #endif
 #endif
 
+#ifdef BINSEC
+    exit(driver_main());
+#else
     return driver_main();
+#endif
 }
 
 #endif /* RUNNER_H */
