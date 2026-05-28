@@ -335,6 +335,7 @@ def _render_header(resolved: dict[str, object]) -> list[str]:
     lines.append("}")
     lines.append("")
 
+    lines.append("#ifdef REPLAY")
     lines.append("int runner_load_replay_inputs(int argc, char *argv[]) {")
     lines.append("    int arg_index = 1;")
     lines.append("    if (argc != RUNNER_EXPECTED_REPLAY_ARGC) {")
@@ -354,6 +355,7 @@ def _render_header(resolved: dict[str, object]) -> list[str]:
     lines.append("#endif")
     lines.append("    return 1;")
     lines.append("}")
+    lines.append("#endif")
     lines.append("")
 
     lines.append("#if defined(KLEE_CF)")

@@ -41,6 +41,10 @@ arguments = ["-break", "-o", "{output}", "{input}"]
 [[benchmarks.targets]]
 target = "modexp"
 runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
 build_sources = ["modexp_wrapper.c"]
 
 [[benchmarks.configs]]
@@ -77,6 +81,10 @@ arguments = ["-break", "-o", "{output}", "{input}"]
 [[benchmarks.variants.sliced.targets]]
 target = "modexp"
 runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
 build_sources = ["modexp_wrapper.c", "bignum_sliced.c"]
 defines = ["USE_SLICED"]
 

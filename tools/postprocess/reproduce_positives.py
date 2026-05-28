@@ -20,6 +20,7 @@ from tools.shared.tool_artifacts import resolve_intel_pin_root
 from tools.shared.result_schema import (
     KIND_BRANCH,
     KIND_MEMORY,
+    format_location,
     STATUS_IDENTICAL_TRACE,
     STATUS_LOCATION_MISMATCH,
     STATUS_KIND_MISMATCH,
@@ -97,6 +98,50 @@ class ReplayResult:
 class LocationMatchResult:
     matches: bool
     snapped: bool = False
+    same_expression: bool = False
+
+
+def _statement_bounds(lines: Sequence[str], line_number: int) -> tuple[int, int] | None:
+    if line_number <= 0 or line_number > len(lines):
+        return None
+
+    start = line_number
+    while start > 1:
+        previous = lines[start - 2].strip()
+        if not previous:
+            break
+        if previous.endswith((";", "{", "}")):
+            break
+        start -= 1
+
+    end = line_number
+    while end < len(lines):
+        current = lines[end - 1].strip()
+        if not current:
+            break
+        if current.endswith((";", "{", "}")):
+            break
+        end += 1
+
+    if start == end:
+        return None
+    return start, end
+
+
+def _same_expression_match(actual_file: str, expected_line: int, actual_line: int) -> bool:
+    if expected_line <= 0 or actual_line <= 0 or expected_line == actual_line:
+        return False
+
+    try:
+        with open(actual_file, "r", encoding="utf-8", errors="replace") as handle:
+            lines = handle.readlines()
+    except OSError:
+        return False
+
+    actual_bounds = _statement_bounds(lines, actual_line)
+    if actual_bounds is None:
+        return False
+    return actual_bounds[0] <= expected_line <= actual_bounds[1]
 
 
 def parse_list(spec: str) -> list[str]:
@@ -564,6 +609,8 @@ def location_matches(
     if expected_filename is not None and os.path.basename(expected_filename) != os.path.basename(actual_file):
         return LocationMatchResult(matches=False)
     if expected_line is not None and expected_line != actual_line:
+        if _same_expression_match(actual_file, expected_line, actual_line):
+            return LocationMatchResult(matches=True, same_expression=True)
         return LocationMatchResult(matches=False)
     if expected_column is None:
         return LocationMatchResult(matches=True)
@@ -603,6 +650,19 @@ def format_snapped_success(
         f"Success (reported column {actual_column} vs expected {expected_column}, "
         f"considered close enough within {window})"
     )
+
+
+def format_same_expression_success(
+    actual_file: str,
+    actual_line: int,
+    actual_column: int,
+    expected_file: str | None,
+    expected_line: int | None,
+    expected_column: int | None,
+) -> str:
+    expected_loc = format_location(expected_file, expected_line, expected_column)
+    actual_loc = format_location(actual_file, actual_line, actual_column)
+    return f"Success (same expression span: expected {expected_loc}, got {actual_loc})"
 
 
 def parse_secret_input_spec(spec: str) -> dict[str, tuple[int, int, int]]:
@@ -881,6 +941,17 @@ def mode_dataframe(
         if match_result.matches:
             if match_result.snapped and expected_col is not None:
                 print(format_snapped_success(actual_col, expected_col, previous_column, next_column))
+            elif match_result.same_expression:
+                print(
+                    format_same_expression_success(
+                        actual_file,
+                        actual_line,
+                        actual_col,
+                        row.get("filename") if isinstance(row.get("filename"), str) else None,
+                        expected_line,
+                        expected_col,
+                    )
+                )
             else:
                 print("Success")
             df.at[idx, "reproduced_status"] = STATUS_SUCCESS
@@ -1012,6 +1083,17 @@ def mode_input_values(
     if match_result.matches:
         if match_result.snapped and expected_column is not None:
             print(format_snapped_success(actual_column, expected_column, previous_column, next_column))
+        elif match_result.same_expression:
+            print(
+                format_same_expression_success(
+                    actual_file,
+                    actual_line,
+                    actual_column,
+                    expected_filename,
+                    expected_line,
+                    expected_column,
+                )
+            )
         return 0
 
     print(
@@ -1071,6 +1153,7 @@ def mode_abacus_json(
 
         filename = row.get("filename")
         line_no = coerce_int(row.get("line"))
+        column_no = coerce_int(row.get("column"))
         expected_kind = None
         raw_kind = row.get("kind")
         if raw_kind is not None:
@@ -1092,6 +1175,7 @@ def mode_abacus_json(
             debug=debug,
             expected_filename=filename if isinstance(filename, str) else None,
             expected_line=line_no,
+            expected_column=column_no,
             expected_kind=expected_kind,
         )
         if rc == 0:
@@ -1103,6 +1187,9 @@ def mode_abacus_json(
         elif rc == 1:
             print("Failed (identical traces)")
             df.at[idx, "reproduced_status"] = STATUS_IDENTICAL_TRACE
+        elif rc == 42:
+            print("Failed (kind mismatch)")
+            df.at[idx, "reproduced_status"] = STATUS_KIND_MISMATCH
         elif rc == 3:
             print("Failed (location mismatch)")
             df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
@@ -1176,6 +1263,7 @@ def reproduce_input_values(
     expected_filename: str | None = None,
     expected_line: int | None = None,
     expected_column: int | None = None,
+    expected_kind: str | None = None,
 ) -> int:
     return mode_input_values(
         executable=executable,
@@ -1186,6 +1274,7 @@ def reproduce_input_values(
         expected_filename=expected_filename,
         expected_line=expected_line,
         expected_column=expected_column,
+        expected_kind=expected_kind,
     )
 
 
@@ -1258,6 +1347,14 @@ def build_parsers_and_dispatch(argv: list[str]) -> int:
         choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "unknown"],
         help="Library identifier for JSON-writing modes.",
     )
+    parser.add_argument("--expected-filename", help="Expected replay source filename for --input mode.")
+    parser.add_argument("--expected-line", type=int, help="Expected replay source line for --input mode.")
+    parser.add_argument("--expected-column", type=int, help="Expected replay source column for --input mode.")
+    parser.add_argument(
+        "--expected-kind",
+        choices=[KIND_BRANCH, KIND_MEMORY],
+        help="Expected replay divergence kind for --input mode.",
+    )
 
     args = parser.parse_args(argv)
 
@@ -1309,6 +1406,10 @@ def build_parsers_and_dispatch(argv: list[str]) -> int:
         public_spec=args.public,
         timeout=args.timeout,
         debug=args.debug,
+        expected_filename=args.expected_filename,
+        expected_line=args.expected_line,
+        expected_column=args.expected_column,
+        expected_kind=args.expected_kind,
     )
 
 

@@ -7,9 +7,12 @@ semantics from filenames.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import shlex
+import shutil
 import sys
 from dataclasses import dataclass
 from typing import Any
@@ -20,6 +23,7 @@ from tools.shared.result_schema import (
     KIND_BRANCH,
     KIND_MEMORY,
     STATUS_IDENTICAL_TRACE,
+    STATUS_KIND_MISMATCH,
     STATUS_LOCATION_MISMATCH,
     STATUS_NOT_REPRODUCED,
     STATUS_SUCCESS,
@@ -259,6 +263,37 @@ def _tail_lines(text: str, n: int = 12) -> str:
     return "\n".join(lines[-n:])
 
 
+def _indent_text(text: str, prefix: str = "    ") -> str:
+    if not text:
+        return ""
+    return "\n".join(f"{prefix}{line}" for line in text.splitlines())
+
+
+def _sha256_file(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _persist_replay_executable(replay_executable: str, output_path: str | None, output_log: str) -> tuple[str, str] | None:
+    base_dir = os.path.dirname(os.path.abspath(output_path or output_log))
+    if not base_dir:
+        return None
+
+    replay_dir = os.path.join(base_dir, "_replay_binaries")
+    os.makedirs(replay_dir, exist_ok=True)
+
+    stem = os.path.splitext(os.path.basename(output_path or output_log))[0]
+    destination = os.path.join(replay_dir, f"{stem}.replay")
+    shutil.copy2(replay_executable, destination)
+    return destination, _sha256_file(destination)
+
+
 def _run_reproduce(
     reproduce_module: str,
     replay_executable: str,
@@ -266,6 +301,10 @@ def _run_reproduce(
     secret_inputs: list[InputLayout],
     public_inputs: list[InputLayout],
     timeout_s: int,
+    expected_filename: str | None = None,
+    expected_line: int | None = None,
+    expected_column: int | None = None,
+    expected_kind: str | None = None,
 ) -> tuple[tuple[str, int, int] | None, int, str]:
     """Run reproduce_positives.py --input and parse the reported divergence location.
 
@@ -303,6 +342,19 @@ def _run_reproduce(
     ]
     if public_spec:
         cmd += ["--public", public_spec]
+    if expected_filename:
+        cmd += ["--expected-filename", expected_filename]
+    if expected_line is not None:
+        cmd += ["--expected-line", str(expected_line)]
+    if expected_column is not None:
+        cmd += ["--expected-column", str(expected_column)]
+    if expected_kind:
+        cmd += ["--expected-kind", expected_kind]
+
+    print(f"[reproduce] command={shlex.join(cmd)}", file=sys.stderr, flush=True)
+    print(f"[reproduce] secret_spec={secret_spec}", file=sys.stderr, flush=True)
+    if public_spec:
+        print(f"[reproduce] public_spec={public_spec}", file=sys.stderr, flush=True)
 
     proc = subprocess.run(
         cmd,
@@ -392,6 +444,11 @@ def build_rows(
                 file=sys.stderr,
                 flush=True,
             )
+            print(
+                f"[reproduce] addr=0x{addr:x} replay_executable={replay_executable}",
+                file=sys.stderr,
+                flush=True,
+            )
 
             loc, rc, repro_out = _run_reproduce(
                 reproduce_module=reproduce_module,
@@ -400,12 +457,29 @@ def build_rows(
                 secret_inputs=secret_inputs,
                 public_inputs=public_inputs,
                 timeout_s=reproduce_timeout_s,
+                expected_filename=filename,
+                expected_line=line_no,
+                expected_column=col_no,
+                expected_kind=(KIND_BRANCH if leak.leak_type == "control flow" else KIND_MEMORY) if leak is not None else None,
             )
+            print(
+                f"[reproduce] addr=0x{addr:x} rc={rc}",
+                file=sys.stderr,
+                flush=True,
+            )
+            if repro_out.strip():
+                print(
+                    f"[reproduce] addr=0x{addr:x} raw_output:\n{_indent_text(repro_out.rstrip())}",
+                    file=sys.stderr,
+                    flush=True,
+                )
             if loc is None:
                 if rc == 124:
                     reproduced_status = STATUS_TIMEOUT
                 elif rc == 1:
                     reproduced_status = STATUS_IDENTICAL_TRACE
+                elif rc == 42:
+                    reproduced_status = STATUS_KIND_MISMATCH
                 elif rc in (0, 3):
                     reproduced_status = STATUS_LOCATION_MISMATCH
                 else:
@@ -423,15 +497,22 @@ def build_rows(
             else:
                 rep_file, rep_line, rep_col = loc
                 repro_loc = format_location(rep_file, rep_line, rep_col)
-                is_success = (os.path.basename(rep_file) == os.path.basename(filename)) and (rep_line == line_no) and (rep_col == col_no)
-                reproduced_status = STATUS_SUCCESS if is_success else STATUS_LOCATION_MISMATCH
-                if is_success:
+                if rc == 42:
+                    reproduced_status = STATUS_KIND_MISMATCH
+                    print(
+                        f"[reproduce] addr=0x{addr:x} KIND_MISMATCH divergence={repro_loc} (reported={reported_loc})",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                elif rc == 0:
+                    reproduced_status = STATUS_SUCCESS
                     print(
                         f"[reproduce] addr=0x{addr:x} SUCCESS divergence={repro_loc}",
                         file=sys.stderr,
                         flush=True,
                     )
                 else:
+                    reproduced_status = STATUS_LOCATION_MISMATCH
                     print(
                         f"[reproduce] addr=0x{addr:x} FAIL divergence={repro_loc} (reported={reported_loc})",
                         file=sys.stderr,
@@ -482,6 +563,25 @@ def convert_binsec_toml(
         raise ValueError("replay_executable is required when reproduce=True")
     if reproduce and not secret_layouts:
         raise ValueError("secret_inputs are required when reproduce=True")
+    if reproduce and replay_executable:
+        persisted_replay = _persist_replay_executable(replay_executable, output_path, output_log)
+        if persisted_replay is not None:
+            persisted_path, replay_sha256 = persisted_replay
+            print(
+                f"[reproduce] replay_executable_original={replay_executable}",
+                file=sys.stderr,
+                flush=True,
+            )
+            print(
+                f"[reproduce] replay_executable_preserved={persisted_path}",
+                file=sys.stderr,
+                flush=True,
+            )
+            print(
+                f"[reproduce] replay_executable_sha256={replay_sha256}",
+                file=sys.stderr,
+                flush=True,
+            )
 
     insecure_addrs, models = parse_binsec_toml(toml_path)
     leaks = parse_output_log(output_log)

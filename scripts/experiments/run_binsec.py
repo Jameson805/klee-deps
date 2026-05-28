@@ -54,6 +54,14 @@ from tools.shared.experiment_registry import (
 CAMPAIGN_TOOL = CampaignTool(tool_id="binsec", module_name=__name__, case_parallel_arg="--max-parallel-cases")
 
 
+def _render_input_specs(raw_specs: list[str], *, sym_size: int) -> list[str]:
+    """Render benchmark-config input specs that depend on the selected symbol size."""
+    rendered: list[str] = []
+    for raw_spec in raw_specs:
+        rendered.append(raw_spec.format(sym_size=sym_size))
+    return rendered
+
+
 def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
     """Load BINSEC cases, preferring explicit per-tool overrides when present."""
     raw_cases = benchmark_definition.extra_config.get("binsec_cases")
@@ -307,9 +315,17 @@ def run_benchmark(
             case_location = f"{benchmark_definition.config_location}.binsec_cases[{case_index}]"
             case_table = expect_table(case_entries[case_index], case_location)
             converter_args: list[str] = []
-            for secret_input in optional_string_list(case_table, "secret_inputs", case_location):
+            secret_inputs = _render_input_specs(
+                optional_string_list(case_table, "secret_inputs", case_location),
+                sym_size=args.sym_size,
+            )
+            public_inputs = _render_input_specs(
+                optional_string_list(case_table, "public_inputs", case_location),
+                sym_size=args.sym_size,
+            )
+            for secret_input in secret_inputs:
                 converter_args.extend(["--secret-input", secret_input])
-            for public_input in optional_string_list(case_table, "public_inputs", case_location):
+            for public_input in public_inputs:
                 converter_args.extend(["--public-input", public_input])
             output_metadata = {
                 **normalized_case_output_metadata(case_table, case_location),
