@@ -6,7 +6,7 @@ Benchmark descriptors under `configs/benchmarks/*.toml` now own the mapping from
 
 The current shared modular-exponentiation config lives at `configs/runner/modexp_runner_config.toml`. Mbed TLS, Libgcrypt, and OpenSSL 1.1.1q all consume this same config and emit benchmark-local artifacts under their own `generated/` directories.
 
-Not every benchmark needs to share one config source. BearSSL `aes_big` and `des_tab` use benchmark-local configs in `configs/runner/bearssl_aes_big_runner_config.toml` and `configs/runner/bearssl_des_tab_runner_config.toml` because they keep different effective schedule sizes while still using the same generator and `runner.h` contract. The benchmark descriptor selects between those configs via runner-profile ids. See `benchmarks/bearssl/README.md` for the rationale behind those choices.
+Not every benchmark needs to share one config source. BearSSL `aes_big`, `aes_ct`, and `des_tab` use benchmark-local configs in `configs/runner/bearssl_aes_big_runner_config.toml` and `configs/runner/bearssl_des_tab_runner_config.toml`. `aes_ct` intentionally reuses the `aes_big` runner profile because the reduced-round wrappers consume the same 48-byte effective AES schedule prefix, while `des_tab` still needs its separate wider schedule config. The benchmark descriptor selects between those configs via runner-profile ids. See `benchmarks/bearssl/README.md` for the rationale behind those choices.
 
 OpenSSL Almeida `tls-rempad-luk13` also uses a benchmark-local config in `configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml` because it models one secret record buffer plus several fixed-width public control scalars instead of the shared modular-exponentiation buffer shape.
 
@@ -122,7 +122,7 @@ For benchmarks that opt into this flow, the generator can also emit BINSEC cfg f
 
 Some benchmark integrations intentionally use benchmark-local macros and sizes instead of one shared `SYM_SIZE` abstraction.
 
-- BearSSL `aes_big` and `des_tab` keep the original wrappers' fixed zero IV and original `DATA_LEN` values.
+- BearSSL `aes_big`, `aes_ct`, and `des_tab` keep the original wrappers' fixed zero IV and original `DATA_LEN` values.
 - Those BearSSL wrappers now make only the effective prefix of `ctx.skey` symbolic, not the full backing array, because the wrappers hardcode `N_ROUND=2` and never read the unused tail.
 - For BearSSL, mod-exp-style `size_4` or `size_16` presets would be misleading: unlike `SYM_SIZE` in the modular-exponentiation benchmarks, `ctx.skey` is an expanded internal schedule, not a raw semantic key buffer. Smaller widths there would produce partially symbolic schedules with the remaining consumed words fixed to zero.
 - They therefore use a single `default` preset per target instead of exposing a family of `size_N` presets.

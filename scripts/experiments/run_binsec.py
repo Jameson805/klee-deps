@@ -10,12 +10,16 @@ replay binary exists.
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
 from pathlib import Path
 import shutil
 import signal
 import sys
 import time
+from typing import Any
+
+tomllib = importlib.import_module("tomllib" if sys.version_info >= (3, 11) else "tomli")
 
 from scripts.experiments.common import (
     CampaignTool,
@@ -47,6 +51,7 @@ from tools.shared.experiment_registry import (
     definition_for_path,
     format_benchmark_selector,
     normalized_case_output_metadata,
+    runner_profile_for_definition,
     selected_benchmarks,
 )
 
@@ -54,12 +59,92 @@ from tools.shared.experiment_registry import (
 CAMPAIGN_TOOL = CampaignTool(tool_id="binsec", module_name=__name__, case_parallel_arg="--max-parallel-cases")
 
 
-def _render_input_specs(raw_specs: list[str], *, sym_size: int) -> list[str]:
-    """Render benchmark-config input specs that depend on the selected symbol size."""
-    rendered: list[str] = []
+def _load_runner_config(config_path: Path) -> dict[str, Any]:
+    """Load one benchmark-owned runner config for BINSEC replay layout expansion."""
+    try:
+        with config_path.open("rb") as handle:
+            config = tomllib.load(handle)
+    except OSError as exc:
+        raise ValueError(f"failed to load runner config {config_path}: {exc}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f"failed to parse runner config {config_path}: {exc}") from exc
+
+    if not isinstance(config, dict):
+        raise ValueError(f"runner config {config_path} root must be a table")
+    return config
+
+
+def _resolve_runner_format_values(
+    benchmark_definition,
+    case_table: dict[str, object],
+    case_location: str,
+    build_preset: str,
+    *,
+    sym_size: int,
+) -> dict[str, object]:
+    """Resolve runner preset macros that BINSEC replay layouts may reference."""
+    runner_profile_id = optional_string(case_table, "runner_profile", case_location)
+    _, runner_profile = runner_profile_for_definition(benchmark_definition, runner_profile_id)
+    runner_config_path = resolve_repo_path(runner_profile.config)
+    runner_config = _load_runner_config(runner_config_path)
+
+    presets = runner_config.get("presets")
+    if not isinstance(presets, dict):
+        raise ValueError(f"runner config {runner_config_path} is missing presets")
+    preset = presets.get(build_preset)
+    if not isinstance(preset, dict):
+        raise ValueError(f"runner config {runner_config_path} is missing preset {build_preset!r}")
+    macros = preset.get("macros", {})
+    if not isinstance(macros, dict):
+        raise ValueError(f"runner config {runner_config_path} preset {build_preset!r} is missing macros")
+
+    format_values: dict[str, object] = dict(macros)
+    for key, value in macros.items():
+        if isinstance(key, str) and key:
+            format_values[key.lower()] = value
+    format_values.setdefault("sym_size", sym_size)
+    if isinstance(macros.get("SYM_SIZE"), int):
+        format_values["sym_size"] = macros["SYM_SIZE"]
+    return format_values
+
+
+def _resolve_input_specs(
+    benchmark_definition,
+    case_table: dict[str, object],
+    case_location: str,
+    build_preset: str,
+    key: str,
+    *,
+    sym_size: int,
+) -> list[str]:
+    """Return explicit BINSEC replay layouts for one case field."""
+    raw_specs = optional_string_list(case_table, key, case_location)
+    if not raw_specs:
+        return []
+    if any(spec.count(":") != 2 for spec in raw_specs):
+        raise ValueError(
+            f"{case_location}.{key} must use explicit BINSEC replay layouts name:bytes:model_key"
+        )
+    if not any("{" in spec for spec in raw_specs):
+        return raw_specs
+
+    format_values = _resolve_runner_format_values(
+        benchmark_definition,
+        case_table,
+        case_location,
+        build_preset,
+        sym_size=sym_size,
+    )
+    resolved_specs: list[str] = []
     for raw_spec in raw_specs:
-        rendered.append(raw_spec.format(sym_size=sym_size))
-    return rendered
+        try:
+            resolved_specs.append(raw_spec.format(**format_values))
+        except KeyError as exc:
+            missing_key = exc.args[0]
+            raise ValueError(
+                f"{case_location}.{key} references unknown format key {missing_key!r}"
+            ) from exc
+    return resolved_specs
 
 
 def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
@@ -70,6 +155,9 @@ def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
 
     cases: list[dict[str, object]] = []
     for expanded_case in expand_benchmark_cases(benchmark_definition, "binsec"):
+        runner_profile = optional_string(
+            expanded_case.config_table, "runner_profile", expanded_case.config_location
+        ) or optional_string(expanded_case.target_table, "runner_profile", expanded_case.target_location)
         secret_inputs = tuple(
             optional_string_list(expanded_case.config_table, "secret_inputs", expanded_case.config_location)
         ) or tuple(
@@ -96,6 +184,8 @@ def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
                 "sliced": expanded_case.variant_id == "sliced",
             }
         )
+        if runner_profile:
+            cases[-1]["runner_profile"] = runner_profile
         if secret_inputs:
             cases[-1]["secret_inputs"] = list(secret_inputs)
         if bool(expanded_case.config_table.get("use_public_inputs", False)) and public_inputs:
@@ -315,12 +405,21 @@ def run_benchmark(
             case_location = f"{benchmark_definition.config_location}.binsec_cases[{case_index}]"
             case_table = expect_table(case_entries[case_index], case_location)
             converter_args: list[str] = []
-            secret_inputs = _render_input_specs(
-                optional_string_list(case_table, "secret_inputs", case_location),
+            build_preset = build.preset.format(sym_size=args.sym_size)
+            secret_inputs = _resolve_input_specs(
+                benchmark_definition,
+                case_table,
+                case_location,
+                build_preset,
+                "secret_inputs",
                 sym_size=args.sym_size,
             )
-            public_inputs = _render_input_specs(
-                optional_string_list(case_table, "public_inputs", case_location),
+            public_inputs = _resolve_input_specs(
+                benchmark_definition,
+                case_table,
+                case_location,
+                build_preset,
+                "public_inputs",
                 sym_size=args.sym_size,
             )
             for secret_input in secret_inputs:

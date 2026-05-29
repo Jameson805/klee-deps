@@ -1,0 +1,55 @@
+[[benchmarks]]
+library = "hacl_modexp"
+code_path = "benchmarks/hacl-packages-c-v0.6.0"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[benchmarks.runner_profiles.default]
+config = "configs/runner/modexp_runner_config.toml"
+preset = "size_{sym_size}"
+
+[benchmarks.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = [
+    "{repo_root}/include",
+    "include",
+    "karamel/include",
+    "karamel/krmllib/dist/minimal",
+    "build",
+]
+prepare_commands = [
+    "mkdir -p build",
+]
+
+[benchmarks.tool_defaults.klee]
+code_path = "hacl-packages-c-v0.6.0"
+extra_args = ["--ctchecker-prefix", "src"]
+secret_inputs = ["exp"]
+public_inputs = ["base", "mod"]
+
+[benchmarks.variants.default]
+
+[[benchmarks.targets]]
+target = "modexp32"
+runner_profile = "default"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp32_wrapper.c", "src/Hacl_Bignum32.c", "src/Hacl_Bignum.c"]
+
+[[benchmarks.targets]]
+target = "modexp64"
+runner_profile = "default"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp64_wrapper.c", "src/Hacl_Bignum64.c", "src/Hacl_Bignum.c"]
+
+[[benchmarks.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+runner_profile = "default"
+
+[[benchmarks.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+use_public_inputs = true

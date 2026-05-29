@@ -1,0 +1,48 @@
+[[benchmarks]]
+library = "libsodium"
+code_path = "benchmarks/libsodium"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[benchmarks.runner_profiles.default]
+config = "configs/runner/libsodium_curve25519_runner_config.toml"
+preset = "default"
+
+[benchmarks.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "{code_path}/build/install/include"]
+link_libraries = ["{code_path}/build/install/lib/libsodium.a"]
+build_dep_commands = [
+  "rm -rf build",
+  "mkdir -p build",
+  "cd libsodium-stable && ./autogen.sh -s",
+  "cd build && ../libsodium-stable/configure --disable-shared --enable-static --prefix=\"$(pwd)/install\" CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\"",
+  "cd build && make -j {make_jobs}",
+  "cd build && make install",
+]
+
+[benchmarks.variants.curve25519]
+
+# Keep the selector explicit so campaigns do not silently widen if new
+# libsodium targets are added later.
+[[benchmarks.variants.curve25519.targets]]
+target = "curve25519_scalarmult"
+runner_profile = "default"
+build_sources = ["curve25519_scalarmult_wrapper.c"]
+secret_layout = "scalar:32"
+secret_inputs = ["scalar:32:scalar_buf"]
+public_layout = "point:32"
+public_inputs = ["point:32:point_buf"]
+klee_secret_inputs = ["scalar"]
+klee_public_inputs = ["point"]
+
+[[benchmarks.variants.curve25519.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+runner_profile = "default"
+
+[[benchmarks.variants.curve25519.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+use_public_inputs = true

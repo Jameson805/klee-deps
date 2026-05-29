@@ -11,6 +11,10 @@ preset = "default"
 config = "configs/runner/bearssl_des_tab_runner_config.toml"
 preset = "default"
 
+[benchmarks.runner_profiles.default]
+config = "configs/runner/modexp_runner_config.toml"
+preset = "size_{sym_size}"
+
 [benchmarks.build]
 preset = "default"
 common_flags = ["-g", "-O0"]
@@ -20,6 +24,73 @@ include_dirs = ["{repo_root}/include", "bearssl-0.6/inc", "bearssl-0.6/src"]
 concrete_pubs = false
 
 [benchmarks.variants.default]
+
+[benchmarks.variants.aes_ct_only]
+
+[[benchmarks.variants.aes_ct_only.targets]]
+target = "aes_ct"
+runner_profile = "aes_big"
+build_sources = [
+	"aes_ct_wrapper.c",
+	"bearssl-0.6/src/symcipher/aes_ct_cbcenc.c",
+	"bearssl-0.6/src/symcipher/aes_ct.c",
+	"bearssl-0.6/src/symcipher/aes_ct_enc.c",
+]
+secret_layout = "skey:48,data:32"
+secret_inputs = ["skey:48:skey_buf", "data:32:data_buf"]
+klee_secret_inputs = ["skey", "data"]
+
+[benchmarks.variants.modexp.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "bearssl-0.6/inc", "bearssl-0.6/src"]
+
+[benchmarks.variants.modexp.build.tools.abacus]
+concrete_pubs = false
+
+[benchmarks.variants.modexp.tool_defaults.klee]
+code_path = "benchmarks/bearssl/bearssl-0.6/src/int"
+secret_inputs = ["exp"]
+public_inputs = ["base", "mod"]
+mod_exp_extra_args = ["--filename", "i32_modpow.c", "--lines", "29:64"]
+
+[[benchmarks.variants.modexp.targets]]
+target = "modexp"
+runner_profile = "default"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = [
+	"modexp_wrapper.c",
+	"bearssl-0.6/src/codec/ccopy.c",
+	"bearssl-0.6/src/int/i32_add.c",
+	"bearssl-0.6/src/int/i32_bitlen.c",
+	"bearssl-0.6/src/int/i32_decode.c",
+	"bearssl-0.6/src/int/i32_decmod.c",
+	"bearssl-0.6/src/int/i32_decred.c",
+	"bearssl-0.6/src/int/i32_div32.c",
+	"bearssl-0.6/src/int/i32_encode.c",
+	"bearssl-0.6/src/int/i32_fmont.c",
+	"bearssl-0.6/src/int/i32_iszero.c",
+	"bearssl-0.6/src/int/i32_modpow.c",
+	"bearssl-0.6/src/int/i32_montmul.c",
+	"bearssl-0.6/src/int/i32_mulacc.c",
+	"bearssl-0.6/src/int/i32_muladd.c",
+	"bearssl-0.6/src/int/i32_ninv32.c",
+	"bearssl-0.6/src/int/i32_reduce.c",
+	"bearssl-0.6/src/int/i32_sub.c",
+	"bearssl-0.6/src/int/i32_tmont.c",
+]
+
+[[benchmarks.variants.modexp.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+runner_profile = "default"
+
+[[benchmarks.variants.modexp.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+use_public_inputs = true
 
 [[benchmarks.targets]]
 target = "aes_big"
@@ -33,6 +104,46 @@ build_sources = [
 secret_layout = "skey:48,data:32"
 secret_inputs = ["skey:48:skey_buf", "data:32:data_buf"]
 klee_secret_inputs = ["skey", "data"]
+
+[[benchmarks.targets]]
+target = "aes_ct"
+runner_profile = "aes_big"
+build_sources = [
+	"aes_ct_wrapper.c",
+	"bearssl-0.6/src/symcipher/aes_ct_cbcenc.c",
+	"bearssl-0.6/src/symcipher/aes_ct.c",
+	"bearssl-0.6/src/symcipher/aes_ct_enc.c",
+]
+secret_layout = "skey:48,data:32"
+secret_inputs = ["skey:48:skey_buf", "data:32:data_buf"]
+klee_secret_inputs = ["skey", "data"]
+
+[[benchmarks.targets]]
+target = "modexp"
+runner_profile = "default"
+build_sources = [
+	"modexp_wrapper.c",
+	"bearssl-0.6/src/codec/ccopy.c",
+	"bearssl-0.6/src/int/i32_add.c",
+	"bearssl-0.6/src/int/i32_bitlen.c",
+	"bearssl-0.6/src/int/i32_decode.c",
+	"bearssl-0.6/src/int/i32_decmod.c",
+	"bearssl-0.6/src/int/i32_decred.c",
+	"bearssl-0.6/src/int/i32_div32.c",
+	"bearssl-0.6/src/int/i32_encode.c",
+	"bearssl-0.6/src/int/i32_fmont.c",
+	"bearssl-0.6/src/int/i32_iszero.c",
+	"bearssl-0.6/src/int/i32_modpow.c",
+	"bearssl-0.6/src/int/i32_montmul.c",
+	"bearssl-0.6/src/int/i32_mulacc.c",
+	"bearssl-0.6/src/int/i32_muladd.c",
+	"bearssl-0.6/src/int/i32_ninv32.c",
+	"bearssl-0.6/src/int/i32_reduce.c",
+	"bearssl-0.6/src/int/i32_sub.c",
+	"bearssl-0.6/src/int/i32_tmont.c",
+]
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
 
 [[benchmarks.targets]]
 target = "des_tab"

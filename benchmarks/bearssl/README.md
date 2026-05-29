@@ -1,11 +1,12 @@
 BearSSL Runner Integration
 ==========================
 
-This directory contains two BearSSL CBC benchmarks integrated with the shared
+This directory contains three BearSSL CBC benchmarks integrated with the shared
 runner artifact generator:
 
-- `binsec_aes_big`, configured by `configs/runner/bearssl_aes_big_runner_config.toml`
-- `appliedcryp_des`, configured by `configs/runner/bearssl_des_tab_runner_config.toml`
+- `aes_big`, the original table-based AES benchmark, configured by `configs/runner/bearssl_aes_big_runner_config.toml`
+- `aes_ct`, the constant-time AES benchmark, which reuses `configs/runner/bearssl_aes_big_runner_config.toml`
+- `des_tab`, configured by `configs/runner/bearssl_des_tab_runner_config.toml`
 
 The integration intentionally preserves the original benchmark shape as closely
 as possible while reducing unnecessary symbolic state.
@@ -34,9 +35,10 @@ Why Use The Effective Length Of `ctx.skey`
 The original wrappers made the full `ctx.skey` storage symbolic.
 
 - `aes_big` stores `uint32_t skey[60]`, which is 240 bytes.
+- `aes_ct` stores `uint32_t skey[60]`, which is 240 bytes.
 - `des_tab` stores `uint32_t skey[96]`, which is 384 bytes.
 
-That is larger than what the current wrappers actually read, because both
+That is larger than what the current wrappers actually read, because all three
 wrappers hardcode `N_ROUND=2`.
 
 For `aes_big`, the encryption path consumes only 12 schedule words when
@@ -54,6 +56,19 @@ This is exactly what the code does in `br_aes_big_encrypt(...)`.
 - The loop `for (u = 1; u < num_rounds; u++)` runs once when `num_rounds == 2`
 	and consumes `skey[4]` through `skey[7]`.
 - The final round then consumes `skey[8]` through `skey[11]`.
+
+For `aes_ct`, the reduced-round CBC encryption path also consumes only 12
+schedule words when `num_rounds == 2`.
+
+- `br_aes_ct_cbcenc_run(...)` calls `br_aes_ct_ortho_keysched(...)` on the
+	compressed schedule and then invokes `br_aes_ct_bitslice_encrypt(...)`.
+- With `N_ROUND=2`, the same 12 compressed schedule words are consumed:
+	4 for the initial key addition, 4 for the middle round, and 4 for the final
+	round.
+
+That is again 12 `uint32_t` values, or 48 bytes, so `aes_ct` can safely reuse
+the same runner sizing as `aes_big` even though the implementation strategy is
+different.
 
 For `des_tab`, the block-processing loop advances the schedule pointer by 32
 words per round block. With `num_rounds == 2`, the wrapper reads 64 schedule
@@ -134,11 +149,13 @@ Chosen Sizes
 The single presets currently use these macro values.
 
 - `aes_big`: `EFFECTIVE_SKEY_LEN=48`, `DATA_LEN=32`, `N_ROUND=2`
+- `aes_ct`: `EFFECTIVE_SKEY_LEN=48`, `DATA_LEN=32`, `N_ROUND=2`
 - `des_tab`: `EFFECTIVE_SKEY_LEN=256`, `DATA_LEN=16`, `N_ROUND=2`
 
 The data lengths intentionally keep the original wrapper values.
 
 - `aes_big` keeps 32 bytes, which is two AES blocks.
+- `aes_ct` keeps 32 bytes, which is two AES blocks.
 - `des_tab` keeps 16 bytes, which is two DES blocks.
 
 The IV is not configurable in the current presets because the original wrappers
@@ -174,12 +191,14 @@ uninitialized buffer.
 Generated Artifacts
 -------------------
 
-`build.sh` emits target-local generated artifacts because the two wrappers do
-not share one concrete materialization.
+The generic benchmark builder emits target-local generated artifacts because
+the three wrappers do not all share one concrete materialization.
 
-- `generated/binsec_aes_big/runner_config.generated.h`
-- `generated/appliedcryp_des/runner_config.generated.h`
+- `generated/aes_big/runner_config.generated.h`
+- `generated/aes_ct/runner_config.generated.h`
+- `generated/des_tab/runner_config.generated.h`
 - target-local BINSEC cfgs under the same directories when BINSEC mode is built
+- built executables and bitcode under `artifacts/<mode>/<target>/`
 
-This keeps the two wrapper integrations isolated while still using the same
+This keeps the wrapper integrations isolated while still using the same
 generic generator and `runner.h` runtime contract.

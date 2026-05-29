@@ -1,22 +1,17 @@
-#include "../../__libsym__/sym.h"
-#include "inc/bearssl.h"
-#include <stdint.h>
+#include "runner_config.generated.h"
+#include "bearssl.h"
 
-#define KEY_LEN 240 /* uint32_t skey[60]; => 60 * 4 */
-#define N_ROUND 2
-#define IV_LEN br_aes_big_BLOCK_SIZE /* 16 bytes */
-#define DATA_LEN 32   /* Must be a multiple of block size */
+int driver_main(void) {
+  br_aes_ct_cbcenc_keys ctx = {0};
+  unsigned char iv[br_aes_big_BLOCK_SIZE] = {0};
+  unsigned char data[DATA_LEN] = {0};
 
-int main(){  
-  br_aes_ct_cbcenc_keys ctx;
+  /* Only the reduced-round prefix of the expanded key schedule is symbolic. */
+  runner_copy_bytes(ctx.skey, skey_buf, sizeof(skey_buf));
+  runner_copy_bytes(data, data_buf, sizeof(data));
   ctx.vtable = &br_aes_ct_cbcenc_vtable;
   ctx.num_rounds = N_ROUND;
-  uint8_t iv[IV_LEN];
-  uint8_t data[DATA_LEN];
 
-  HIGH_INPUT(KEY_LEN)(ctx.skey);
-  HIGH_INPUT(DATA_LEN)(data);
-
-  br_aes_ct_cbcenc_run(&ctx, iv, data, (size_t) DATA_LEN);
+  br_aes_ct_cbcenc_run(&ctx, iv, data, (size_t)DATA_LEN);
   return 0;
 }
