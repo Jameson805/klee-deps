@@ -10,7 +10,8 @@ link_libraries = ["libcrypto.a"]
 variables = { openssl_arch = "linux-generic64" }
 prepare_commands = ["cp -f crypto/bn/bn_exp_orig.c crypto/bn/bn_exp.c"]
 build_dep_commands = [
-	"./Configure --debug no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"make clean",
 	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
 ]
 
@@ -48,7 +49,8 @@ link_libraries = ["libcrypto.a"]
 variables = { openssl_arch = "linux-generic64" }
 prepare_commands = ["cp -f crypto/bn/bn_exp_sliced.c crypto/bn/bn_exp.c"]
 build_dep_commands = [
-	"./Configure --debug no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"make clean",
 	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
 ]
 
