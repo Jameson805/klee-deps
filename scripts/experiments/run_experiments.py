@@ -78,11 +78,6 @@ def orchestrator_log_path(output_dir: Path) -> Path:
     return output_dir / "_orchestrator.log"
 
 
-def default_best_selection_csv(aggregate_output_base: str) -> Path:
-    """Return the default location of the generated best-selection CSV."""
-    return Path(f"{aggregate_output_base}_best_selection.csv")
-
-
 def resolve_campaign_path(path: str | Path) -> Path:
     """Resolve config paths after expanding shell-style environment variables."""
     expanded = Path(os.path.expandvars(os.fspath(path))).expanduser()
@@ -406,6 +401,7 @@ def main(argv: list[str] | None = None) -> int:
             # but call the Python entry points directly so the campaign fails fast on
             # argument or import errors without another subprocess layer.
             from tools.postprocess.aggregate_experiment_groups import main as aggregate_experiment_groups_main
+            from tools.postprocess.apply_sliced_map import main as apply_sliced_map_main
             from tools.postprocess.filter_merged_results import main as filter_merged_results_main
             from tools.postprocess.merge_csv_by_location import main as merge_csv_by_location_main
             from tools.postprocess.merge_json_runs_by_experiment import main as merge_json_runs_main
@@ -461,12 +457,38 @@ def main(argv: list[str] | None = None) -> int:
                 shutil.copyfile(merged_results_path, all_merged_results_path)
                 copy_column_metadata(merged_results_path, all_merged_results_path)
             else:
+                sliced_relabeled_results_path = f"{output_str}/sliced_relabeled_merged_results.csv"
+                print(
+                    "[APPLY SLICED MAP] apply_sliced_map "
+                    + shlex.join(
+                        [
+                            f"{output_str}/sliced_merged_results.csv",
+                            "-m",
+                            str(sliced_map_csv),
+                            "-o",
+                            sliced_relabeled_results_path,
+                            "--keep-unmapped",
+                        ]
+                    )
+                )
+                if apply_sliced_map_main(
+                    [
+                        f"{output_str}/sliced_merged_results.csv",
+                        "-m",
+                        str(sliced_map_csv),
+                        "-o",
+                        sliced_relabeled_results_path,
+                        "--keep-unmapped",
+                    ]
+                ) != 0:
+                    raise SystemExit(1)
+
                 print(
                     "[MERGE CSV BY LOCATION] merge_csv_by_location "
                     + shlex.join(
                         [
                             f"{output_str}/merged_results.csv",
-                            f"{output_str}/sliced_relabeled_merged_results.csv",
+                            sliced_relabeled_results_path,
                             "-o",
                             f"{output_str}/all_merged_results.csv",
                         ]
@@ -475,7 +497,7 @@ def main(argv: list[str] | None = None) -> int:
                 if merge_csv_by_location_main(
                     [
                         f"{output_str}/merged_results.csv",
-                        f"{output_str}/sliced_relabeled_merged_results.csv",
+                        sliced_relabeled_results_path,
                         "-o",
                         f"{output_str}/all_merged_results.csv",
                     ]
@@ -521,11 +543,6 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     raise
 
-            selection_csv_for_reports = (
-                ideal_config_selection_csv
-                if ideal_config_selection_csv is not None
-                else default_best_selection_csv(aggregate_output_base)
-            )
             summary_base_args = [
                 output_str,
                 "--filter",
@@ -537,8 +554,6 @@ def main(argv: list[str] | None = None) -> int:
             ]
             summary_selection_args = [
                 *summary_base_args,
-                "--selection-csv",
-                str(selection_csv_for_reports),
                 "--selected-output",
                 f"{output_str}/filtered_reproduction_status_best_of.csv",
                 "--selected-latex-output",
@@ -547,6 +562,11 @@ def main(argv: list[str] | None = None) -> int:
                 "--by-library-output-prefix",
                 f"{output_str}/{by_library_output_prefix}",
             ]
+            if ideal_config_selection_csv is not None:
+                summary_selection_args.extend([
+                    "--selection-csv",
+                    str(ideal_config_selection_csv),
+                ])
             print(
                 "[SUMMARY REPRO STATUS] summarize_reproduction_status "
                 + shlex.join(summary_selection_args)
