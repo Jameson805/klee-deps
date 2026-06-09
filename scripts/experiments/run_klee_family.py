@@ -104,6 +104,16 @@ def _format_replay_opts(secret_inputs: list[str], public_inputs: list[str], publ
     return " ".join(options)
 
 
+def _input_names_from_layout(input_specs: list[str]) -> list[str]:
+    """Extract symbolic input names from layout specs like name:size:buffer."""
+    names: list[str] = []
+    for input_spec in input_specs:
+        name = input_spec.split(":", 1)[0].strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
 def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, object]]:
     """Load KLEE-family cases, preferring explicit per-tool overrides when present."""
     raw_cases = benchmark_definition.extra_config.get("klee_cases")
@@ -124,11 +134,31 @@ def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, objec
         secret_inputs = list(
             tuple(optional_string_list(expanded_case.config_table, "klee_secret_inputs", expanded_case.config_location))
             or tuple(optional_string_list(expanded_case.target_table, "klee_secret_inputs", expanded_case.target_location))
+            or tuple(
+                _input_names_from_layout(
+                    optional_string_list(expanded_case.config_table, "secret_inputs", expanded_case.config_location)
+                )
+            )
+            or tuple(
+                _input_names_from_layout(
+                    optional_string_list(expanded_case.target_table, "secret_inputs", expanded_case.target_location)
+                )
+            )
             or default_secret_inputs
         )
         public_inputs = list(
             tuple(optional_string_list(expanded_case.config_table, "klee_public_inputs", expanded_case.config_location))
             or tuple(optional_string_list(expanded_case.target_table, "klee_public_inputs", expanded_case.target_location))
+            or tuple(
+                _input_names_from_layout(
+                    optional_string_list(expanded_case.config_table, "public_inputs", expanded_case.config_location)
+                )
+            )
+            or tuple(
+                _input_names_from_layout(
+                    optional_string_list(expanded_case.target_table, "public_inputs", expanded_case.target_location)
+                )
+            )
             or default_public_inputs
         )
         case = {
