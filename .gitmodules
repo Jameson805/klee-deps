@@ -8,3 +8,6 @@
 	path = klee-self-comp
 	url = https://github.com/Jameson805/klee-controlflow/
 	branch = self-comp
+[submodule "abacus"]
+	path = abacus
+	url = https://github.com/theta-lin/Abacus-Witness
