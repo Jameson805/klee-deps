@@ -12,7 +12,7 @@ filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-klee_self_comp = ["appliedcryp:default", "bearssl:default", "ghostrider:default", "libg:default", "openssl_almeida:default", "pycrypto:default"]
+klee_self_comp = ["appliedcryp:default", "bearssl:aes_des", "ghostrider:default", "libg:default", "openssl_almeida:default", "pycrypto:default"]
 
 [runs]
 klee_self_comp_default_4 = true

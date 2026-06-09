@@ -10,7 +10,7 @@ output = "/datapool/theta-lin-experiments/20260502_new_abacus"
 [benchmarks]
 abacus = [
   "appliedcryp:default",
-  "bearssl:default",
+  "bearssl:aes_des",
   "ghostrider:default",
   "libg:default",
   "openssl_almeida:default",
