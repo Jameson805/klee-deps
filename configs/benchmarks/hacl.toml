@@ -1,7 +1,7 @@
 [[benchmarks]]
 library = "hacl_modexp"
 code_path = "benchmarks/hacl-packages-c-v0.6.0"
-tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
@@ -20,6 +20,9 @@ include_dirs = [
 prepare_commands = [
     "mkdir -p build",
 ]
+
+[benchmarks.build.tools.abacus]
+concrete_pubs = false
 
 [benchmarks.tool_defaults.klee]
 code_path = "hacl-packages-c-v0.6.0"
