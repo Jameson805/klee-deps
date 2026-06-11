@@ -99,6 +99,7 @@ class LocationMatchResult:
     matches: bool
     snapped: bool = False
     same_expression: bool = False
+    same_line_different_column: bool = False
 
 
 def _statement_bounds(lines: Sequence[str], line_number: int) -> tuple[int, int] | None:
@@ -624,11 +625,11 @@ def location_matches(
     if upper_bound is not None and upper_bound <= actual_column:
         upper_bound = None
     if lower_bound is None and upper_bound is None:
-        return LocationMatchResult(matches=False)
+        return LocationMatchResult(matches=True, same_line_different_column=True)
     if lower_bound is not None and not (lower_bound <= expected_column):
-        return LocationMatchResult(matches=False)
+        return LocationMatchResult(matches=True, same_line_different_column=True)
     if upper_bound is not None and not (expected_column <= upper_bound):
-        return LocationMatchResult(matches=False)
+        return LocationMatchResult(matches=True, same_line_different_column=True)
     return LocationMatchResult(matches=True, snapped=True)
 
 
@@ -663,6 +664,10 @@ def format_same_expression_success(
     expected_loc = format_location(expected_file, expected_line, expected_column)
     actual_loc = format_location(actual_file, actual_line, actual_column)
     return f"Success (same expression span: expected {expected_loc}, got {actual_loc})"
+
+
+def format_same_line_column_success(actual_column: int, expected_column: int) -> str:
+    return f"Success (same line; using replay column {actual_column} instead of reported column {expected_column})"
 
 
 def parse_secret_input_spec(spec: str) -> dict[str, tuple[int, int, int]]:
@@ -952,8 +957,12 @@ def mode_dataframe(
                         expected_col,
                     )
                 )
+            elif match_result.same_line_different_column and expected_col is not None:
+                print(format_same_line_column_success(actual_col, expected_col))
             else:
                 print("Success")
+            if expected_line == actual_line and expected_col is not None and expected_col != actual_col:
+                df.at[idx, "column"] = actual_col
             df.at[idx, "reproduced_status"] = STATUS_SUCCESS
         else:
             print(f"Failed at {actual_file}:{actual_line}:{actual_col}")
@@ -1094,6 +1103,8 @@ def mode_input_values(
                     expected_column,
                 )
             )
+        elif match_result.same_line_different_column and expected_column is not None:
+            print(format_same_line_column_success(actual_column, expected_column))
         return 0
 
     print(

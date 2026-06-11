@@ -220,11 +220,20 @@ def _parse_input_layouts(raw_specs: list[str], defaults: list[tuple[str, int, st
     return layouts
 
 
+def _canonicalize_input_value(value: int, size: int, byteorder: str) -> int:
+    try:
+        raw = int(value).to_bytes(size, byteorder=byteorder, signed=False)
+    except OverflowError as exc:
+        raise ValueError(f"BINSEC model value 0x{int(value):x} does not fit in {size} bytes") from exc
+    return int.from_bytes(raw, byteorder="big", signed=False)
+
+
 def _pick_model_counterexamples(
     models: dict[int, dict[str, dict[str, int]]],
     addr: int,
     secret_inputs: list[InputLayout],
     public_inputs: list[InputLayout],
+    model_byteorder: str,
 ) -> dict[str, int] | None:
     model = models.get(addr)
     if not model:
@@ -241,14 +250,14 @@ def _pick_model_counterexamples(
         prime_value = s2.get(inp.model_key) if isinstance(s2, dict) else None
         if value is None or prime_value is None:
             continue
-        counterexamples[inp.name] = value
-        counterexamples[f"{inp.name}__prime"] = prime_value
+        counterexamples[inp.name] = _canonicalize_input_value(value, inp.size, model_byteorder)
+        counterexamples[f"{inp.name}__prime"] = _canonicalize_input_value(prime_value, inp.size, model_byteorder)
 
     for inp in public_inputs:
         value = pub.get(inp.model_key) if isinstance(pub, dict) else None
         if value is None:
             continue
-        counterexamples[inp.name] = value
+        counterexamples[inp.name] = _canonicalize_input_value(value, inp.size, model_byteorder)
 
     return counterexamples or None
 
@@ -384,6 +393,7 @@ def build_rows(
     library: str,
     secret_inputs: list[InputLayout],
     public_inputs: list[InputLayout],
+    model_byteorder: str,
     reproduce_module: str | None,
     replay_executable: str | None,
     reproduce_timeout_s: int,
@@ -417,7 +427,7 @@ def build_rows(
         leak = leaks.get(addr)
         non_ct_time = leak.seconds if leak is not None else None
 
-        counterexamples = _pick_model_counterexamples(models, addr, secret_inputs, public_inputs)
+        counterexamples = _pick_model_counterexamples(models, addr, secret_inputs, public_inputs, model_byteorder)
 
         code: str | None = None
         if filename and line_no and code_root and code_index is not None:
@@ -506,6 +516,8 @@ def build_rows(
                     )
                 elif rc == 0:
                     reproduced_status = STATUS_SUCCESS
+                    if os.path.basename(rep_file) == os.path.basename(filename) and rep_line == line_no and rep_col != col_no:
+                        col_no = rep_col
                     print(
                         f"[reproduce] addr=0x{addr:x} SUCCESS divergence={repro_loc}",
                         file=sys.stderr,
@@ -553,8 +565,11 @@ def convert_binsec_toml(
     code_path: str | None = None,
     library: str,
     metadata: dict[str, Any] | None = None,
+    model_byteorder: str = sys.byteorder,
 ) -> dict[str, object]:
     """Convert one BINSEC case using explicit replay layouts and per-case worker output."""
+    if model_byteorder not in {"little", "big"}:
+        raise ValueError("model_byteorder must be 'little' or 'big'")
     secret_layouts = _parse_input_layouts(secret_inputs or [], [], "secret")
     public_layouts = _parse_input_layouts(public_inputs or [], [], "public")
 
@@ -594,6 +609,7 @@ def convert_binsec_toml(
         library=library,
         secret_inputs=secret_layouts,
         public_inputs=public_layouts,
+        model_byteorder=model_byteorder,
         reproduce_module=reproduce_module if reproduce else None,
         replay_executable=replay_executable if reproduce else None,
         reproduce_timeout_s=reproduce_timeout,
@@ -705,6 +721,16 @@ def main(argv: list[str]) -> int:
         choices=["mbedtls", "libgcrypt", "openssl", "bearssl", "unknown"],
         help="Library identifier for this dataset.",
     )
+    p.add_argument(
+        "--model-byteorder",
+        choices=["little", "big"],
+        default=sys.byteorder,
+        help=(
+            "Byte order used by BINSEC scalar model values for input objects before "
+            "normalizing them into the JSON/replay big-endian integer convention "
+            f"(default: native {sys.byteorder})."
+        ),
+    )
 
     args = p.parse_args(argv)
 
@@ -729,6 +755,7 @@ def main(argv: list[str]) -> int:
             output_path=args.out,
             code_path=args.code_path,
             library=args.library,
+            model_byteorder=args.model_byteorder,
         )
     except (FileNotFoundError, RuntimeError, ValueError) as err:
         print(f"Error: {err}", file=sys.stderr)

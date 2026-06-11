@@ -17,6 +17,7 @@ from tools.converters.binsec_toml_to_json import (
     main,
     parse_output_log,
 )
+from tools.postprocess.reproduce_positives import location_matches
 
 
 class BinsecTomlToJsonTest(unittest.TestCase):
@@ -53,6 +54,7 @@ class BinsecTomlToJsonTest(unittest.TestCase):
             library="mbedtls",
             secret_inputs=[InputLayout(name="exp", size=4, model_key="exp_buf")],
             public_inputs=[],
+            model_byteorder="big",
             reproduce_module=None,
             replay_executable=None,
             reproduce_timeout_s=60,
@@ -60,6 +62,54 @@ class BinsecTomlToJsonTest(unittest.TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["kind"], "branch")
+
+    def test_location_match_accepts_same_line_column_difference(self) -> None:
+        result = location_matches(
+            expected_filename="loki91.c",
+            expected_line=201,
+            expected_column=6,
+            actual_file="/tmp/benchmark/benchmarks/appliedCryp/loki91.c",
+            actual_line=201,
+            actual_column=21,
+        )
+
+        self.assertTrue(result.matches)
+        self.assertTrue(result.same_line_different_column)
+
+    def test_build_rows_uses_replay_column_on_same_line_success(self) -> None:
+        models = {
+            0x401D07: {
+                "secret1": {"key_buf": 1},
+                "secret2": {"key_buf": 2},
+                "public": {},
+            }
+        }
+
+        with (
+            patch("tools.converters.binsec_toml_to_json.get_addr_info", return_value=("/tmp/loki91.c", 201, 6)),
+            patch(
+                "tools.converters.binsec_toml_to_json._run_reproduce",
+                return_value=(("/tmp/loki91.c", 201, 21), 0, "memory divergence at 0x401f54: /tmp/loki91.c:201:21"),
+            ),
+        ):
+            rows = build_rows(
+                insecure_addrs=[0x401D07],
+                models=models,
+                leaks={0x401D07: LeakInfo(leak_type="memory access", seconds=0.5)},
+                addr_executable="/tmp/fix_pub",
+                code_root=None,
+                library="unknown",
+                secret_inputs=[InputLayout(name="key", size=1, model_key="key_buf")],
+                public_inputs=[],
+                model_byteorder="big",
+                reproduce_module="tools.postprocess.reproduce_positives",
+                replay_executable="/tmp/fix_pub_replay",
+                reproduce_timeout_s=60,
+            )
+
+        self.assertEqual(rows[0]["line"], 201)
+        self.assertEqual(rows[0]["column"], 21)
+        self.assertEqual(rows[0]["reproduced_status"], "success")
 
     def test_convert_binsec_toml_does_not_infer_public_inputs_from_var_pub_filename(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
