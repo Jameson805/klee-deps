@@ -1,0 +1,7 @@
+[comparison_tool_labels]
+abacus = "Abacus"
+binsec = "Binsec/Rel 2"
+klee_cf = "CT-Witness"
+klee_cf_sliced = "CT-Witness sliced"
+klee_eager = "Naive Prod-Prog"
+klee_self_comp = "Self-Comp"

@@ -29,6 +29,7 @@ import numpy as np
 import pandas as pd
 
 from tools.postprocess.selection_helpers import (
+    default_display_label,
     load_selected_configurations,
     normalize_plot_groups as normalize_plot_groups_shared,
 )
@@ -304,7 +305,7 @@ def best_selection_table(best_summary: pd.DataFrame) -> pd.DataFrame:
         {
             "comparison_tool": best_summary["comparison_tool"],
             "source_column": best_summary["source_column"],
-            "display_label": best_summary["comparison_tool"],
+            "display_label": best_summary["comparison_tool"].map(default_display_label),
         }
     )
 
@@ -477,19 +478,54 @@ def build_legend_group(
 def filter_tool_summary_for_plot(
     tool_summary: pd.DataFrame, focal_field: str
 ) -> pd.DataFrame:
-    filtered = tool_summary.copy()
-    for field_name in PLOT_DIMENSIONS:
-        if field_name == focal_field:
-            continue
-        distinct_values = ordered_dimension_values(
-            field_name,
-            filtered[field_name].dropna().astype(str).tolist(),
+    fixed_fields = [field_name for field_name in PLOT_DIMENSIONS if field_name != focal_field]
+    eligible_groups: list[tuple[tuple[Any, ...], pd.DataFrame]] = []
+
+    if not fixed_fields:
+        eligible_groups.append((tuple(), tool_summary.copy()))
+    else:
+        grouped = tool_summary.groupby(fixed_fields, dropna=False, sort=False)
+        for group_key, group_df in grouped:
+            distinct_focal_values = ordered_dimension_values(
+                focal_field,
+                group_df[focal_field].dropna().astype(str).tolist(),
+            )
+            if len(distinct_focal_values) < 2:
+                continue
+            normalized_key = group_key if isinstance(group_key, tuple) else (group_key,)
+            eligible_groups.append((normalized_key, group_df.reset_index(drop=True)))
+
+    if not eligible_groups:
+        return tool_summary.iloc[0:0].copy()
+
+    def group_sort_key(item: tuple[tuple[Any, ...], pd.DataFrame]) -> tuple[Any, ...]:
+        group_key, group_df = item
+        ranked_group = group_df.sort_values(
+            [
+                "insecure_locations_found",
+                "max_time",
+                "source_column",
+            ],
+            ascending=[False, True, True],
+            na_position="last",
+            kind="stable",
+        ).reset_index(drop=True)
+        best_row = ranked_group.iloc[0]
+        distinct_focal_values = ordered_dimension_values(
+            focal_field,
+            group_df[focal_field].dropna().astype(str).tolist(),
         )
-        if len(distinct_values) > 1:
-            filtered = filtered.loc[
-                filtered[field_name].astype(str) == distinct_values[0]
-            ]
-    return filtered.reset_index(drop=True)
+        normalized_group_key = tuple("" if pd.isna(value) else str(value) for value in group_key)
+        return (
+            -int(best_row["insecure_locations_found"]),
+            float(best_row["max_time"]) if pd.notna(best_row["max_time"]) else float("inf"),
+            -len(distinct_focal_values),
+            normalized_group_key,
+            str(best_row["source_column"]),
+        )
+
+    _, best_group = min(eligible_groups, key=group_sort_key)
+    return best_group.reset_index(drop=True)
 
 
 def centered_lane_centers(level: int, lane_count: int) -> list[float]:
@@ -1004,6 +1040,7 @@ def write_exploration_outputs(
     for comparison_tool, tool_summary in summary.groupby("comparison_tool", sort=False):
         tool_dir = exploration_dir / comparison_tool
         tool_dir.mkdir(parents=True, exist_ok=True)
+        tool_display_label = default_display_label(str(comparison_tool))
 
         tool_summary_path = tool_dir / "configurations.csv"
         tool_summary.to_csv(tool_summary_path, index=False)
@@ -1024,7 +1061,7 @@ def write_exploration_outputs(
                 curves,
                 plot_path,
                 title=(
-                    f"{input_stem} {comparison_tool} configurations styled by "
+                    f"{input_stem} {tool_display_label} configurations styled by "
                     f"{dimension_label}"
                 ),
                 legend_groups=legend_groups,
@@ -1177,7 +1214,9 @@ def automatic_selection_summary(best_summary: pd.DataFrame) -> pd.DataFrame:
         return best_summary.copy()
 
     automatic_summary = best_summary.copy()
-    automatic_summary["display_label"] = automatic_summary["comparison_tool"]
+    automatic_summary["display_label"] = automatic_summary["comparison_tool"].map(
+        default_display_label
+    )
     automatic_summary["plot_groups"] = ""
     return automatic_summary
 

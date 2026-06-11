@@ -21,7 +21,10 @@ from typing import Any
 from tools.postprocess.apply_sliced_map import load_sliced_map
 from tools.postprocess.csv_to_latex_table import escape_latex
 from tools.postprocess.filter_merged_results import load_filters, location_matches
-from tools.postprocess.selection_helpers import load_selected_configurations
+from tools.postprocess.selection_helpers import (
+    default_display_label,
+    load_selected_configurations,
+)
 from tools.shared.configuration_metadata import build_column_metadata, load_run_metadata
 from tools.shared.experiment_registry import _BENCHMARK_DEFINITIONS, canonical_case_id
 from tools.shared.result_schema import (
@@ -489,21 +492,6 @@ def _load_selected_configurations(
     return selected_rows
 
 
-def _default_display_label(comparison_tool: str) -> str:
-    known_labels = {
-        "abacus": "Abacus",
-        "binsec": "BINSEC",
-        "klee_cf": "KLEE-CF",
-        "klee_cf_sliced": "KLEE-CF sliced",
-        "klee_eager": "KLEE-Eager",
-        "klee_self_comp": "KLEE Self-Comp",
-    }
-    label = known_labels.get(comparison_tool)
-    if label is not None:
-        return label
-    return comparison_tool.replace("_", "-")
-
-
 def _default_plot_groups(*, comparison_tool: str, tool_family: str) -> str:
     if comparison_tool == "klee_cf":
         return "internal|external"
@@ -610,7 +598,7 @@ def _automatic_selected_configurations(
         selected_row = {
             **summary_row,
             "source_column": source_column,
-            "display_label": _default_display_label(comparison_tool),
+            "display_label": default_display_label(comparison_tool),
             "plot_groups": _default_plot_groups(
                 comparison_tool=comparison_tool,
                 tool_family=tool_family,

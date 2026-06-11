@@ -142,6 +142,7 @@ Campaign runs now write explicit metadata that downstream tools rely on:
 
 - each campaign output root contains `_run_metadata.json`
 - merged CSVs can carry a `*.metadata.json` sidecar with per-column metadata
+- default report and matplotlib tool display names are configured in `configs/postprocess/display_labels.toml`
 
 That metadata stores raw option values such as `searcher=random-path,dfs` and `concretization_policy=false`. The shared metadata layer does not normalize those values into tool-specific display names anymore. Presentation choices belong in reporting code, not in metadata generation.
 

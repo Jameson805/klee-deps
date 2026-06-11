@@ -43,7 +43,7 @@ def derive_run_configuration(
     return {
         "source_column_prefix": destination_name,
         "tool_family": tool_name,
-        "searcher": _option_value(args_template, "--search") or "all",
+        "searcher": _option_value(args_template, "--search") or "default",
         "sym_size": _option_value(args_template, "--sym-size") or "all",
         "concretization_policy": _option_value(args_template, "--concretize-on-solver-timeout") or "all",
     }

@@ -1,8 +1,58 @@
 from __future__ import annotations
 
 import csv
+from functools import lru_cache
 from pathlib import Path
+import sys
+import tomllib
 from typing import Any, Mapping
+
+
+DISPLAY_LABELS_CONFIG_PATH = (
+    Path(__file__).resolve().parents[2] / "configs" / "postprocess" / "display_labels.toml"
+)
+
+
+@lru_cache(maxsize=1)
+def configured_display_labels() -> dict[str, str]:
+    labels: dict[str, str] = {}
+
+    try:
+        with DISPLAY_LABELS_CONFIG_PATH.open("rb") as handle:
+            payload = tomllib.load(handle)
+    except FileNotFoundError:
+        return labels
+    except tomllib.TOMLDecodeError as error:
+        print(
+            f"Warning: {DISPLAY_LABELS_CONFIG_PATH}: invalid TOML ({error}); using canonical comparison tool names.",
+            file=sys.stderr,
+        )
+        return labels
+
+    configured_labels = payload.get("comparison_tool_labels")
+    if configured_labels is None:
+        return labels
+    if not isinstance(configured_labels, dict):
+        print(
+            f"Warning: {DISPLAY_LABELS_CONFIG_PATH}: 'comparison_tool_labels' must be a table; using canonical comparison tool names.",
+            file=sys.stderr,
+        )
+        return labels
+
+    for comparison_tool, label in configured_labels.items():
+        normalized_tool = str(comparison_tool).strip()
+        normalized_label = str(label).strip()
+        if normalized_tool and normalized_label:
+            labels[normalized_tool] = normalized_label
+
+    return labels
+
+
+def default_display_label(comparison_tool: str) -> str:
+    label = configured_display_labels().get(comparison_tool)
+    if label is not None:
+        return label
+    return comparison_tool
 
 
 def normalize_plot_groups(plot_groups: Any) -> str:
@@ -64,7 +114,10 @@ def load_selected_configurations(
                 f"does not match summary metadata {summary_row['comparison_tool']!r}"
             )
 
-        display_label = str(selection_row.get("display_label", "")).strip() or source_column
+        display_label = (
+            str(selection_row.get("display_label", "")).strip()
+            or default_display_label(comparison_tool)
+        )
         selected_rows.append(
             {
                 **dict(summary_row),
