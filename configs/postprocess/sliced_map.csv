@@ -1,5 +1,9 @@
 library,file,line,column,file_sliced,line_sliced,column_sliced
 libgcrypt,mpi-bit.c,61,5,mpi-bit.c,61,5
+libgcrypt,mpih-mul.c,84,9,powm_sliced.c,532,11
+libgcrypt,mpi-pow.c,610,7,powm_sliced.c,341,7
+libgcrypt,mpi-pow.c,635,13,powm_sliced.c,361,11
+libgcrypt,mpi-pow.c,641,15,powm_sliced.c,369,13
 libgcrypt,mpi-pow.c,559,35,mpi-pow.c,185,35
 libgcrypt,mpi-pow.c,617,11,mpi-pow.c,208,13
 libgcrypt,mpi-pow.c,641,15,mpi-pow.c,234,17
