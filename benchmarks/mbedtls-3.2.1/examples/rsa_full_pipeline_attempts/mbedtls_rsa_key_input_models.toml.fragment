@@ -1,0 +1,30 @@
+[benchmarks.variants.rsa_key_input_models]
+tools = ["klee_cf", "klee_eager"]
+
+[[benchmarks.variants.rsa_key_input_models.targets]]
+target = "rsa_private_full_key"
+runner_profile = "rsa_private_full_key"
+secret_layout = "n:{sym_size},p:{sym_size},q:{sym_size},d:{sym_size},dp:{sym_size},dq:{sym_size},qp:{sym_size}"
+secret_inputs = ["n:{sym_size}:n_buf", "p:{sym_size}:p_buf", "q:{sym_size}:q_buf", "d:{sym_size}:d_buf", "dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf", "qp:{sym_size}:qp_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_private_full_key_wrapper.c"]
+
+[[benchmarks.variants.rsa_key_input_models.targets]]
+target = "rsa_private_pqe"
+runner_profile = "rsa_private_pqe"
+secret_layout = "p:{sym_size},q:{sym_size}"
+secret_inputs = ["p:{sym_size}:p_buf", "q:{sym_size}:q_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_private_pqe_wrapper.c"]
+
+[[benchmarks.variants.rsa_key_input_models.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.rsa_key_input_models.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager"]
+use_public_inputs = true

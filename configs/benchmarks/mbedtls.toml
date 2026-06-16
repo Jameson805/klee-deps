@@ -7,6 +7,14 @@ tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
 
+[benchmarks.runner_profiles.rsa_private]
+config = "configs/runner/mbedtls_rsa_private_runner_config.toml"
+preset = "size_{sym_size}"
+
+[benchmarks.runner_profiles.pkcs1_v15_unpadding]
+config = "configs/runner/mbedtls_pkcs1_v15_unpadding_runner_config.toml"
+preset = "size_{sym_size}"
+
 [benchmarks.build]
 preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
@@ -47,6 +55,40 @@ public_layout = "base:{sym_size},mod:{sym_size}"
 public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
 build_sources = ["modexp_wrapper.c"]
 
+[[benchmarks.targets]]
+target = "rsa_private"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_private_wrapper.c"]
+
+[[benchmarks.targets]]
+target = "rsa_rsaes_pkcs1_v15_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_rsaes_pkcs1_v15_decrypt_wrapper.c"]
+
+[[benchmarks.targets]]
+target = "rsa_rsaes_oaep_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_rsaes_oaep_decrypt_wrapper.c"]
+
+[[benchmarks.targets]]
+target = "pkcs1_v15_unpadding"
+runner_profile = "pkcs1_v15_unpadding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["pkcs1_v15_unpadding_wrapper.c"]
+
 [[benchmarks.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
@@ -63,6 +105,98 @@ config = "var_pub_lim_loop_break"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager"]
 preprocess = "lim_loop_break"
+use_public_inputs = true
+
+[benchmarks.variants.rsa_stages]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_private"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_private_wrapper.c"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_rsaes_pkcs1_v15_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_rsaes_pkcs1_v15_decrypt_wrapper.c"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_rsaes_oaep_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_rsaes_oaep_decrypt_wrapper.c"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "pkcs1_v15_unpadding"
+runner_profile = "pkcs1_v15_unpadding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["pkcs1_v15_unpadding_wrapper.c"]
+
+[[benchmarks.variants.rsa_stages.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.rsa_stages.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "binsec"]
+use_public_inputs = true
+
+[benchmarks.variants.rsa_decrypt_only]
+
+[[benchmarks.variants.rsa_decrypt_only.targets]]
+target = "rsa_private"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_private_wrapper.c"]
+
+[[benchmarks.variants.rsa_decrypt_only.targets]]
+target = "rsa_rsaes_pkcs1_v15_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_rsaes_pkcs1_v15_decrypt_wrapper.c"]
+
+[[benchmarks.variants.rsa_decrypt_only.targets]]
+target = "rsa_rsaes_oaep_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_rsaes_oaep_decrypt_wrapper.c"]
+
+[[benchmarks.variants.rsa_decrypt_only.targets]]
+target = "pkcs1_v15_unpadding"
+runner_profile = "pkcs1_v15_unpadding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["pkcs1_v15_unpadding_wrapper.c"]
+
+[[benchmarks.variants.rsa_decrypt_only.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.rsa_decrypt_only.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
 use_public_inputs = true
 
 [benchmarks.variants.sliced]
