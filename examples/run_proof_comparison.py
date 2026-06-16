@@ -440,7 +440,7 @@ def _run_klee(
         "--posix-runtime",
         "--external-calls=all",
         "--solver-backend=stp",
-        "--concretize-on-solver-timeout=true",
+        "--use-cv-model=true",
         "--kdalloc",
         "--kdalloc-constants-size=5",
         "--kdalloc-globals-size=5",

@@ -23,7 +23,7 @@ klee_cf_dfs_4 = true
 klee_cf_dfs_16 = true
 klee_cf_rand_path_dfs_4 = true
 klee_cf_rand_path_dfs_16 = true
-klee_cf_no_conc_4 = true
+klee_cf_no_cv_4 = true
 klee_eager_default_4 = true
 klee_eager_default_16 = true
 klee_eager_dfs_4 = true
@@ -75,11 +75,11 @@ tool = "klee_cf"
 destination = "klee_cf_rand_path_dfs_16"
 args = ["{run_time}", "--sym-size", "16", "--search", "random-path,dfs"]
 
-[run_definitions.klee_cf_no_conc_4]
-tag = "KLEE CF NO CONC 4"
+[run_definitions.klee_cf_no_cv_4]
+tag = "KLEE CF NO CV 4"
 tool = "klee_cf"
-destination = "klee_cf_no_conc_4"
-args = ["{run_time}", "--sym-size", "4", "--concretize-on-solver-timeout", "false"]
+destination = "klee_cf_no_cv_4"
+args = ["{run_time}", "--sym-size", "4", "--use-cv-model", "false"]
 
 [run_definitions.klee_eager_default_4]
 tag = "KLEE Eager Default 4"
