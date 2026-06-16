@@ -24,7 +24,7 @@ build_dep_commands = [
   "rm -rf build",
   "mkdir -p build",
   "cd libsodium-stable && ./autogen.sh -s",
-  "cd build && ../libsodium-stable/configure --disable-shared --enable-static --prefix=\"$(pwd)/install\" CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\"",
+  "cd build && ../libsodium-stable/configure --disable-shared --enable-static --disable-asm --prefix=\"$(pwd)/install\" CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\"",
   "cd build && make -j {make_jobs}",
   "cd build && make install",
 ]
