@@ -10,7 +10,7 @@ link_libraries = ["libcrypto.a"]
 variables = { openssl_arch = "linux-generic64" }
 prepare_commands = ["cp -f crypto/bn/bn_exp_orig.c crypto/bn/bn_exp.c"]
 build_dep_commands = [
-	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}",
 	"make clean",
 	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
 ]
@@ -22,6 +22,14 @@ variables = { openssl_arch = "linux-generic32" }
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
+preset = "size_{sym_size}"
+
+[benchmarks.runner_profiles.rsa_private]
+config = "configs/runner/openssl_rsa_private_runner_config.toml"
+preset = "size_{sym_size}"
+
+[benchmarks.runner_profiles.rsa_padding]
+config = "configs/runner/openssl_rsa_padding_runner_config.toml"
 preset = "size_{sym_size}"
 
 [benchmarks.tool_defaults.klee]
@@ -41,6 +49,10 @@ arguments = ["-break", "-o", "{output}", "{input}"]
 [benchmarks.variants.sliced]
 tools = ["klee_cf"]
 
+[benchmarks.variants.rsa_stages.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
 [benchmarks.variants.sliced.build]
 preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
@@ -49,7 +61,7 @@ link_libraries = ["libcrypto.a"]
 variables = { openssl_arch = "linux-generic64" }
 prepare_commands = ["cp -f crypto/bn/bn_exp_sliced.c crypto/bn/bn_exp.c"]
 build_dep_commands = [
-	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}",
 	"make clean",
 	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
 ]
@@ -67,6 +79,7 @@ arguments = ["-break", "-o", "{output}", "{input}"]
 
 [[benchmarks.targets]]
 target = "recp"
+runner_profile = "default"
 secret_layout = "exp:{sym_size}"
 secret_inputs = ["exp:{sym_size}:exp_buf"]
 public_layout = "base:{sym_size},mod:{sym_size}"
@@ -76,6 +89,7 @@ defines = ["RECP"]
 
 [[benchmarks.targets]]
 target = "mont"
+runner_profile = "default"
 secret_layout = "exp:{sym_size}"
 secret_inputs = ["exp:{sym_size}:exp_buf"]
 public_layout = "base:{sym_size},mod:{sym_size}"
@@ -85,6 +99,7 @@ defines = ["MONT"]
 
 [[benchmarks.targets]]
 target = "mont_consttime"
+runner_profile = "default"
 secret_layout = "exp:{sym_size}"
 secret_inputs = ["exp:{sym_size}:exp_buf"]
 public_layout = "base:{sym_size},mod:{sym_size}"
@@ -94,6 +109,7 @@ defines = ["MONT_CONSTTIME"]
 
 [[benchmarks.targets]]
 target = "mont_word"
+runner_profile = "default"
 secret_layout = "exp:{sym_size}"
 secret_inputs = ["exp:{sym_size}:exp_buf"]
 public_layout = "base:{sym_size},mod:{sym_size}"
@@ -122,3 +138,86 @@ use_public_inputs = true
 [[benchmarks.exclusions]]
 variant = "sliced"
 target = "mont_consttime"
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_private_core"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_private_core_wrapper.c"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "padding_check_pkcs1_type_2"
+runner_profile = "rsa_padding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["padding_check_wrapper.c"]
+defines = ["OPENSSL_RSA_PADDING_CHECK_PKCS1_TYPE_2"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "padding_check_oaep_mgf1"
+runner_profile = "rsa_padding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["padding_check_wrapper.c"]
+defines = ["OPENSSL_RSA_PADDING_CHECK_OAEP_MGF1"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "padding_check_sslv23"
+runner_profile = "rsa_padding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["padding_check_wrapper.c"]
+defines = ["OPENSSL_RSA_PADDING_CHECK_SSLV23"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "pkey_rsa_pkcs1_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["pkey_rsa_decrypt_wrapper.c"]
+defines = ["OPENSSL_RSA_DECRYPT_PKCS1"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "pkey_rsa_oaep_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["pkey_rsa_decrypt_wrapper.c"]
+defines = ["OPENSSL_RSA_DECRYPT_OAEP"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "pkey_rsa_sslv23_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["pkey_rsa_decrypt_wrapper.c"]
+defines = ["OPENSSL_RSA_DECRYPT_SSLV23"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "pkey_rsa_no_padding_decrypt"
+runner_profile = "rsa_private"
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["pkey_rsa_decrypt_wrapper.c"]
+defines = ["OPENSSL_RSA_DECRYPT_NO_PADDING"]
+
+[[benchmarks.variants.rsa_stages.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.rsa_stages.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
