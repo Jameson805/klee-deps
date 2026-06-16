@@ -19,7 +19,7 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
             "tool_family": tool_name,
             "searcher": "default",
             "sym_size": "all",
-            "concretization_policy": "default",
+            "cv_model": "default",
         }
 
     def _case_metadata(self, suffix: str, library_key: str) -> dict[str, object]:

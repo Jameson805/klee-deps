@@ -18,7 +18,7 @@ LABEL_FIELDS = (
     "searcher",
     "sym_size",
     "public_mode",
-    "concretization_policy",
+    "cv_model",
 )
 
 
@@ -28,7 +28,10 @@ def column_metadata_path(csv_path: str | Path) -> Path:
 
 
 def _option_value(args: Sequence[str], option_name: str) -> str | None:
+    prefix = option_name + "="
     for index, token in enumerate(args):
+        if token.startswith(prefix):
+            return token[len(prefix):]
         if token == option_name and index + 1 < len(args):
             return args[index + 1]
     return None
@@ -45,7 +48,7 @@ def derive_run_configuration(
         "tool_family": tool_name,
         "searcher": _option_value(args_template, "--search") or "default",
         "sym_size": _option_value(args_template, "--sym-size") or "all",
-        "concretization_policy": _option_value(args_template, "--concretize-on-solver-timeout") or "all",
+        "cv_model": _option_value(args_template, "--use-cv-model") or "all",
     }
 
 
@@ -126,7 +129,7 @@ def build_column_metadata(
         "searcher": str(run_metadata["searcher"]),
         "sym_size": str(run_metadata["sym_size"]),
         "public_mode": str(case_metadata["public_mode"]),
-        "concretization_policy": str(run_metadata["concretization_policy"]),
+        "cv_model": str(run_metadata["cv_model"]),
         "raw_suffix": str(case_metadata["source_column_suffix"]),
         "normalized_suffix": str(case_metadata["public_mode"]),
     }

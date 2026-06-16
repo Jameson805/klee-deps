@@ -26,7 +26,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
             "tool_family": tool_name,
             "searcher": "default",
             "sym_size": "all",
-            "concretization_policy": "default",
+            "cv_model": "default",
         }
 
     def _case_metadata(
@@ -235,14 +235,14 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                 [
                     {
                         "configuration": "binsec_var_pub",
-                        "configuration_label": "searcher=default, public_mode=var_pub, concretization_policy=default",
+                        "configuration_label": "searcher=default, public_mode=var_pub, cv_model=default",
                         "comparison_tool": "binsec",
                         "tool_family": "binsec",
                         "sliced": "False",
                         "searcher": "default",
                         "sym_size": "all",
                         "public_mode": "var_pub",
-                        "concretization_policy": "default",
+                        "cv_model": "default",
                         "success": "3",
                         "timeout": "0",
                         "identical_trace": "0",
@@ -254,14 +254,14 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                     },
                     {
                         "configuration": "klee_cf_fix_pub",
-                        "configuration_label": "searcher=default, public_mode=fix_pub, concretization_policy=default",
+                        "configuration_label": "searcher=default, public_mode=fix_pub, cv_model=default",
                         "comparison_tool": "klee_cf",
                         "tool_family": "klee_cf",
                         "sliced": "False",
                         "searcher": "default",
                         "sym_size": "all",
                         "public_mode": "fix_pub",
-                        "concretization_policy": "default",
+                        "cv_model": "default",
                         "success": "2",
                         "timeout": "1",
                         "identical_trace": "0",
@@ -273,14 +273,14 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                     },
                     {
                         "configuration": "klee_eager_fix_pub",
-                        "configuration_label": "searcher=default, public_mode=fix_pub, concretization_policy=default",
+                        "configuration_label": "searcher=default, public_mode=fix_pub, cv_model=default",
                         "comparison_tool": "klee_eager",
                         "tool_family": "klee_eager",
                         "sliced": "False",
                         "searcher": "default",
                         "sym_size": "all",
                         "public_mode": "fix_pub",
-                        "concretization_policy": "default",
+                        "cv_model": "default",
                         "success": "2",
                         "timeout": "0",
                         "identical_trace": "0",
@@ -463,6 +463,95 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "target": "sha",
                         "klee_cf_control_flow": "0",
                         "klee_cf_memory": "1",
+                    },
+                ],
+            )
+
+    def test_target_specific_filter_and_sliced_map_use_legacy_library_target_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            root = tmp_path / "input"
+            (root / "klee_cf").mkdir(parents=True, exist_ok=True)
+            self._write_run_metadata(root, ("klee_cf",))
+
+            self._write_json(
+                root / "klee_cf" / "openssl_sliced_mont_fix_pub.json",
+                [
+                    {
+                        "library": "openssl",
+                        "filename": "bn_exp.c",
+                        "line": 240,
+                        "column": 9,
+                        "kind": "branch",
+                        "reproduced_status": "success",
+                    },
+                ],
+                metadata={
+                    **self._case_metadata("fix_pub", "openssl", target_key="mont"),
+                    "sliced": True,
+                },
+            )
+
+            filter_csv = tmp_path / "filter.csv"
+            filter_csv.write_text(
+                "library,file,line_start,line_end\n"
+                "openssl_mont,bn_exp.c,364,364\n",
+                encoding="utf-8",
+            )
+            sliced_map_csv = tmp_path / "sliced_map.csv"
+            sliced_map_csv.write_text(
+                "library,file,line,column,file_sliced,line_sliced,column_sliced\n"
+                "openssl_mont,bn_exp.c,364,9,bn_exp.c,240,9\n",
+                encoding="utf-8",
+            )
+            selection_csv = tmp_path / "selection.csv"
+            selection_csv.write_text(
+                "comparison_tool,source_column,display_label\n"
+                "klee_cf_sliced,klee_cf_sliced_fix_pub,klee_cf\n",
+                encoding="utf-8",
+            )
+
+            summary_csv = tmp_path / "summary.csv"
+            by_library_prefix = tmp_path / "by_library"
+            command = [
+                sys.executable,
+                "-m",
+                SCRIPT_MODULE,
+                str(root),
+                "-f",
+                str(filter_csv),
+                "--sliced-map",
+                str(sliced_map_csv),
+                "-o",
+                str(summary_csv),
+                "--selection-csv",
+                str(selection_csv),
+                "--by-library-selection-tables",
+                "--by-library-output-prefix",
+                str(by_library_prefix),
+            ]
+            result = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                result.returncode,
+                0,
+                msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}",
+            )
+
+            self.assertEqual(self._read_csv(summary_csv)[0]["total_filtered_positives"], "1")
+            self.assertEqual(
+                self._read_csv(tmp_path / "by_library.csv"),
+                [
+                    {
+                        "library": "openssl",
+                        "target": "mont",
+                        "klee_cf_control_flow": "1",
+                        "klee_cf_memory": "0",
                     },
                 ],
             )
@@ -756,11 +845,11 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
             selected_by_name = {
                 row["configuration"]: row for row in selected_rows
             }
-            self.assertEqual(set(selected_by_name), {"BINSEC", "KLEE-CF"})
-            self.assertEqual(selected_by_name["BINSEC"]["success"], "1")
-            self.assertEqual(selected_by_name["BINSEC"]["total"], "1")
-            self.assertEqual(selected_by_name["KLEE-CF"]["success"], "1")
-            self.assertEqual(selected_by_name["KLEE-CF"]["total"], "1")
+            self.assertEqual(set(selected_by_name), {"Binsec/Rel 2", "CT-Witness"})
+            self.assertEqual(selected_by_name["Binsec/Rel 2"]["success"], "1")
+            self.assertEqual(selected_by_name["Binsec/Rel 2"]["total"], "1")
+            self.assertEqual(selected_by_name["CT-Witness"]["success"], "1")
+            self.assertEqual(selected_by_name["CT-Witness"]["total"], "1")
 
             self.assertEqual(
                 self._read_csv(tmp_path / "by_library.csv"),
@@ -768,10 +857,10 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                     {
                         "library": "mbedtls",
                         "target": "aes",
-                        "KLEE-CF_control_flow": "1",
-                        "KLEE-CF_memory": "0",
-                        "BINSEC_control_flow": "0",
-                        "BINSEC_memory": "1",
+                        "CT-Witness_control_flow": "1",
+                        "CT-Witness_memory": "0",
+                        "Binsec/Rel 2_control_flow": "0",
+                        "Binsec/Rel 2_memory": "1",
                     },
                 ],
             )

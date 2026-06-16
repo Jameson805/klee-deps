@@ -67,6 +67,16 @@ def normalize_plot_groups(plot_groups: Any) -> str:
     return "|".join(normalized_groups)
 
 
+def default_plot_groups(*, comparison_tool: str, tool_family: str) -> str:
+    if comparison_tool == "klee_cf":
+        return "internal|external|slicing"
+    if comparison_tool == "klee_cf_sliced":
+        return "internal|slicing"
+    if comparison_tool.startswith("klee") or tool_family.startswith("klee"):
+        return "internal"
+    return "external"
+
+
 def load_selected_configurations(
     selection_csv: Path,
     lookup_by_source_column: Mapping[str, Mapping[str, Any]],

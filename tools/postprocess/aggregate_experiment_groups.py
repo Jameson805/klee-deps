@@ -30,6 +30,7 @@ import pandas as pd
 
 from tools.postprocess.selection_helpers import (
     default_display_label,
+    default_plot_groups,
     load_selected_configurations,
     normalize_plot_groups as normalize_plot_groups_shared,
 )
@@ -52,7 +53,7 @@ PLOT_DIMENSIONS: OrderedDict[str, str] = OrderedDict(
         ("searcher", "searcher"),
         ("sym_size", "symbolic input size"),
         ("public_mode", "public input mode"),
-        ("concretization_policy", "public-input concretization"),
+        ("cv_model", "CV model"),
     ]
 )
 STYLE_CHANNELS_BY_FOCAL_FIELD: dict[str, dict[str, str]] = {
@@ -60,22 +61,22 @@ STYLE_CHANNELS_BY_FOCAL_FIELD: dict[str, dict[str, str]] = {
         "color": "searcher",
         "linestyle": "public_mode",
         "brightness": "sym_size",
-        "linewidth": "concretization_policy",
+        "linewidth": "cv_model",
     },
     "sym_size": {
         "color": "sym_size",
         "linestyle": "searcher",
         "brightness": "public_mode",
-        "linewidth": "concretization_policy",
+        "linewidth": "cv_model",
     },
     "public_mode": {
         "color": "public_mode",
         "linestyle": "searcher",
         "brightness": "sym_size",
-        "linewidth": "concretization_policy",
+        "linewidth": "cv_model",
     },
-    "concretization_policy": {
-        "color": "concretization_policy",
+    "cv_model": {
+        "color": "cv_model",
         "linestyle": "public_mode",
         "brightness": "sym_size",
         "linewidth": "searcher",
@@ -92,7 +93,7 @@ class ColumnConfiguration:
     searcher: str
     sym_size: str
     public_mode: str
-    concretization_policy: str
+    cv_model: str
     raw_suffix: str
     normalized_suffix: str
     configuration_label: str
@@ -171,7 +172,7 @@ def column_configuration_from_metadata(column_name: str, metadata: Mapping[str, 
         searcher=str(metadata["searcher"]),
         sym_size=str(metadata["sym_size"]),
         public_mode=str(metadata["public_mode"]),
-        concretization_policy=str(metadata["concretization_policy"]),
+        cv_model=str(metadata["cv_model"]),
         raw_suffix=str(metadata["raw_suffix"]),
         normalized_suffix=str(metadata["normalized_suffix"]),
         configuration_label=str(metadata["configuration_label"]),
@@ -242,7 +243,7 @@ def summarize_configurations(
         "searcher",
         "sym_size",
         "public_mode",
-        "concretization_policy",
+        "cv_model",
         "raw_suffix",
         "normalized_suffix",
         "insecure_locations_found",
@@ -265,7 +266,7 @@ def configuration_metadata(summary: pd.DataFrame) -> pd.DataFrame:
         "searcher",
         "sym_size",
         "public_mode",
-        "concretization_policy",
+        "cv_model",
         "raw_suffix",
         "normalized_suffix",
     ]
@@ -1217,7 +1218,13 @@ def automatic_selection_summary(best_summary: pd.DataFrame) -> pd.DataFrame:
     automatic_summary["display_label"] = automatic_summary["comparison_tool"].map(
         default_display_label
     )
-    automatic_summary["plot_groups"] = ""
+    automatic_summary["plot_groups"] = automatic_summary.apply(
+        lambda row: default_plot_groups(
+            comparison_tool=str(row["comparison_tool"]),
+            tool_family=str(row["tool_family"]),
+        ),
+        axis=1,
+    )
     return automatic_summary
 
 

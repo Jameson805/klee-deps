@@ -70,7 +70,7 @@ MODE_PROFILES = {
         tool_id="klee_cf",
         executable_artifact="klee-cf",
         results_dir="results/klee_cf_results",
-        extra_flag="concretize_on_solver_timeout",
+        extra_flag="use_cv_model",
     ),
     "klee_eager": KleeModeProfile(
         tool_id="klee_eager",
@@ -266,8 +266,8 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--config", help="Run only KLEE cases whose config id matches this value")
     parser.add_argument("--mod-exp-only", action="store_true")
     parser.add_argument("--search", default="random-path,nurs:covnew")
-    if profile.extra_flag == "concretize_on_solver_timeout":
-        parser.add_argument("--concretize-on-solver-timeout", default="true")
+    if profile.extra_flag == "use_cv_model":
+        parser.add_argument("--use-cv-model", default="true")
     elif profile.extra_flag == "product_program_fallback":
         parser.add_argument("--product-program-fallback", action="store_true")
     parser.add_argument("--solver-backend", default="stp", choices=SOLVER_BACKENDS)
@@ -335,8 +335,8 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         context.log(f"config={args.config or '<all>'}")
         context.log(f"mod_exp_only={'true' if args.mod_exp_only else 'false'}")
         context.log(f"search_strategies={args.search}")
-        if profile.extra_flag == "concretize_on_solver_timeout":
-            context.log(f"concretize_on_solver_timeout={args.concretize_on_solver_timeout}")
+        if profile.extra_flag == "use_cv_model":
+            context.log(f"use_cv_model={args.use_cv_model}")
         elif profile.extra_flag == "product_program_fallback":
             context.log(
                 f"product_program_fallback={'true' if args.product_program_fallback else 'false'}"
@@ -644,8 +644,8 @@ def run_benchmark(
                     "--external-calls=all",
                     f"--solver-backend={args.solver_backend}",
                 ]
-                if local_profile.extra_flag == "concretize_on_solver_timeout":
-                    command.append(f"--concretize-on-solver-timeout={args.concretize_on_solver_timeout}")
+                if local_profile.extra_flag == "use_cv_model":
+                    command.append(f"--use-cv-model={args.use_cv_model}")
                 elif local_profile.extra_flag == "product_program_fallback":
                     command.append(
                         f"--product-program-fallback={'true' if args.product_program_fallback else 'false'}"

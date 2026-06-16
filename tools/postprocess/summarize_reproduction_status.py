@@ -23,6 +23,7 @@ from tools.postprocess.csv_to_latex_table import escape_latex
 from tools.postprocess.filter_merged_results import load_filters, location_matches
 from tools.postprocess.selection_helpers import (
     default_display_label,
+    default_plot_groups,
     load_selected_configurations,
 )
 from tools.shared.configuration_metadata import build_column_metadata, load_run_metadata
@@ -62,7 +63,7 @@ OUTPUT_COLUMNS = [
     "searcher",
     "sym_size",
     "public_mode",
-    "concretization_policy",
+    "cv_model",
     *STATUS_COLUMNS,
     "total_filtered_positives",
 ]
@@ -124,6 +125,34 @@ def _resolve_target_key(json_path: Path, case_metadata: Mapping[str, Any]) -> st
     if isinstance(explicit_target, str) and explicit_target.strip():
         return explicit_target.strip()
     return _target_key_by_result_stem().get(json_path.stem, "")
+
+
+def _target_library_key(library: str, target: str) -> str | None:
+    if not target:
+        return None
+    return f"{library}_{target}"
+
+
+def _library_lookup_candidates(
+    library: str,
+    target: str,
+    configured_libraries: set[str],
+) -> list[str]:
+    target_library = _target_library_key(library, target)
+    if target_library and target_library in configured_libraries:
+        return [target_library, library]
+    return [library]
+
+
+def _filter_lookup_candidates(
+    library: str,
+    target: str,
+    configured_libraries: set[str],
+) -> list[str]:
+    target_library = _target_library_key(library, target)
+    if target_library and target_library in configured_libraries:
+        return [target_library]
+    return [library]
 
 
 def _benchmark_label(library: str, target: str) -> str:
@@ -215,6 +244,7 @@ def _resolve_location(
     row: dict[str, Any],
     *,
     library_hint: str,
+    library_lookup_candidates: Sequence[str],
     sliced: bool,
     sliced_map: Mapping[tuple[str, str, int, int], tuple[str, int, int]] | None,
     keep_unmapped: bool,
@@ -261,7 +291,11 @@ def _resolve_location(
                 f"{json_path} data[{row_number}]: sliced rows require a concrete column for relabeling"
             )
 
-        target = sliced_map.get((library, filename, line, column))
+        target = None
+        for lookup_library in library_lookup_candidates:
+            target = sliced_map.get((lookup_library, filename, line, column))
+            if target is not None:
+                break
         if target is None:
             context = _location_context(
                 json_path=json_path,
@@ -317,6 +351,9 @@ def collect_reproduction_status_counts(
 
     filters = load_filters(filter_path)
     sliced_map = load_sliced_map(sliced_map_path) if sliced_map_path else None
+    configured_libraries = set(filters.libraries_with_filters)
+    if sliced_map is not None:
+        configured_libraries.update(key[0] for key in sliced_map)
 
     ordered_configurations: list[str] = []
     counts_by_configuration: dict[str, dict[str, int]] = {}
@@ -359,18 +396,32 @@ def collect_reproduction_status_counts(
             observed_library_targets_by_configuration[configuration].add(
                 (library_hint, target_key)
             )
+            library_lookup_candidates = _library_lookup_candidates(
+                library_hint,
+                target_key,
+                configured_libraries,
+            )
+            filter_lookup_candidates = _filter_lookup_candidates(
+                library_hint,
+                target_key,
+                filters.libraries_with_filters,
+            )
 
             for row_number, row in enumerate(rows, start=1):
                 library, filename, line, column, context = _resolve_location(
                     row,
                     library_hint=library_hint,
+                    library_lookup_candidates=library_lookup_candidates,
                     sliced=bool(case_metadata.get("sliced")),
                     sliced_map=sliced_map,
                     keep_unmapped=keep_unmapped,
                     json_path=entry,
                     row_number=row_number,
                 )
-                if not location_matches(filters, library=library, file=filename, line=line):
+                if not any(
+                    location_matches(filters, library=lookup_library, file=filename, line=line)
+                    for lookup_library in filter_lookup_candidates
+                ):
                     continue
 
                 library_counts = counts_by_configuration_and_library[configuration].setdefault(
@@ -419,7 +470,7 @@ def _build_summary_rows(
                 "searcher": metadata["searcher"],
                 "sym_size": metadata["sym_size"],
                 "public_mode": metadata["public_mode"],
-                "concretization_policy": metadata["concretization_policy"],
+                "cv_model": metadata["cv_model"],
                 **{status_name: counts[status_name] for status_name in STATUS_COLUMNS},
                 "total_filtered_positives": sum(counts.values()),
             }
@@ -490,14 +541,6 @@ def _load_selected_configurations(
             selected_row[status_name] = int(selected_row[status_name])
         selected_row["summary_row"] = dict(selected_row)
     return selected_rows
-
-
-def _default_plot_groups(*, comparison_tool: str, tool_family: str) -> str:
-    if comparison_tool == "klee_cf":
-        return "internal|external"
-    if comparison_tool.startswith("klee") or tool_family.startswith("klee"):
-        return "internal"
-    return "external"
 
 
 def _parse_positive_time(raw_value: Any) -> float | None:
@@ -599,7 +642,7 @@ def _automatic_selected_configurations(
             **summary_row,
             "source_column": source_column,
             "display_label": default_display_label(comparison_tool),
-            "plot_groups": _default_plot_groups(
+            "plot_groups": default_plot_groups(
                 comparison_tool=comparison_tool,
                 tool_family=tool_family,
             ),

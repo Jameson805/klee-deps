@@ -48,7 +48,7 @@ def main() -> int:
             "--use-batching-search=false",
             "--search=random-path",
             "--search=nurs:covnew",
-            "--concretize-on-solver-timeout=true",
+            "--use-cv-model=true",
             "--max-solver-time=30s",
             "--max-memory=10000",
             "benchmarks/mbedtls-3.2.1/test_mod.bc",
