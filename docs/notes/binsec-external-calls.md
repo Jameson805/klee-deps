@@ -150,6 +150,17 @@ Examples:
 - OpenSSL paths that appear to wander into atexit/destructor cleanup.
 - Libgcrypt/OpenSSL binaries that import `__cxa_atexit` and `__cxa_finalize`.
 
+The runner therefore provides a local BINSEC-only completion symbol:
+
+- `runner_binsec_halt`
+
+Generated BINSEC cfgs halt at that symbol before falling back to `exit@plt`.
+This keeps execution starting from `main`, so benchmark setup and fixed-public
+presets still run, but normal benchmark completion stops before libc `exit`
+and C runtime finalizer machinery can enter `.plt.got` `__cxa_finalize@plt`.
+Do not replace this with a direct `.plt.got` hook unless the initial-state
+resolution issue above has been re-tested.
+
 ## Case 3: Static Linking and glibc IFUNC
 
 This is the hardest case and the main reason we moved away from statically
@@ -180,7 +191,31 @@ executable”. It is:
 - libc kept dynamic
 - imported libc calls handled at the PLT boundary
 
-## Case 4: Startup and Teardown Machinery
+## Case 4: Loader-Initialized Library Function Pointers
+
+Some library code is linked into the benchmark, but still calls through global
+function pointers that are normally initialized by library startup or loader
+state. BINSEC loads the file image directly, so those slots can remain zero.
+
+One OpenSSL 1.1.1q example is:
+
+- `OPENSSL_cleanse`
+
+Its implementation can call through an internal cleanse/memset function pointer.
+During OpenSSL BIGNUM cleanup, BINSEC may therefore reach a `call *%rax` with
+`%rax == 0`, producing:
+
+```text
+Cut path ... (non executable) @ 0x000000
+```
+
+This is not a crypto branch and not the `.plt.got` `__cxa_finalize@plt` issue;
+it is cleanup code falling through an uninitialized indirect-call slot. The
+shared BINSEC prelude replaces `OPENSSL_cleanse` with a direct byte-zeroing stub.
+The config rewriter drops that replacement for binaries that do not contain the
+symbol, so it is safe to keep in the shared base cfg.
+
+## Case 5: Startup and Teardown Machinery
 
 Even when the binary shape is otherwise good, starting from `main` can still
 pull BINSEC into code that is not relevant to the benchmark.
@@ -198,8 +233,8 @@ Our runner change in:
 
 - `include/runner.h`
 
-uses `exit(driver_main())` for BINSEC mode so that normal benchmark completion
-stops at `exit@plt` rather than returning past `main` into synthetic teardown.
+halts at `runner_binsec_halt` for BINSEC mode so that normal benchmark completion
+stops before `exit@plt` rather than entering libc teardown.
 
 That helped, but it does not eliminate all cleanup-related side paths.
 
@@ -437,4 +472,4 @@ For new BINSEC-integrated benchmarks, prefer the following order:
 - `configs/benchmarks/openssl.toml`
 - `configs/benchmarks/libgcrypt.toml`
 - `include/runner.h`
-- `docs/runner-config.md`
+- `docs/architecture/runner-config.md`

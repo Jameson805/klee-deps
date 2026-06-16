@@ -5,8 +5,8 @@ counterexample diverges earlier at a different source location.
 
 The standalone reproducer is:
 
-- [example/toy_binsec_wrong_location.c](/dkucc/home/yl925/klee-deps/example/toy_binsec_wrong_location.c)
-- [example/toy_binsec_wrong_location_var_pub.cfg](/dkucc/home/yl925/klee-deps/example/toy_binsec_wrong_location_var_pub.cfg)
+- [examples/toy_binsec_wrong_location.c](../../examples/toy_binsec_wrong_location.c)
+- [examples/toy_binsec_wrong_location_var_pub.cfg](../../examples/toy_binsec_wrong_location_var_pub.cfg)
 
 ## Reproduction
 
@@ -16,35 +16,35 @@ From the repo root:
 source ./activate-workspace.sh
 
 clang -O0 -g -fno-omit-frame-pointer -no-pie \
-  example/toy_binsec_wrong_location.c \
-  -o example/toy_binsec_wrong_location
+  examples/toy_binsec_wrong_location.c \
+  -o examples/toy_binsec_wrong_location
 
 clang -O0 -g -fno-omit-frame-pointer -no-pie -DREPLAY \
-  example/toy_binsec_wrong_location.c \
-  -o example/toy_binsec_wrong_location_replay
+  examples/toy_binsec_wrong_location.c \
+  -o examples/toy_binsec_wrong_location_replay
 
 binsec -sse -checkct \
   -fml-solver z3 \
   -smt-solver z3 \
   -sse-timeout 60 \
   -sse-jump-enum 10 \
-  -sse-script example/toy_binsec_wrong_location_var_pub.cfg \
+  -sse-script examples/toy_binsec_wrong_location_var_pub.cfg \
   -sse-depth 1000000 \
   -sse-heuristics nurs \
   -checkct-features control-flow,memory-access \
   -checkct-stats-file /tmp/toy_binsec_wrong_location.toml \
-  example/toy_binsec_wrong_location \
+  examples/toy_binsec_wrong_location \
   2>&1 | tee /tmp/toy_binsec_wrong_location.log
 
 python -m tools.converters.binsec_toml_to_json \
   --toml /tmp/toy_binsec_wrong_location.toml \
   --output-log /tmp/toy_binsec_wrong_location.log \
-  --executable example/toy_binsec_wrong_location \
+  --executable examples/toy_binsec_wrong_location \
   --secret-input secret:4:secret_buf \
-  --replay-executable example/toy_binsec_wrong_location_replay \
+  --replay-executable examples/toy_binsec_wrong_location_replay \
   --reproduce \
   --out /tmp/toy_binsec_wrong_location.json \
-  --code-path example \
+  --code-path examples \
   --library unknown
 ```
 
@@ -58,8 +58,8 @@ Expected outcome:
 
 The source has two distinct statements:
 
-- [example/toy_binsec_wrong_location.c](/dkucc/home/yl925/klee-deps/example/toy_binsec_wrong_location.c#L99)
-- [example/toy_binsec_wrong_location.c](/dkucc/home/yl925/klee-deps/example/toy_binsec_wrong_location.c#L100)
+- [examples/toy_binsec_wrong_location.c](../../examples/toy_binsec_wrong_location.c#L99)
+- [examples/toy_binsec_wrong_location.c](../../examples/toy_binsec_wrong_location.c#L100)
 
 The corresponding load instructions are:
 

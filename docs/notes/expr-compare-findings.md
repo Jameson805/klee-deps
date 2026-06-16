@@ -10,7 +10,7 @@ The analysis in this document was built from three profiling layers on the same 
 2. Per-callsite scoped attribution around higher-level code paths.
 3. Callgrind instruction profiling for hotspot confirmation.
 
-The toy workload source is `example/toy_selfcomp_arc4_like.c` in the sibling `klee-deps` workspace.
+The toy workload source is `examples/toy_selfcomp_arc4_like.c` in this workspace.
 
 ### Build + Run Pattern
 
@@ -26,7 +26,7 @@ Representative command shape:
 ```bash
 cd /dkucc/home/yl925/klee-deps-self-comp-trace-overhead && source ./activate-workspace.sh
 OUT=/tmp/klee_selfcomp_profile_taggedX
-clang-16 /dkucc/home/yl925/klee-deps/example/toy_selfcomp_arc4_like.c -g -emit-llvm -O0 -Xclang -disable-O0-optnone -c -I klee-self-comp/include -o "$OUT/toy.bc"
+clang-16 /dkucc/home/yl925/klee-deps-new/examples/toy_selfcomp_arc4_like.c -g -emit-llvm -O0 -Xclang -disable-O0-optnone -c -I klee-self-comp/include -o "$OUT/toy.bc"
 timeout --foreground --signal=INT --kill-after=30s 10s build/klee-self-comp/bin/klee --output-dir="$OUT/klee-out" --kdalloc --kdalloc-constants-size=1 --kdalloc-globals-size=1 --kdalloc-heap-size=1 --kdalloc-stack-size=1 --write-no-tests --max-time=3900s "$OUT/toy.bc" >"$OUT/klee.log" 2>&1
 grep -nE '^KLEE: expr-compare profile|^KLEE:   |^KLEE:     ' "$OUT/klee.log"
 ```
@@ -38,7 +38,7 @@ Callgrind was used to verify that counter hotspots matched instruction-level hot
 ```bash
 cd /dkucc/home/yl925/klee-deps-self-comp-trace-overhead && source ./activate-workspace.sh
 OUT=/tmp/klee_selfcomp_callgrind
-clang-16 /dkucc/home/yl925/klee-deps/example/toy_selfcomp_arc4_like.c -g -emit-llvm -O0 -Xclang -disable-O0-optnone -c -I klee-self-comp/include -o "$OUT/toy.bc"
+clang-16 /dkucc/home/yl925/klee-deps-new/examples/toy_selfcomp_arc4_like.c -g -emit-llvm -O0 -Xclang -disable-O0-optnone -c -I klee-self-comp/include -o "$OUT/toy.bc"
 timeout --foreground --signal=INT --kill-after=30s 10s valgrind --tool=callgrind --trace-children=no --callgrind-out-file="$OUT/callgrind.out" build/klee-self-comp/bin/klee --output-dir="$OUT/klee-out" --kdalloc --kdalloc-constants-size=1 --kdalloc-globals-size=1 --kdalloc-heap-size=1 --kdalloc-stack-size=1 --write-no-tests --max-time=3900s "$OUT/toy.bc" >"$OUT/klee.log" 2>&1
 callgrind_annotate --auto=yes "$OUT/callgrind.out"
 ```
