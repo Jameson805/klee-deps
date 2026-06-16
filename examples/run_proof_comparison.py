@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run a focused BINSEC vs KLEE-CF proof comparison for one benchmark case.
 
-This helper lives under ``example/`` on purpose: it is a narrow, exploratory
+This helper lives under ``examples/`` on purpose: it is a narrow, exploratory
 workflow rather than part of the main experiment pipeline.
 
 What it does:
@@ -20,9 +20,9 @@ Common uses:
 Examples:
 
 - run one comparison and save artifacts under the default proof-runs directory
-  ``python example/run_proof_comparison.py --benchmark libg:default --target des --config fix_pub --trace-binsec``
+    ``python examples/run_proof_comparison.py --benchmark libg:default --target des --config fix_pub --trace-binsec``
 - inspect a previous run
-  ``python example/run_proof_comparison.py --summary /path/to/summary.json --diff-lines cipher/bn.c``
+    ``python examples/run_proof_comparison.py --summary /path/to/summary.json --diff-lines cipher/bn.c``
 """
 
 from __future__ import annotations
@@ -66,9 +66,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Run one benchmark proof comparison with BINSEC and KLEE-CF.",
         epilog=(
             "Examples:\n"
-            "  python example/run_proof_comparison.py --benchmark libg:default --target des --config fix_pub\n"
-            "  python example/run_proof_comparison.py --output-dir /tmp/proof --diff-lines src/foo.c\n"
-            "  python example/run_proof_comparison.py --summary /tmp/proof/summary.json --diff-lines src/foo.c"
+            "  python examples/run_proof_comparison.py --benchmark libg:default --target des --config fix_pub\n"
+            "  python examples/run_proof_comparison.py --output-dir /tmp/proof --diff-lines src/foo.c\n"
+            "  python examples/run_proof_comparison.py --summary /tmp/proof/summary.json --diff-lines src/foo.c"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

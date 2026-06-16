@@ -6,7 +6,7 @@
  * Usage:
  *   source ./activate-workspace.sh
  *   clang -I./klee-self-comp/include -O0 -g -emit-llvm -c \
- *     example/toy_aes_big_like_no_tables.c -o /tmp/toy_aes_big_like_no_tables.bc
+ *     examples/toy_aes_big_like_no_tables.c -o /tmp/toy_aes_big_like_no_tables.bc
  *   klee-self-comp --output-dir=/tmp/toy_aes_big_like_no_tables.out \
  *     --external-calls=all --kdalloc --kdalloc-constants-size=5 \
  *     --kdalloc-globals-size=5 --kdalloc-heap-size=20 \

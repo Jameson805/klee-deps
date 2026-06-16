@@ -7,7 +7,7 @@
  * the key shape that makes compare-heavy self-comp runs interesting.
  *
  * Companion helper:
- *   example/toy_selfcomp_arc4_like.profile.sh
+ *   examples/toy_selfcomp_arc4_like.profile.sh
  */
 
 #include "klee/klee.h"

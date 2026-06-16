@@ -9,7 +9,7 @@
  *   export LLVM_COMPILER=clang
  *   export LLVM_COMPILER_PATH=$(dirname "$(command -v clang-16)")
  *   wllvm -g -O2 -fno-pie -fno-plt -Wl,-no-pie \
- *     example/min_missing_dbg_shift_repro.c -o /tmp/min_missing_dbg_shift_repro
+ *     examples/min_missing_dbg_shift_repro.c -o /tmp/min_missing_dbg_shift_repro
  *   extract-bc /tmp/min_missing_dbg_shift_repro
  *   /dkucc/home/yl925/klee-deps/build/klee-cf/bin/klee --write-no-tests \
  *     /tmp/min_missing_dbg_shift_repro.bc

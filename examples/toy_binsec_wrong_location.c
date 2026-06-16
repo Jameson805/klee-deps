@@ -14,11 +14,11 @@
  * Build:
  *   source ./activate-workspace.sh
  *   clang -O0 -g -fno-omit-frame-pointer -no-pie \
- *     example/toy_binsec_wrong_location.c \
- *     -o example/toy_binsec_wrong_location
+ *     examples/toy_binsec_wrong_location.c \
+ *     -o examples/toy_binsec_wrong_location
  *   clang -O0 -g -fno-omit-frame-pointer -no-pie -DREPLAY \
- *     example/toy_binsec_wrong_location.c \
- *     -o example/toy_binsec_wrong_location_replay
+ *     examples/toy_binsec_wrong_location.c \
+ *     -o examples/toy_binsec_wrong_location_replay
  *
  * Run BINSEC and keep the raw log that contains [checkct:result] lines:
  *   source ./activate-workspace.sh
@@ -27,24 +27,24 @@
  *     -smt-solver z3 \
  *     -sse-timeout 60 \
  *     -sse-jump-enum 10 \
- *     -sse-script example/toy_binsec_wrong_location_var_pub.cfg \
+ *     -sse-script examples/toy_binsec_wrong_location_var_pub.cfg \
  *     -sse-depth 1000000 \
  *     -sse-heuristics nurs \
  *     -checkct-features control-flow,memory-access \
  *     -checkct-stats-file /tmp/toy_binsec_wrong_location.toml \
- *     example/toy_binsec_wrong_location \
+ *     examples/toy_binsec_wrong_location \
  *     2>&1 | tee /tmp/toy_binsec_wrong_location.log
  *
  * Convert and replay the BINSEC counterexamples:
  *   python -m tools.converters.binsec_toml_to_json \
  *     --toml /tmp/toy_binsec_wrong_location.toml \
  *     --output-log /tmp/toy_binsec_wrong_location.log \
- *     --executable example/toy_binsec_wrong_location \
+ *     --executable examples/toy_binsec_wrong_location \
  *     --secret-input secret:4:secret_buf \
- *     --replay-executable example/toy_binsec_wrong_location_replay \
+ *     --replay-executable examples/toy_binsec_wrong_location_replay \
  *     --reproduce \
  *     --out /tmp/toy_binsec_wrong_location.json \
- *     --code-path example \
+ *     --code-path examples \
  *     --library unknown
  *
  * What to look for:

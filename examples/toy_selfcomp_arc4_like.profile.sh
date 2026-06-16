@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Profiling helper for example/toy_selfcomp_arc4_like.c
+# Profiling helper for examples/toy_selfcomp_arc4_like.c
 #
 # This script captures:
 # 1) self-comp compare-profile counters
@@ -7,7 +7,7 @@
 # 3) optional self-comp callgrind hotspots
 #
 # Usage:
-#   ./example/toy_selfcomp_arc4_like.profile.sh
+#   ./examples/toy_selfcomp_arc4_like.profile.sh
 #
 # Optional env:
 #   OUT_BASE=/tmp/my_toy_profiles
@@ -15,8 +15,9 @@
 
 set -euo pipefail
 
-ROOT_SELFCOMP="/dkucc/home/yl925/klee-deps-self-comp-trace-overhead"
-TOY_SRC="/dkucc/home/yl925/klee-deps/example/toy_selfcomp_arc4_like.c"
+ROOT_SELFCOMP="${ROOT_SELFCOMP:-/dkucc/home/yl925/klee-deps-self-comp-trace-overhead}"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TOY_SRC="$REPO_ROOT/examples/toy_selfcomp_arc4_like.c"
 OUT_BASE="${OUT_BASE:-/tmp/toy_selfcomp_profiles}"
 DO_CALLGRIND="${DO_CALLGRIND:-1}"
 

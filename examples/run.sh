@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 cd "$(dirname "$0")"
-bin_path=$(realpath ../klee-controlflow/build/bin)
+bin_path=$(realpath ../build/klee-cf/bin)
 #bin_path=$(realpath ../klee-eager/build/bin)
 
 # set virtual memory limit to 70GB to prevent excessive memory usage
