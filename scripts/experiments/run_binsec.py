@@ -205,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sym-size", type=int, default=4)
     parser.add_argument("--jump-enum", type=int, default=10)
     parser.add_argument("--sse-depth", type=int, default=1_000_000_000_000)
+    parser.add_argument("--max-solver-time", default="30s")
     parser.add_argument("--fml-solver", default="z3")
     parser.add_argument("--smt-solver", default="z3")
     parser.add_argument(
@@ -230,6 +231,10 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         args.max_time_seconds = duration_to_seconds(args.max_time, "max_time")
+    except ValueError as error:
+        raise SystemExit(f"Error: {error}") from error
+    try:
+        args.max_solver_time_seconds = duration_to_seconds(args.max_solver_time, "max_solver_time")
     except ValueError as error:
         raise SystemExit(f"Error: {error}") from error
 
@@ -260,6 +265,8 @@ def main(argv: list[str] | None = None) -> int:
         context.log("Args:")
         context.log(f"max_time={args.max_time}")
         context.log(f"max_time_seconds={args.max_time_seconds}")
+        context.log(f"max_solver_time={args.max_solver_time}")
+        context.log(f"max_solver_time_seconds={args.max_solver_time_seconds}")
         context.log(f"sym_size={args.sym_size}")
         context.log(f"jump_enum={args.jump_enum}")
         context.log(f"sse_depth={args.sse_depth}")
@@ -474,8 +481,12 @@ def run_case(
             "-checkct",
             "-fml-solver",
             args.fml_solver,
+            "-fml-solver-timeout",
+            str(args.max_solver_time_seconds),
             "-smt-solver",
             args.smt_solver,
+            "-smt-timeout",
+            str(args.max_solver_time_seconds),
             "-sse-timeout",
             str(args.max_time_seconds),
             "-sse-jump-enum",

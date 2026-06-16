@@ -119,6 +119,12 @@ void runner_make_abacus_secret_inputs(void);
 
 int driver_main(void);
 
+#ifdef BINSEC
+__attribute__((noinline, used)) void runner_binsec_halt(int status) {
+    (void)status;
+}
+#endif
+
 RUNNER_MAIN_SIGNATURE {
 #ifdef REPLAY
     assert(RUNNER_EXPECTED_REPLAY_ARGC > 0 && "Generated replay argc must be positive");
@@ -154,7 +160,9 @@ RUNNER_MAIN_SIGNATURE {
 #endif
 
 #ifdef BINSEC
-    exit(driver_main());
+    int status = driver_main();
+    runner_binsec_halt(status);
+    exit(status);
 #else
     return driver_main();
 #endif

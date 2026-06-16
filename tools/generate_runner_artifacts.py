@@ -423,6 +423,7 @@ def _render_binsec_config(resolved: dict[str, object], base_path: str, mode_name
     if public_input_ids and mode_policy[mode_name]["public_symbolic"]:
         lines.append(f"public global {', '.join(public_input_ids)}")
     lines.append("")
+    lines.append("halt at <runner_binsec_halt>")
     lines.append("halt at <exit>")
     lines.append("explore all")
     lines.append("")

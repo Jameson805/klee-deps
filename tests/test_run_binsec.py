@@ -73,6 +73,7 @@ class RunBinsecTest(unittest.TestCase):
                     "fml_solver": "z3",
                     "smt_solver": "z3",
                     "max_time_seconds": 300,
+                    "max_solver_time_seconds": 30,
                     "jump_enum": 10,
                     "sse_depth": 100,
                     "sym_size": 4,
