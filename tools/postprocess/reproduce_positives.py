@@ -149,6 +149,21 @@ def parse_list(spec: str) -> list[str]:
     return [part.strip() for part in spec.split(",") if part and part.strip()]
 
 
+def _parse_input_value_int(raw_value: str, entry: str, value_name: str) -> int:
+    text = raw_value.strip()
+    try:
+        return int(text, 0)
+    except ValueError as exc:
+        set_digit_limit = getattr(sys, "set_int_max_str_digits", None)
+        if set_digit_limit is not None and "Exceeds the limit" in str(exc):
+            set_digit_limit(0)
+            try:
+                return int(text, 0)
+            except ValueError:
+                pass
+        raise ValueError(f"Invalid {value_name} value in specification '{entry}'") from exc
+
+
 def require_tools(tools: Sequence[str]) -> None:
     missing = [tool for tool in tools if shutil.which(tool) is None]
     if missing:
@@ -695,7 +710,11 @@ def parse_secret_input_spec(spec: str) -> dict[str, tuple[int, int, int]]:
         if "/" not in values_part:
             raise ValueError(f"Invalid secret specification '{entry}', expected name:bytes=orig/prime")
         orig_str, prime_str = values_part.split("/", 1)
-        result[name] = (size, int(orig_str, 0), int(prime_str, 0))
+        result[name] = (
+            size,
+            _parse_input_value_int(orig_str, entry, "original secret"),
+            _parse_input_value_int(prime_str, entry, "prime secret"),
+        )
 
     return result
 
@@ -722,7 +741,7 @@ def parse_public_input_spec(spec: str) -> dict[str, tuple[int, int]]:
             raise ValueError(f"Invalid byte size in public specification '{entry}'") from exc
         if size <= 0:
             raise ValueError(f"Byte size must be positive in public specification '{entry}'")
-        result[name] = (size, int(value_str, 0))
+        result[name] = (size, _parse_input_value_int(value_str, entry, "public"))
 
     return result
 
@@ -1023,6 +1042,7 @@ def mode_input_values(
     public_spec: str,
     timeout: int,
     debug: bool,
+    pin_root: str | None = None,
     expected_filename: str | None = None,
     expected_line: int | None = None,
     expected_column: int | None = None,
@@ -1038,7 +1058,7 @@ def mode_input_values(
         print(f"Error parsing inputs: {err}", file=sys.stderr)
         return 2
 
-    resolved_pin_root = resolve_pin_root()
+    resolved_pin_root = pin_root if pin_root is not None else resolve_pin_root()
     executable_path = os.path.abspath(executable)
 
     try:
