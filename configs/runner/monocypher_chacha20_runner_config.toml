@@ -1,0 +1,39 @@
+[[inputs]]
+id = "key_buf"
+name = "key"
+kind = "secret"
+size = "KEY_LEN"
+
+[[inputs]]
+id = "nonce_buf"
+name = "nonce"
+kind = "public"
+size = "NONCE_LEN"
+
+[[inputs]]
+id = "message_buf"
+name = "message"
+kind = "public"
+size = "MESSAGE_LEN"
+
+[mode_policy.var_pub]
+public_symbolic = true
+
+[mode_policy.fix_pub]
+public_symbolic = false
+
+[mode_policy.abacus]
+secret_inputs = ["key_buf"]
+public_fixed = true
+
+[presets.default.macros]
+KEY_LEN = 32
+NONCE_LEN = 8
+MESSAGE_LEN = 64
+
+[presets.default.vars]
+nonce_buf = 0
+message_buf = 0
+
+[presets.default.abacus_secrets]
+key_buf = 0

@@ -1,0 +1,34 @@
+[[inputs]]
+id = "password_buf"
+name = "password"
+kind = "secret"
+size = "PASSWORD_LEN"
+
+[[inputs]]
+id = "salt_buf"
+name = "salt"
+kind = "public"
+size = "SALT_LEN"
+
+[mode_policy.var_pub]
+public_symbolic = true
+
+[mode_policy.fix_pub]
+public_symbolic = false
+
+[mode_policy.abacus]
+secret_inputs = ["password_buf"]
+public_fixed = true
+
+[presets.default.macros]
+PASSWORD_LEN = 16
+SALT_LEN = 16
+HASH_LEN = 32
+ARGON2_BLOCKS = 8
+ARGON2_ITERATIONS = 1
+
+[presets.default.vars]
+salt_buf = 0
+
+[presets.default.abacus_secrets]
+password_buf = 0
