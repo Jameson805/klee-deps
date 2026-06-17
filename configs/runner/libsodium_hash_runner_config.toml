@@ -1,0 +1,23 @@
+[[inputs]]
+id = "message_buf"
+name = "message"
+kind = "secret"
+size = "MESSAGE_LEN"
+
+[mode_policy.var_pub]
+public_symbolic = true
+
+[mode_policy.fix_pub]
+public_symbolic = false
+
+[mode_policy.abacus]
+secret_inputs = ["message_buf"]
+public_fixed = true
+
+[presets.default.macros]
+MESSAGE_LEN = 256
+
+[presets.default.vars]
+
+[presets.default.abacus_secrets]
+message_buf = 0
