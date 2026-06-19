@@ -3,14 +3,12 @@ id = "dp_buf"
 name = "dp"
 kind = "secret"
 size = "SYM_SIZE"
-constraints = ["top_bit_set"]
 
 [[inputs]]
 id = "dq_buf"
 name = "dq"
 kind = "secret"
 size = "SYM_SIZE"
-constraints = ["top_bit_set"]
 
 [[inputs]]
 id = "ciphertext_buf"

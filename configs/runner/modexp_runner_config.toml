@@ -15,7 +15,6 @@ id = "mod_buf"
 name = "mod"
 kind = "public"
 size = "SYM_SIZE"
-constraints = ["top_bit_set", "odd"]
 
 [mode_policy.var_pub]
 public_symbolic = true

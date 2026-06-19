@@ -33,6 +33,8 @@ The runner artifact generator is `tools/generate_runner_artifacts.py`.
 
 For BINSEC, the checked-in shared prelude lives in `configs/binsec/binsec_base.cfg`. The generator concatenates that shared base with mode-specific declarations derived from `inputs` and `mode_policy`, then appends the common BINSEC trailer. The old checked-in `binsec_fix_pub.cfg` and `binsec_var_pub.cfg` files are gone; builds now rely on benchmark-local generated cfg outputs only.
 
+Runner input constraints are intentionally not used by current benchmark configs. The generator still validates and can emit KLEE assumptions for the supported constraint names, but BINSEC cfg generation does not currently mirror those assumptions. Leaving constraints out of active configs avoids accidental tool-to-tool domain mismatches.
+
 This means the compiler command line should not redefine preset-owned macros such as `SYM_SIZE`.
 
 ## Top-Level Fields
@@ -46,7 +48,8 @@ This means the compiler command line should not redefine preset-owned macros suc
   - `kind`: `"secret"` or `"public"`
   - `size`: integer byte length or a macro name defined by the selected preset
 - `id` and `name` are both required and must be unique within the config.
-- Optional `constraints` currently supports:
+- Optional `constraints` remains available for future benchmark models, but the current benchmark configs do not use it. Keeping benchmark inputs unconstrained makes it easier to compare KLEE-CF, KLEE-Eager, KLEE self-composition, BINSEC, and ABACUS over the same input domain.
+- Supported constraint names are:
   - `top_bit_set`
   - `odd`
 
@@ -153,7 +156,6 @@ id = "mod_buf"
 name = "mod"
 kind = "public"
 size = "SYM_SIZE"
-constraints = ["top_bit_set", "odd"]
 
 [mode_policy.var_pub]
 public_symbolic = true

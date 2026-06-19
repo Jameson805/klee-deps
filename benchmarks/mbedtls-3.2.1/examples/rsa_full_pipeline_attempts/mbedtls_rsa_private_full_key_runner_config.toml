@@ -3,49 +3,42 @@ id = "n_buf"
 name = "n"
 kind = "secret"
 size = "SYM_SIZE"
-constraints = ["top_bit_set"]
 
 [[inputs]]
 id = "p_buf"
 name = "p"
 kind = "secret"
 size = "SYM_SIZE"
-constraints = ["top_bit_set"]
 
 [[inputs]]
 id = "q_buf"
 name = "q"
 kind = "secret"
 size = "SYM_SIZE"
-constraints = ["top_bit_set"]
 
 [[inputs]]
 id = "d_buf"
 name = "d"
 kind = "secret"
 size = "SYM_SIZE"
-constraints = ["top_bit_set"]
 
 [[inputs]]
 id = "dp_buf"
 name = "dp"
 kind = "secret"
 size = "SYM_SIZE"
-constraints = ["top_bit_set"]
 
 [[inputs]]
 id = "dq_buf"
 name = "dq"
 kind = "secret"
 size = "SYM_SIZE"
-constraints = ["top_bit_set"]
 
 [[inputs]]
 id = "qp_buf"
 name = "qp"
 kind = "secret"
 size = "SYM_SIZE"
-constraints = ["top_bit_set"]
 
 [[inputs]]
 id = "ciphertext_buf"
