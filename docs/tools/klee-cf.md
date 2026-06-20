@@ -42,6 +42,8 @@ The executor keeps a `prime` map from the original secret array name to the prim
 
 The user-facing input API is `klee_make_symbolic_sc`. It behaves like `klee_make_symbolic`, but the final `is_secret` argument controls whether the array participates in relational renaming.
 
+Runner configs can still describe input constraints such as `top_bit_set` and `odd`, and the artifact generator keeps support for turning them into KLEE assumptions. Current benchmark configs do not use those constraints because the matching BINSEC cfg assumptions are not generated yet. Keeping them inactive preserves a single input domain when comparing KLEE-CF against the other tools.
+
 ## Recursive Secret Renaming
 
 The current `Executor::renameSecret` is the critical implementation point. It transforms an expression into the expression for the primed execution and returns whether any secret-dependent component changed.
@@ -73,7 +75,7 @@ When a witness is found, KLEE-CF writes assignments for public arrays, original 
 
 The current KLEE-CF implementation also includes a concrete-model path controlled by `--use-cv-model`. This is documented in more detail in `../notes/klee-cf-candidate-models.md`.
 
-Each live `ExecutionState` carries a `concreteModel` assignment that must satisfy the state's current constraints. After constraints change, KLEE-CF repairs the model with deterministic candidate assignments or falls back to solver-generated initial values. If the model cannot be repaired, the state stops rather than continuing with stale model data.
+Each live `ExecutionState` carries a `concreteModel` assignment that must satisfy the state's current constraints. After constraints change, KLEE-CF repairs the model with deterministic candidate assignments or falls back to solver-generated initial values. If the model cannot be repaired, KLEE-CF terminates that state with an execution error rather than continuing with stale model data.
 
 For non-CT checks, the concrete-model path uses an escalation ladder:
 
@@ -81,7 +83,7 @@ For non-CT checks, the concrete-model path uses an escalation ladder:
 2. keep current public inputs fixed, then search both original and primed secrets;
 3. leave public inputs symbolic too, then search or solve for public, original secret, and primed secret values.
 
-At each level, KLEE-CF tries explicit concrete candidates before the corresponding solver query. The fixed candidates include zero bytes, one-byte `1`, all `0xff`, `0x55`, `0xaa`, and deterministic pseudo-random assignments controlled by `--cv-model-random-candidates`.
+At each level, KLEE-CF tries explicit concrete candidates before the corresponding solver query. The candidate order is the current state model, then fixed one-byte `1`, then all `0xff`, then deterministic pseudo-random whole-state assignments controlled by `--cv-model-random-candidates`. The current default is `1` deterministic pseudo-random whole-state candidate.
 
 The optimization is a witness-finding shortcut, not a replacement for relational solving. If the cheap candidates fail, KLEE-CF falls back to the solver for the same stage.
 
@@ -122,7 +124,7 @@ That shared implementation handles:
 
 - benchmark-local workspace isolation
 - bitcode selection
-- common KLEE flags such as libc mode, kdalloc settings, solver backend, searchers, and output capture
+- common KLEE flags such as libc mode, kdalloc settings, solver backend, searchers, batching, istats write intervals, and output capture
 - conversion through `tools.converters.klee_log_to_json`
 - replay of positives after conversion
 
@@ -131,6 +133,12 @@ KLEE-CF's mode-specific runner flag is `--use-cv-model`.
 ## Important Option Surface
 
 - `--use-cv-model=true|false`: enable or disable the concrete-model optimization path
+- `--cv-model-random-candidates=N`: number of deterministic pseudo-random whole-state candidates tried after the current-model probe and the fixed `1` and `-1` assignments; default `1`
+- `--use-batching-search=true|false`: enable or disable KLEE batching in the shared runner; default `true`
+- `--batch-instructions=N`: batching instruction budget used when batching is enabled; default `1000`
+- `--batch-time=T`: batching time budget used when batching is enabled; default `0s`, which leaves the instruction budget as the active batching limit
+- `--optimize-concrete-object-state-reads=true|false`: enable or disable the direct read path for fully concrete `ObjectState` byte ranges; default `true`
+- `--istats-write-interval=T`: control how often KLEE writes `run.istats`; default `0s`, which keeps only the shutdown write
 - `--solver-backend=...`: choose the KLEE solver backend
 - `--search=...`: set one or more KLEE search strategies
 - `--loop-max-iterations=...`: control loop-limiter preprocessing when configured by the benchmark
@@ -143,6 +151,7 @@ The main implementation anchors are:
 
 - `klee-cf/lib/Core/Executor.cpp`: symbolic input creation, `renameSecret`, relational witness checks, concrete-model repair, and fork handling;
 - `klee-cf/lib/Core/Executor.h`: the prime map and rename caches;
+- `klee-cf/lib/Core/Memory.cpp`: the concrete `ObjectState::read` fast path controlled by `--optimize-concrete-object-state-reads`;
 - `../notes/klee-cf-candidate-models.md`: concrete-model and chosen-value details.
 
 These implementation files define the exact recursion, cache behavior, and witness-search order documented above.

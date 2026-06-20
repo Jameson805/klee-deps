@@ -261,8 +261,20 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     parser.add_argument("--sym-size", type=int, default=4)
     parser.add_argument("--loop-max-iterations", type=int, default=10)
     parser.add_argument("--max-solver-time", default="30s")
+    parser.add_argument(
+        "--istats-write-interval",
+        default="0s",
+        help="Approximate time between KLEE run.istats writes; 0s keeps only the final shutdown write",
+    )
     parser.add_argument("--kill-after", default="1800s")
     parser.add_argument("--max-memory", type=int, default=10000)
+    parser.add_argument("--use-batching-search", default="true", choices=("true", "false"))
+    parser.add_argument("--batch-instructions", type=int, default=1000)
+    parser.add_argument(
+        "--batch-time",
+        default="0s",
+        help="BatchingSearcher time budget; 0s leaves --batch-instructions as the active batching limit",
+    )
     parser.add_argument("--config", help="Run only KLEE cases whose config id matches this value")
     parser.add_argument("--mod-exp-only", action="store_true")
     parser.add_argument("--search", default="random-path,nurs:covnew")
@@ -272,6 +284,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         parser.add_argument("--product-program-fallback", action="store_true")
     parser.add_argument("--solver-backend", default="stp", choices=SOLVER_BACKENDS)
     parser.add_argument("--optimize-array", default="false", choices=OPTIMIZE_ARRAY_VALUES)
+    parser.add_argument("--optimize-concrete-object-state-reads", default="true", choices=("true", "false"))
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -305,6 +318,10 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         raise SystemExit(f"Error: sym_size must be a non-negative integer (got '{args.sym_size}')")
     if args.max_memory < 0:
         raise SystemExit(f"Error: max_memory must be a non-negative integer (got '{args.max_memory}')")
+    if args.batch_instructions < 0:
+        raise SystemExit(
+            f"Error: batch_instructions must be a non-negative integer (got '{args.batch_instructions}')"
+        )
     if args.max_parallel_cases is not None and args.max_parallel_cases <= 0:
         raise SystemExit("Error: max_parallel_cases must be a positive integer when set")
 
@@ -330,8 +347,12 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         context.log(f"sym_size={args.sym_size}")
         context.log(f"loop_max_iterations={args.loop_max_iterations}")
         context.log(f"max_solver_time={args.max_solver_time}")
+        context.log(f"istats_write_interval={args.istats_write_interval}")
         context.log(f"kill_after={args.kill_after}")
         context.log(f"max_memory={args.max_memory}")
+        context.log(f"use_batching_search={args.use_batching_search}")
+        context.log(f"batch_instructions={args.batch_instructions}")
+        context.log(f"batch_time={args.batch_time}")
         context.log(f"config={args.config or '<all>'}")
         context.log(f"mod_exp_only={'true' if args.mod_exp_only else 'false'}")
         context.log(f"search_strategies={args.search}")
@@ -343,6 +364,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
             )
         context.log(f"solver_backend={args.solver_backend}")
         context.log(f"optimize_array={args.optimize_array}")
+        context.log(f"optimize_concrete_object_state_reads={args.optimize_concrete_object_state_reads}")
         context.log(f"verbose={'true' if args.verbose else 'false'}")
         context.log(f"tmp_dir={Path(args.tmp_dir).expanduser().resolve()}")
         context.log(f"results_dir={results_dir}")
@@ -658,10 +680,20 @@ def run_benchmark(
                         "--kdalloc-heap-size=20",
                         "--kdalloc-stack-size=10",
                         "--dump-states-on-halt=false",
-                        "--use-batching-search=false",
+                        f"--use-batching-search={args.use_batching_search}",
+                        *(
+                            [
+                                f"--batch-instructions={args.batch_instructions}",
+                                f"--batch-time={args.batch_time}",
+                            ]
+                            if args.use_batching_search == "true"
+                            else []
+                        ),
                         *[f"--search={item}" for item in args.search.split(",") if item],
                         *([] if args.optimize_array == "false" else [f"--optimize-array={args.optimize_array}"]),
+                        f"--optimize-concrete-object-state-reads={args.optimize_concrete_object_state_reads}",
                         f"--max-solver-time={args.max_solver_time}",
+                        f"--istats-write-interval={args.istats_write_interval}",
                         f"--max-memory={args.max_memory}",
                         "--emit-all-errors=true",
                         str(bitcode_path),

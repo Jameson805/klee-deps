@@ -2,17 +2,17 @@
 num_copies = 1
 max_parallel_workers = 96
 temp_dir = "/scratch/$USER/$SLURM_JOB_ID"
-output = "/dkucc/home/yl925/klee-deps-new/klee-results/20260613_mbedtls_rsa_decrypt_only"
+output = "/dkucc/home/yl925/klee-results/20260618_rsa_decrypt"
 run_time = "2h"
 sliced_map_csv = "configs/postprocess/sliced_map.csv"
 filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-all = ["mbedtls:rsa_decrypt_only", "openssl:rsa_stages"]
-klee_cf = ["mbedtls:rsa_decrypt_only", "openssl:rsa_stages"]
-klee_eager = ["mbedtls:rsa_decrypt_only", "openssl:rsa_stages"]
-binsec = ["mbedtls:rsa_decrypt_only", "openssl:rsa_stages"]
+all = ["bearssl:rsa_stages", "libgcrypt:rsa_stages", "mbedtls:rsa_decrypt_only", "mbedtls:rsa_stages", "openssl:rsa_stages"]
+klee_cf = ["bearssl:rsa_stages", "libgcrypt:rsa_stages", "mbedtls:rsa_decrypt_only", "mbedtls:rsa_stages", "openssl:rsa_stages"]
+klee_eager = ["bearssl:rsa_stages", "libgcrypt:rsa_stages", "mbedtls:rsa_decrypt_only", "mbedtls:rsa_stages", "openssl:rsa_stages"]
+binsec = ["bearssl:rsa_stages", "libgcrypt:rsa_stages", "mbedtls:rsa_decrypt_only", "mbedtls:rsa_stages", "openssl:rsa_stages"]
 
 [runs]
 klee_cf_default_4 = true

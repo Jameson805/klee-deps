@@ -21,17 +21,16 @@ Two simpler experiments were useful negative controls. A direct symbolic divisio
 
 Each `ExecutionState` now carries an `Assignment concreteModel`. New symbolic arrays are initialized to zero bytes in the model, and secret arrays also initialize zero-valued prime-secret bindings because KLEE-CF stores renamed CT path constraints in the same state constraint set. The model is copied with the state. After path constraints are added, KLEE-CF tries to repair the model with deterministic candidate assignments and then with `getInitialValues`.
 
-When `--use-cv-model=true`, the implementation treats this as an invariant: every live state must have a concrete model that satisfies its current path constraints, including renamed prime-secret path constraints. If KLEE-CF adds a constraint and cannot repair the model, it stops with an error instead of continuing with a stale model. Fork-time model checks can therefore use the model directly rather than revalidating it before every use.
+When `--use-cv-model=true`, the implementation treats this as an invariant: every live state must have a concrete model that satisfies its current path constraints, including renamed prime-secret path constraints. If KLEE-CF adds a constraint and cannot repair the model, it terminates that state with an execution error instead of continuing with a stale model. Fork-time model checks can therefore use the model directly rather than revalidating it before every use.
 
 The candidate set is explicit in the implementation. For code paths that enable candidate search, KLEE-CF tries candidates in this order:
 
 - the state's current concrete model;
-- scalar `0`, encoded as all-zero object bytes;
 - scalar `1`, encoded as little-endian object bytes `{0x01, 0x00, ...}`;
 - scalar `-1`, encoded as all-`0xff` object bytes;
-- a whole-state byte pattern of `0x55`;
-- a whole-state byte pattern of `0xaa`;
-- `--cv-model-random-candidates=N` deterministic pseudo-random whole-state assignments, defaulting to 10.
+- `--cv-model-random-candidates=N` deterministic pseudo-random whole-state assignments, defaulting to 1.
+
+The current tuned default keeps the fixed set intentionally small. Broader fixed patterns such as all-zero or alternating `0x55` and `0xaa` whole-state fills were removed because they did not justify their per-query cost on the RSA CT workload.
 
 For CT checking, `--use-cv-model` starts with the fixed current public/current secret1 fallback level. At that level it first tries chosen alternate secret2 values for the renamed side, then asks the solver for secret2 if the candidates fail. If both expressions become constants and differ, KLEE-CF reports the non-CT issue immediately.
 
@@ -63,7 +62,7 @@ This single option controls the whole concrete-model optimization and defaults t
 
 `--cv-model-random-candidates=N`
 
-This option controls how many deterministic pseudo-random assignments are tried after the fixed candidate values. It defaults to `10`. Setting it to `0` keeps only the fixed `0`, `1`, `-1`, `0x55`, and `0xaa` candidates.
+This option controls how many deterministic pseudo-random assignments are tried after the fixed candidate values. It defaults to `1`. Setting it to `0` keeps only the current-model probe plus the fixed `1` and `-1` candidates.
 
 After a new constraint is added, KLEE-CF checks whether the existing `concreteModel` still satisfies the state's path constraints. If not, it tries to repair that model first with the explicit candidate list above and then, only if those candidates fail, with `solver->getInitialValues(...)`.
 
@@ -73,7 +72,7 @@ This is a witness-finding optimization, not a proof optimization. If no concrete
 
 For forks outside seed and replay modes, the option changes normal `fork()` handling. KLEE-CF first evaluates the branch under the current concrete model. It then tries the explicit candidate list for the opposite branch value before falling back to a solver query for that opposite side. If both sides have models, KLEE-CF creates both states. If only the current-model side is feasible or the opposite-side solver request fails, KLEE-CF continues that side and records the other side as deferred.
 
-Each local candidate probe uses the same fixed order: scalar `0`, scalar `1`, scalar `-1`, `0x55`, `0xaa`, then the configured deterministic pseudo-random assignments. Fork handling additionally tries the current model before that explicit candidate list because it needs a concrete branch side to continue.
+Each local candidate probe uses the same fixed order: current model, scalar `1`, scalar `-1`, then the configured deterministic pseudo-random assignments. Fork handling uses that same ordering and relies on the current-model probe to pick the first concrete branch side.
 
 The optimization is enabled by default:
 
@@ -114,6 +113,8 @@ This is an existing upstream KLEE stat. It counts any case where KLEE chose not 
 ## Validation result
 
 The latest focused validation was run on 2026-06-14. Raw commands and logs are under `results/cv-model-validation-20260614/`. KLEE-CF used `--solver-backend=stp`, `--max-solver-time=1s`, DFS search, and a 20 second outer timeout. BINSEC used `-fml-solver z3`, `-smt-solver z3`, one second formula/SMT timeouts, `-sse-timeout 20`, `-sse-heuristics nurs`, and `-checkct-no-cv` for the CV-off runs. The BINSEC configs replace `klee_make_symbolic_sc` and mark the passed memory range as secret, so both global and stack-local toy inputs are handled consistently.
+
+This validation predates the current default of `--cv-model-random-candidates=1`. Read the matrix as confirmation of the control-flow and witness-search behavior, not as a tuned performance baseline for the current default candidate count.
 
 | Example | Tool/options | First non-CT report | Final status | Notes |
 | --- | --- | ---: | --- | --- |
