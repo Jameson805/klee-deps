@@ -138,6 +138,45 @@ The OpenSSL RSA benchmark set mirrors the same split:
 2. Internal private-primitive target through `rsa->meth->rsa_mod_exp`.
 3. Full EVP-facing decrypt targets.
 
+### Libgcrypt 1.10.1
+
+Libgcrypt now follows the same three-stage model in the repository descriptor
+layer, with one deliberate difference from the long-term ideal split.
+
+1. Full decrypt API target.
+   - Use the public RSA decrypt entrypoint `gcry_pk_decrypt` (or its internal
+     helper `_gcry_pk_decrypt`) as the top-level benchmark target.
+   - This matches the public API layer in the other libraries and captures
+     padding-choice and decoding dispatch.
+
+2. Internal private-primitive target.
+    - A direct `secret_core_crt` benchmark remains the natural private-core
+       analogue and is still the clearest next extension if a Libgcrypt-only CRT
+       comparison becomes necessary.
+    - The current repository implementation does not add that extra target.
+       Instead, it covers Libgcrypt through `gcry_pk_decrypt` modes plus the
+       internal padding helpers.
+    - This keeps the current Libgcrypt selector smaller while still exposing
+       the public decrypt path and the unpadding helpers that match the other
+       libraries.
+
+3. Padding-only targets.
+   - Use `_gcry_rsa_pkcs1_decode_for_enc` and
+     `_gcry_rsa_oaep_decode` as the two unpadding benchmark targets.
+   - These are the libgcrypt equivalents of the PKCS#1 v1.5 and OAEP padding
+     helpers used in the other libraries.
+
+The current Libgcrypt benchmark set therefore mirrors the same overall layering
+as mbedTLS and OpenSSL, with the private arithmetic observed through the public
+decrypt path rather than a separate CRT-only target:
+
+1. A padding-only benchmark for PKCS#1 v1.5 and OAEP decoding.
+2. A full public decrypt benchmark through the libgcrypt RSA decrypt API.
+
+This keeps the Libgcrypt measurement split aligned with the rest of the RSA
+benchmark family while accounting for its built-in blinding behavior and the
+current repository scope.
+
 ## Simplifications Used In Benchmarks
 
 The RSA benchmarks intentionally simplify several aspects of the production

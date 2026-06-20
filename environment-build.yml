@@ -28,6 +28,7 @@ dependencies:
   - clangxx=16
   - libcxx
   - libcxxabi
+  - sympy
   - pip
   - pip:
       - lit

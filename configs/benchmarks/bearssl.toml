@@ -15,6 +15,14 @@ preset = "default"
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
 
+[benchmarks.runner_profiles.rsa_private]
+config = "configs/runner/bearssl_rsa_private_runner_config.toml"
+preset = "size_{sym_size}"
+
+[benchmarks.runner_profiles.rsa_padding]
+config = "configs/runner/bearssl_rsa_padding_runner_config.toml"
+preset = "size_{sym_size}"
+
 [benchmarks.build]
 preset = "default"
 common_flags = ["-g", "-O0"]
@@ -114,6 +122,137 @@ runner_profile = "default"
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+use_public_inputs = true
+
+[benchmarks.variants.rsa_stages.tool_defaults.klee]
+code_path = "benchmarks/bearssl/bearssl-0.6/src/rsa"
+extra_args = ["--ctchecker-prefix", "rsa"]
+
+[benchmarks.variants.rsa_stages.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "bearssl-0.6/inc", "bearssl-0.6/src"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_i31_private"
+runner_profile = "rsa_private"
+build_sources = [
+	"rsa_private_wrapper.c",
+	"bearssl-0.6/src/rsa/rsa_i31_priv.c",
+	"bearssl-0.6/src/int/i31_add.c",
+	"bearssl-0.6/src/int/i31_bitlen.c",
+	"bearssl-0.6/src/int/i31_decode.c",
+	"bearssl-0.6/src/int/i31_decred.c",
+	"bearssl-0.6/src/int/i31_encode.c",
+	"bearssl-0.6/src/int/i31_fmont.c",
+	"bearssl-0.6/src/int/i31_modpow2.c",
+	"bearssl-0.6/src/int/i31_montmul.c",
+	"bearssl-0.6/src/int/i31_mulacc.c",
+	"bearssl-0.6/src/int/i31_muladd.c",
+	"bearssl-0.6/src/int/i31_ninv31.c",
+	"bearssl-0.6/src/int/i31_reduce.c",
+	"bearssl-0.6/src/int/i31_rshift.c",
+	"bearssl-0.6/src/int/i31_sub.c",
+	"bearssl-0.6/src/int/i31_tmont.c",
+	"bearssl-0.6/src/codec/dec32be.c",
+	"bearssl-0.6/src/codec/enc32be.c",
+	"bearssl-0.6/src/codec/ccopy.c",
+	"bearssl-0.6/src/int/i32_div32.c",
+]
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_i31_oaep_decrypt"
+runner_profile = "rsa_private"
+build_sources = [
+	"rsa_oaep_decrypt_wrapper.c",
+	"bearssl-0.6/src/rsa/rsa_i31_oaep_decrypt.c",
+	"bearssl-0.6/src/rsa/rsa_i31_priv.c",
+	"bearssl-0.6/src/rsa/rsa_oaep_unpad.c",
+	"bearssl-0.6/src/hash/mgf1.c",
+	"bearssl-0.6/src/hash/sha1.c",
+	"bearssl-0.6/src/int/i31_add.c",
+	"bearssl-0.6/src/int/i31_bitlen.c",
+	"bearssl-0.6/src/int/i31_decode.c",
+	"bearssl-0.6/src/int/i31_decred.c",
+	"bearssl-0.6/src/int/i31_encode.c",
+	"bearssl-0.6/src/int/i31_fmont.c",
+	"bearssl-0.6/src/int/i31_modpow2.c",
+	"bearssl-0.6/src/int/i31_montmul.c",
+	"bearssl-0.6/src/int/i31_mulacc.c",
+	"bearssl-0.6/src/int/i31_muladd.c",
+	"bearssl-0.6/src/int/i31_ninv31.c",
+	"bearssl-0.6/src/int/i31_reduce.c",
+	"bearssl-0.6/src/int/i31_rshift.c",
+	"bearssl-0.6/src/int/i31_sub.c",
+	"bearssl-0.6/src/int/i31_tmont.c",
+	"bearssl-0.6/src/codec/dec32be.c",
+	"bearssl-0.6/src/codec/enc32be.c",
+	"bearssl-0.6/src/codec/ccopy.c",
+	"bearssl-0.6/src/int/i32_div32.c",
+]
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_ssl_decrypt"
+runner_profile = "rsa_private"
+build_sources = [
+	"rsa_ssl_decrypt_wrapper.c",
+	"bearssl-0.6/src/rsa/rsa_ssl_decrypt.c",
+	"bearssl-0.6/src/rsa/rsa_i31_priv.c",
+	"bearssl-0.6/src/int/i31_add.c",
+	"bearssl-0.6/src/int/i31_bitlen.c",
+	"bearssl-0.6/src/int/i31_decode.c",
+	"bearssl-0.6/src/int/i31_decred.c",
+	"bearssl-0.6/src/int/i31_encode.c",
+	"bearssl-0.6/src/int/i31_fmont.c",
+	"bearssl-0.6/src/int/i31_modpow2.c",
+	"bearssl-0.6/src/int/i31_montmul.c",
+	"bearssl-0.6/src/int/i31_mulacc.c",
+	"bearssl-0.6/src/int/i31_muladd.c",
+	"bearssl-0.6/src/int/i31_ninv31.c",
+	"bearssl-0.6/src/int/i31_reduce.c",
+	"bearssl-0.6/src/int/i31_rshift.c",
+	"bearssl-0.6/src/int/i31_sub.c",
+	"bearssl-0.6/src/int/i31_tmont.c",
+	"bearssl-0.6/src/codec/dec32be.c",
+	"bearssl-0.6/src/codec/enc32be.c",
+	"bearssl-0.6/src/codec/ccopy.c",
+	"bearssl-0.6/src/int/i32_div32.c",
+]
+secret_layout = "dp:{sym_size},dq:{sym_size}"
+secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_oaep_unpad"
+runner_profile = "rsa_padding"
+build_sources = [
+	"rsa_oaep_unpad_wrapper.c",
+	"bearssl-0.6/src/rsa/rsa_oaep_unpad.c",
+	"bearssl-0.6/src/hash/mgf1.c",
+	"bearssl-0.6/src/hash/sha1.c",
+	"bearssl-0.6/src/codec/dec32be.c",
+	"bearssl-0.6/src/codec/enc32be.c",
+]
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+
+[[benchmarks.variants.rsa_stages.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.rsa_stages.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
 use_public_inputs = true
 
 [[benchmarks.targets]]

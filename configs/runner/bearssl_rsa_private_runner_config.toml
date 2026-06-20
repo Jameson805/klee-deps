@@ -1,0 +1,93 @@
+[[inputs]]
+id = "dp_buf"
+name = "dp"
+kind = "secret"
+size = "SYM_SIZE"
+
+[[inputs]]
+id = "dq_buf"
+name = "dq"
+kind = "secret"
+size = "SYM_SIZE"
+
+[[inputs]]
+id = "ciphertext_buf"
+name = "ciphertext"
+kind = "public"
+size = "RSA_KEY_SIZE"
+
+[mode_policy.var_pub]
+public_symbolic = true
+
+[mode_policy.fix_pub]
+public_symbolic = false
+
+[mode_policy.abacus]
+secret_inputs = ["dp_buf", "dq_buf"]
+public_fixed = true
+
+[presets.size_1.macros]
+SYM_SIZE = 1
+RSA_KEY_SIZE = 128
+
+[presets.size_1.vars]
+ciphertext_buf = 0
+
+[presets.size_1.abacus_secrets]
+dp_buf = 0xf1
+dq_buf = 0xef
+
+[presets.size_2.macros]
+SYM_SIZE = 2
+RSA_KEY_SIZE = 128
+
+[presets.size_2.vars]
+ciphertext_buf = 0
+
+[presets.size_2.abacus_secrets]
+dp_buf = 0xffef
+dq_buf = 0xffe1
+
+[presets.size_4.macros]
+SYM_SIZE = 4
+RSA_KEY_SIZE = 128
+
+[presets.size_4.vars]
+ciphertext_buf = 0
+
+[presets.size_4.abacus_secrets]
+dp_buf = 0xffffffef
+dq_buf = 0xffffffe1
+
+[presets.size_6.macros]
+SYM_SIZE = 6
+RSA_KEY_SIZE = 128
+
+[presets.size_6.vars]
+ciphertext_buf = 0
+
+[presets.size_6.abacus_secrets]
+dp_buf = [0xff, 0xff, 0xff, 0xff, 0xff, 0xef]
+dq_buf = [0xff, 0xff, 0xff, 0xff, 0xff, 0xe1]
+
+[presets.size_8.macros]
+SYM_SIZE = 8
+RSA_KEY_SIZE = 128
+
+[presets.size_8.vars]
+ciphertext_buf = 0
+
+[presets.size_8.abacus_secrets]
+dp_buf = 0xffffffffffffffef
+dq_buf = 0xffffffffffffffe1
+
+[presets.size_16.macros]
+SYM_SIZE = 16
+RSA_KEY_SIZE = 128
+
+[presets.size_16.vars]
+ciphertext_buf = 0
+
+[presets.size_16.abacus_secrets]
+dp_buf = 0xffffffffffffffffffffffffffffffef
+dq_buf = 0xffffffffffffffffffffffffffffffe1

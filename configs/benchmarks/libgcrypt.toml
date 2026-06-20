@@ -7,6 +7,14 @@ tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
 
+[benchmarks.runner_profiles.rsa_private]
+config = "configs/runner/libgcrypt_rsa_private_runner_config.toml"
+preset = "size_{sym_size}"
+
+[benchmarks.runner_profiles.rsa_padding]
+config = "configs/runner/libgcrypt_rsa_padding_runner_config.toml"
+preset = "size_{sym_size}"
+
 [benchmarks.build]
 preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
@@ -63,6 +71,88 @@ use_public_inputs = true
 
 [benchmarks.variants.sliced]
 tools = ["klee_cf"]
+
+[benchmarks.variants.rsa_stages.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1" }
+build_dep_commands = [
+	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
+	"cd {libgcrypt_dir} && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
+]
+
+[benchmarks.variants.rsa_stages.build.tools.klee]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.variants.rsa_stages.build.tools.binsec]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.variants.rsa_stages.build.tools.abacus]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+concrete_pubs = false
+variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
+
+[benchmarks.variants.rsa_stages.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "gcry_pk_decrypt_pkcs1"
+runner_profile = "rsa_private"
+secret_layout = "d:{sym_size}"
+secret_inputs = ["d:{sym_size}:d_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_DECRYPT_PKCS1"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "gcry_pk_decrypt_oaep"
+runner_profile = "rsa_private"
+secret_layout = "d:{sym_size}"
+secret_inputs = ["d:{sym_size}:d_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_DECRYPT_OAEP"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "gcry_pk_decrypt_raw"
+runner_profile = "rsa_private"
+secret_layout = "d:{sym_size}"
+secret_inputs = ["d:{sym_size}:d_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_DECRYPT_RAW"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_pkcs1_decode_for_enc"
+runner_profile = "rsa_padding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["rsa_padding_decode_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_PKCS1_DECODE_FOR_ENC"]
+
+[[benchmarks.variants.rsa_stages.targets]]
+target = "rsa_oaep_decode"
+runner_profile = "rsa_padding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["rsa_padding_decode_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_OAEP_DECODE"]
+
+[[benchmarks.variants.rsa_stages.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.rsa_stages.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
 
 [benchmarks.variants.sliced.build]
 preset = "size_{sym_size}"
