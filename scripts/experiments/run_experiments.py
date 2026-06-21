@@ -406,6 +406,7 @@ def main(argv: list[str] | None = None) -> int:
             from tools.postprocess.merge_csv_by_location import main as merge_csv_by_location_main
             from tools.postprocess.merge_json_runs_by_experiment import main as merge_json_runs_main
             from tools.postprocess.merge_results import main as merge_results_main
+            from tools.postprocess.merge_verification_timings import main as merge_verification_timings_main
             from tools.postprocess.summarize_reproduction_status import main as summarize_reproduction_status_main
 
             required_files = [sliced_map_csv, filtered_locations_csv]
@@ -516,6 +517,22 @@ def main(argv: list[str] | None = None) -> int:
                     f"{output_str}/filtered_merged_results.csv",
                 ]
             ) != 0:
+                raise SystemExit(1)
+
+            timing_args = [
+                output_str,
+                "--output",
+                f"{output_str}/verification_times.csv",
+                "--best-output",
+                f"{output_str}/verification_times_best_by_tool.csv",
+                "--best-latex-output",
+                f"{output_str}/verification_times_best_by_tool.tex",
+            ]
+            print(
+                "[MERGE VERIFICATION TIMES] merge_verification_timings "
+                + shlex.join(timing_args)
+            )
+            if merge_verification_timings_main(timing_args) != 0:
                 raise SystemExit(1)
 
             aggregate_output_base = f"{output_str}/{aggregate_output_prefix}"

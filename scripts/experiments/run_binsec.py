@@ -54,6 +54,7 @@ from tools.shared.experiment_registry import (
     runner_profile_for_definition,
     selected_benchmarks,
 )
+from tools.shared.verification_timing import verification_status, write_verification_timing
 
 
 CAMPAIGN_TOOL = CampaignTool(tool_id="binsec", module_name=__name__, case_parallel_arg="--max-parallel-cases")
@@ -181,6 +182,7 @@ def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
                 "executable": f"{benchmark_definition.code_path}/artifacts/binsec/{expanded_case.output_target}/{expanded_case.public_mode}",
                 "source_column_suffix": expanded_case.public_mode,
                 "public_mode": expanded_case.public_mode,
+                "target_key": expanded_case.target_id,
                 "sliced": expanded_case.variant_id == "sliced",
             }
         )
@@ -436,6 +438,7 @@ def run_benchmark(
             output_metadata = {
                 **normalized_case_output_metadata(case_table, case_location),
                 "library_key": benchmark_definition.library_id,
+                "variant_key": benchmark_definition.variant_id,
             }
             run_case(
                 local_context,
@@ -474,37 +477,58 @@ def run_case(
     context.log("=========")
     context.log(title)
     context.log("=========")
-    context.run(
-        [
-            binsec_executable,
-            "-sse",
-            "-checkct",
-            "-fml-solver",
-            args.fml_solver,
-            "-fml-solver-timeout",
-            str(args.max_solver_time_seconds),
-            "-smt-solver",
-            args.smt_solver,
-            "-smt-timeout",
-            str(args.max_solver_time_seconds),
-            "-sse-timeout",
-            str(args.max_time_seconds),
-            "-sse-jump-enum",
-            str(args.jump_enum),
-            "-sse-script",
-            str(sse_script_path),
-            "-sse-depth",
-            str(args.sse_depth),
-            "-sse-heuristics",
-            "nurs",
-            "-checkct-features",
-            "control-flow,memory-access",
-            "-checkct-stats-file",
-            str(results_dir / stats_file),
-            str(executable_path),
-        ],
+    command = [
+        binsec_executable,
+        "-sse",
+        "-checkct",
+        "-fml-solver",
+        args.fml_solver,
+        "-fml-solver-timeout",
+        str(args.max_solver_time_seconds),
+        "-smt-solver",
+        args.smt_solver,
+        "-smt-timeout",
+        str(args.max_solver_time_seconds),
+        "-sse-timeout",
+        str(args.max_time_seconds),
+        "-sse-jump-enum",
+        str(args.jump_enum),
+        "-sse-script",
+        str(sse_script_path),
+        "-sse-depth",
+        str(args.sse_depth),
+        "-sse-heuristics",
+        "nurs",
+        "-checkct-features",
+        "control-flow,memory-access",
+        "-checkct-stats-file",
+        str(results_dir / stats_file),
+        str(executable_path),
+    ]
+    started_at = time.monotonic()
+    return_code = context.run(
+        command,
         cwd=workspace.root,
+        check=False,
     )
+    elapsed_seconds = time.monotonic() - started_at
+    status = verification_status(
+        exit_code=return_code,
+        elapsed_seconds=elapsed_seconds,
+        timeout_seconds=args.max_time_seconds,
+    )
+    write_verification_timing(
+        results_dir,
+        case_id=Path(stats_file).stem,
+        title=title,
+        metadata=metadata,
+        timeout_seconds=args.max_time_seconds,
+        elapsed_seconds=elapsed_seconds,
+        exit_code=return_code,
+        status=status,
+    )
+    if return_code != 0:
+        raise SystemExit(return_code)
     stats_path = results_dir / stats_file
     if not stats_path.is_file():
         context.log(f"Warning: missing stats file {stats_path}; skipping JSON conversion")

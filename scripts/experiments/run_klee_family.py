@@ -24,6 +24,7 @@ from scripts.experiments.common import (
     LaunchedProcess,
     REPO_ROOT,
     cleanup_launched_process,
+    duration_to_seconds,
     expand_benchmark_cases,
     execute_output_captured_worker,
     expect_array,
@@ -51,6 +52,7 @@ from tools.shared.experiment_registry import (
     selected_benchmarks,
 )
 from tools.shared.result_schema import KIND_BRANCH, KIND_MEMORY, build_payload
+from tools.shared.verification_timing import verification_status, write_verification_timing
 
 
 SOLVER_BACKENDS = ("stp", "metasmt", "dummy", "z3")
@@ -181,6 +183,7 @@ def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, objec
             "replay_opts": _format_replay_opts(secret_inputs, public_inputs, expanded_case.public_mode),
             "source_column_suffix": expanded_case.public_mode,
             "public_mode": expanded_case.public_mode,
+            "target_key": expanded_case.target_id,
             "sliced": expanded_case.variant_id == "sliced",
         }
         raw_use_public_inputs = expanded_case.config_table.get("use_public_inputs")
@@ -256,6 +259,7 @@ def _load_klee_preprocess_profiles(benchmark_definition, tool_id: str) -> list[d
 def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     """CLI entrypoint shared by the KLEE-family wrappers."""
     profile = _mode_profile(mode)
+    is_klee_cf = profile.tool_id == "klee_cf"
     parser = argparse.ArgumentParser(description="Run one of the KLEE-based experiment configurations.")
     parser.add_argument("max_time", help="Overall timeout for each KLEE run")
     parser.add_argument("--sym-size", type=int, default=4)
@@ -284,7 +288,8 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         parser.add_argument("--product-program-fallback", action="store_true")
     parser.add_argument("--solver-backend", default="stp", choices=SOLVER_BACKENDS)
     parser.add_argument("--optimize-array", default="false", choices=OPTIMIZE_ARRAY_VALUES)
-    parser.add_argument("--optimize-concrete-object-state-reads", default="true", choices=("true", "false"))
+    if is_klee_cf:
+        parser.add_argument("--optimize-concrete-object-state-reads", default="true", choices=("true", "false"))
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -309,6 +314,11 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         help="Maximum number of per-case workers this runner may execute concurrently",
     )
     args = parser.parse_args(argv)
+
+    try:
+        args.max_time_seconds = duration_to_seconds(args.max_time, "max_time")
+    except ValueError as error:
+        raise SystemExit(f"Error: {error}") from error
 
     if args.loop_max_iterations < 0:
         raise SystemExit(
@@ -344,6 +354,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         context.log("##########")
         context.log("Args:")
         context.log(f"max_time={args.max_time}")
+        context.log(f"max_time_seconds={args.max_time_seconds}")
         context.log(f"sym_size={args.sym_size}")
         context.log(f"loop_max_iterations={args.loop_max_iterations}")
         context.log(f"max_solver_time={args.max_solver_time}")
@@ -364,7 +375,8 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
             )
         context.log(f"solver_backend={args.solver_backend}")
         context.log(f"optimize_array={args.optimize_array}")
-        context.log(f"optimize_concrete_object_state_reads={args.optimize_concrete_object_state_reads}")
+        if is_klee_cf:
+            context.log(f"optimize_concrete_object_state_reads={args.optimize_concrete_object_state_reads}")
         context.log(f"verbose={'true' if args.verbose else 'false'}")
         context.log(f"tmp_dir={Path(args.tmp_dir).expanduser().resolve()}")
         context.log(f"results_dir={results_dir}")
@@ -602,6 +614,7 @@ def run_benchmark(
                 output_metadata = {
                     **normalized_case_output_metadata(case_table, case_location),
                     "library_key": benchmark_definition.library_id,
+                    "variant_key": benchmark_definition.variant_id,
                 }
 
                 bitcode_path = workspace.resolve_repo_path(bitcode)
@@ -691,7 +704,14 @@ def run_benchmark(
                         ),
                         *[f"--search={item}" for item in args.search.split(",") if item],
                         *([] if args.optimize_array == "false" else [f"--optimize-array={args.optimize_array}"]),
-                        f"--optimize-concrete-object-state-reads={args.optimize_concrete_object_state_reads}",
+                    ]
+                )
+                if local_profile.tool_id == "klee_cf":
+                    command.append(
+                        f"--optimize-concrete-object-state-reads={args.optimize_concrete_object_state_reads}"
+                    )
+                command.extend(
+                    [
                         f"--max-solver-time={args.max_solver_time}",
                         f"--istats-write-interval={args.istats_write_interval}",
                         f"--max-memory={args.max_memory}",
@@ -699,7 +719,25 @@ def run_benchmark(
                         str(bitcode_path),
                     ]
                 )
-                local_context.run(command, env=local_env, check=False, cwd=bitcode_dir)
+                started_at = time.monotonic()
+                return_code = local_context.run(command, env=local_env, check=False, cwd=bitcode_dir)
+                elapsed_seconds = time.monotonic() - started_at
+                status = verification_status(
+                    exit_code=return_code,
+                    elapsed_seconds=elapsed_seconds,
+                    timeout_seconds=args.max_time_seconds,
+                    timed_out_exit_codes={124},
+                )
+                write_verification_timing(
+                    local_results_dir,
+                    case_id=result_name,
+                    title=title,
+                    metadata=output_metadata,
+                    timeout_seconds=args.max_time_seconds,
+                    elapsed_seconds=elapsed_seconds,
+                    exit_code=return_code,
+                    status=status,
+                )
 
                 source_output = bitcode_dir / "klee-out-0"
                 if not source_output.is_dir():
