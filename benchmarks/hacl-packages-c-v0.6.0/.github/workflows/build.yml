@@ -1,0 +1,303 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - .gitignore
+      - CLA.md
+      - CODE_OF_CONDUCT.md
+      - CONTRIBUTING.md
+      - cpu-features.md
+      - LICENSE
+      - LICENSE-APACHE
+      - README.md
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        version: [7, 8, 9, 10, 11, 12, 13, 14]
+        bits: [32, 64]
+        edition: [""] # ignore c89 for now
+        #edition: [ c89, "" ]
+        exclude:
+          - compiler: gcc
+            version: 12
+          - compiler: gcc
+            version: 13
+          - compiler: gcc
+            version: 14
+          # Not available
+          - compiler: clang
+            version: 13
+          # Not available
+          - compiler: clang
+            version: 14
+
+    steps:
+      - name: Setup | Update
+        run: sudo apt-get update
+
+      - name: Setup | Install Ninja
+        run: sudo apt-get install ninja-build
+
+      - name: Setup | Install GCC
+        if: ${{ matrix.compiler == 'gcc' }}
+        run: |
+          sudo apt-get install gcc-${{ matrix.version }} g++-${{ matrix.version }}
+          echo "CC=gcc-${{ matrix.version }}" >> $GITHUB_ENV
+          echo "CXX=g++-${{ matrix.version }}" >> $GITHUB_ENV
+
+      - name: Setup | Install GCC (multilib libraries)
+        if: ${{ matrix.compiler == 'gcc' && matrix.bits == 32 }}
+        run: sudo apt-get install gcc-${{ matrix.version }}-multilib g++-${{ matrix.version }}-multilib
+
+      - name: Setup | Install Clang
+        if: ${{ matrix.compiler == 'clang' }}
+        run: |
+          sudo apt-get install clang-${{ matrix.version }}
+          echo "CC=clang-${{ matrix.version }}" >> $GITHUB_ENV
+          echo "CXX=clang++-${{ matrix.version }}" >> $GITHUB_ENV
+
+      - name: Setup | Install Clang (multilib libraries)
+        if: ${{ matrix.compiler == 'clang' && matrix.bits == 32 }}
+        run: sudo apt-get install gcc-multilib g++-multilib
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: mach | Test
+        uses: ./.github/actions/mach_test
+        with:
+          bits: ${{ matrix.bits }}
+          edition: ${{ matrix.edition }}
+
+      - name: mach | Benchmark
+        uses: ./.github/actions/mach_benchmark
+        with:
+          bits: ${{ matrix.bits }}
+          edition: ${{ matrix.edition }}
+          args: "--no-openssl" # Ubuntu 20.04 doesn't have OpenSSL3
+
+      - name: Upload artifacts
+        uses: ./.github/actions/upload_artifacts
+        with:
+          name: linux_${{ matrix.compiler }}_v${{ matrix.version }}_${{ matrix.bits }}_${{ matrix.edition }}
+
+  macos:
+    runs-on: macos-11
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        version: [9, 10, 11, 12, 13, 14]
+        bits: [64]
+        target: ["", "aarch64-apple-ios", "aarch64-apple-darwin"]
+        exclude:
+          - compiler: gcc
+            version: 13
+          - compiler: gcc
+            version: 14
+          - compiler: clang
+            version: 9
+          # Not available in brew
+          - compiler: clang
+            version: 10
+
+    steps:
+      - name: Setup | Install Ninja
+        run: brew install ninja
+
+      - name: Setup | Install GCC
+        if: ${{ matrix.compiler == 'gcc' }}
+        run: |
+          brew install gcc@${{ matrix.version }}
+          echo "CC=gcc-${{ matrix.version }}" >> $GITHUB_ENV
+          echo "CXX=g++-${{ matrix.version }}" >> $GITHUB_ENV
+
+      - name: Setup | Install Clang
+        if: ${{ matrix.compiler == 'clang' }}
+        run: |
+          brew install llvm@${{ matrix.version }}
+          echo "CC=$(brew --prefix llvm@${{ matrix.version }})/bin/clang" >> $GITHUB_ENV
+          echo "CXX=$(brew --prefix llvm@${{ matrix.version }})/bin/clang++" >> $GITHUB_ENV
+          ls /usr/local/opt/llvm@${{ matrix.version }}/bin
+          echo $CC
+          echo $CXX
+          clang++ --version
+
+      - name: Setup | Install OpenSSL3
+        run: brew install openssl@3
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: mach | Build
+        uses: ./.github/actions/mach_build
+        with:
+          bits: ${{ matrix.bits }}
+          target: ${{ matrix.target }}
+
+      - name: mach | Test
+        uses: ./.github/actions/mach_test
+        with:
+          bits: ${{ matrix.bits }}
+          target: ${{ matrix.target }}
+
+      - name: mach | Benchmark
+        uses: ./.github/actions/mach_benchmark
+        with:
+          bits: ${{ matrix.bits }}
+          target: ${{ matrix.target }}
+          args: "--no-openssl" # FIXME: #198 For some reason openssl isn't work
+          environment: OPENSSL_HOME=/usr/local/opt/openssl@3/
+
+      - name: Upload artifacts
+        uses: ./.github/actions/upload_artifacts
+        with:
+          name: macos_${{ matrix.compiler }}_v${{ matrix.version }}_${{ matrix.bits }}_${{ matrix.target }}
+
+  windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        bits: [32, 64]
+        args: ["", "--msvc"]
+        exclude:
+          # See issue #92.
+          - bits: 32
+            args: "--msvc"
+
+    steps:
+      - name: Setup | Developer Command Prompt (x86)
+        if: ${{ matrix.bits == 32 }}
+        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d
+        with:
+          arch: x86
+
+      - name: Setup | Developer Command Prompt (x64)
+        if: ${{ matrix.bits == 64 }}
+        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d
+        with:
+          arch: x64
+
+      - name: Setup | Install Ninja
+        run: choco install ninja
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: mach | Test
+        uses: ./.github/actions/mach_test
+        with:
+          bits: ${{ matrix.bits }}
+          edition: ${{ matrix.edition }}
+          args: ${{ matrix.args }}
+
+      # TODO: #197 Enable benchmarks on Windows
+      # - name: mach | Benchmark
+      #   uses: ./.github/actions/mach_benchmark
+      #   with:
+      #     bits: ${{ matrix.bits }}
+      #     target: ${{ matrix.target }}
+      #     args: "--no-openssl"
+
+      - name: Upload artifacts
+        uses: ./.github/actions/upload_artifacts
+        with:
+          name: windows_${{ matrix.bits }}_v${{ matrix.edition }}_${{ matrix.args }}
+
+  # ----------------------------------------------------------------------------
+
+  android:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: ["aarch64-linux-android"]
+    steps:
+      - name: Setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install ninja-build
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: mach | Build
+        uses: ./.github/actions/mach_build
+        with:
+          bits: ${{ matrix.bits }}
+          target: ${{ matrix.target }}
+          args: --ndk $ANDROID_NDK_LATEST_HOME
+
+      - name: Upload artifacts
+        uses: ./.github/actions/upload_artifacts
+        with:
+          name: ${{ matrix.target }}
+
+  s390x-gcc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Output short_sha
+        uses: ./.github/actions/make_short_sha
+
+      - name: Setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install ninja-build g++-10-s390x-linux-gnu gcc-10-s390x-linux-gnu
+
+      - name: Debug Build
+        run: ./mach build --tests --target s390x -v
+
+      - name: Release Build
+        run: ./mach build --release --target s390x --tests -v
+
+      - name: Install
+        run: |
+          mkdir pkg-release
+          ./mach install -p $PWD/pkg-release
+          mkdir pkg-debug
+          ./mach install -p $PWD/pkg-debug --debug
+
+      - name: Upload artifacts
+        uses: ./.github/actions/upload_artifacts
+        with:
+          name: linux-s390x-gcc10
+
+  # ----------------------------------------------------------------------------
+
+  default:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Output short_sha
+        uses: ./.github/actions/make_short_sha
+
+      - name: Setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install ninja-build
+
+      - name: Build (Release)
+        run: ./_build.sh
+
+      - name: Build (Debug)
+        run: ninja -f build-Debug.ninja -C build
+
+      - name: Upload artifacts
+        uses: ./.github/actions/upload_artifacts
+        with:
+          name: linux-default

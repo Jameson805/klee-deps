@@ -1,0 +1,113 @@
+name: ocaml
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - .gitignore
+      - CLA.md
+      - CODE_OF_CONDUCT.md
+      - CONTRIBUTING.md
+      - cpu-features.md
+      - LICENSE
+      - LICENSE-APACHE
+      - README.md
+  pull_request:
+    # Can't use an YAML anchor because "Anchors are not currently supported." (GitHub 12/07/2022)
+    paths-ignore:
+      - .gitignore
+      - CLA.md
+      - CODE_OF_CONDUCT.md
+      - CONTRIBUTING.md
+      - cpu-features.md
+      - LICENSE
+      - LICENSE-APACHE
+      - README.md
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # mach:
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - name: Cache Setup
+  #       id: cache-ocaml-setup
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ~/.opam
+  #         key: ${{ runner.os }}-ocaml-setup
+
+  #     - name: System Setup
+  #       run: sudo apt-get install ninja-build opam libgmp-dev
+  #     - name: OCaml Setup
+  #       if: steps.cache-ocaml-setup.outputs.cache-hit != 'true'
+  #       run: |
+  #         opam init --auto-setup --disable-sandboxing --yes --bare
+  #         opam switch create 4.12.0 --yes
+  #         eval $(opam env)
+  #         opam install --yes ocamlfind ctypes zarith cppo
+
+  #     - name: Debug Build
+  #       run: |
+  #         eval $(opam env)
+  #         ./mach build -l ocaml -v
+
+  #     - name: Release Build
+  #       run: |
+  #         eval $(opam env)
+  #         ./mach build --release -l ocaml -v
+
+  #     - name: Test Debug
+  #       run: |
+  #         eval $(opam env)
+  #         ./mach test -l ocaml -v
+
+  packaging:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-11
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Cache Setup
+        id: cache-ocaml-setup
+        uses: actions/cache@v3
+        with:
+          path: ~/.opam
+          key: ${{ runner.os }}-ocaml-setup
+
+      - name: Setup Ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install ninja-build opam libgmp-dev
+      - name: Setup macOS
+        if: matrix.os == 'macos-11'
+        run: brew install ninja opam gmp
+      - name: OCaml Setup
+        if: steps.cache-ocaml-setup.outputs.cache-hit != 'true'
+        run: |
+          opam init --auto-setup --disable-sandboxing --yes --bare
+          opam switch create 4.12.0 --yes
+          eval $(opam env)
+          opam install --yes ocamlfind ctypes zarith cppo
+
+      - name: Setup HACL opam
+        run: ./opam.sh
+
+      - name: Update OCaml
+        run: opam update && opam upgrade --yes
+
+      - name: Package & Test
+        working-directory: opam
+        run: opam install . --verbose --with-test --yes
