@@ -6,9 +6,11 @@ Benchmark descriptors under `configs/benchmarks/*.toml` now own the mapping from
 
 The current shared modular-exponentiation config lives at `configs/runner/modexp_runner_config.toml`. Mbed TLS, Libgcrypt, and OpenSSL 1.1.1q all consume this same config and emit benchmark-local artifacts under their own `generated/` directories.
 
-Not every benchmark needs to share one config source. BearSSL `aes_big`, `aes_ct`, and `des_tab` use benchmark-local configs in `configs/runner/bearssl_aes_big_runner_config.toml` and `configs/runner/bearssl_des_tab_runner_config.toml`. `aes_ct` intentionally reuses the `aes_big` runner profile because the reduced-round wrappers consume the same 48-byte effective AES schedule prefix, while `des_tab` still needs its separate wider schedule config. The benchmark descriptor selects between those configs via runner-profile ids. See `benchmarks/bearssl/README.md` for the rationale behind those choices.
-
-OpenSSL Almeida `tls-rempad-luk13` also uses a benchmark-local config in `configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml` because it models one secret record buffer plus several fixed-width public control scalars instead of the shared modular-exponentiation buffer shape.
+Not every benchmark needs to share one config source. Benchmark descriptors can
+select shared or benchmark-local runner profiles, and each profile can point to
+the config that matches the benchmark's input model. Benchmark-specific reasons
+for choosing a shared config, a local config, or a single preset belong in the
+benchmark model pages under `docs/benchmarks/`.
 
 Runner configs are now TOML. That keeps nested structures readable while still allowing `0x...` integer literals for seeds and preset values.
 
@@ -121,16 +123,17 @@ For benchmarks that opt into this flow, the generator can also emit BINSEC cfg f
 - Public default bytes are still owned by the generated header and executable, not by the BINSEC cfg.
 - Even when the config source is shared, the emitted BINSEC cfgs stay benchmark-local so build products remain isolated and easy to inspect.
 
-## Benchmark-Specific Notes
+## Benchmark-Owned Configs
 
-Some benchmark integrations intentionally use benchmark-local macros and sizes instead of one shared `SYM_SIZE` abstraction.
+Some benchmark integrations intentionally use benchmark-local macros, preset
+names, and input sizes instead of one shared `SYM_SIZE` abstraction. The runner
+schema supports that through benchmark descriptor `runner_profiles`; the model
+rationale for a specific benchmark should stay with that benchmark's docs.
 
-- BearSSL `aes_big`, `aes_ct`, and `des_tab` keep the original wrappers' fixed zero IV and original `DATA_LEN` values.
-- Those BearSSL wrappers now make only the effective prefix of `ctx.skey` symbolic, not the full backing array, because the wrappers hardcode `N_ROUND=2` and never read the unused tail.
-- For BearSSL, mod-exp-style `size_4` or `size_16` presets would be misleading: unlike `SYM_SIZE` in the modular-exponentiation benchmarks, `ctx.skey` is an expanded internal schedule, not a raw semantic key buffer. Smaller widths there would produce partially symbolic schedules with the remaining consumed words fixed to zero.
-- They therefore use a single `default` preset per target instead of exposing a family of `size_N` presets.
-- They also currently model only secret inputs, so `vars` is empty and the generated fix-pub and var-pub artifacts differ only by mode plumbing, not by any extra public buffers.
-- OpenSSL Almeida `tls-rempad-luk13` likewise uses a single `default` preset, keeps the original fixed 63-byte record length, models the record payload as the only secret input, and treats `options`, `s3_flags`, `flags`, `slicing_cheat`, `block_size`, and `mac_size` as separate 4-byte public controls.
+Use `docs/benchmarks/benchmark-inventory.md` to find the owning model page for a
+selector. Those pages document benchmark-specific choices such as fixed buffer
+lengths, public-input policy, single-preset configs, target-local generated
+artifacts, and differences from external comparison wrappers.
 
 ## Example
 

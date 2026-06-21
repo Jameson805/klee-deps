@@ -1,7 +1,7 @@
 # Modular Exponentiation Benchmark Models
 
 This page documents the modular-exponentiation benchmark model used by the
-BearSSL, HACL, Libgcrypt, mbedTLS, and OpenSSL modular-exponentiation targets.
+BearSSL, Libgcrypt, mbedTLS, and OpenSSL modular-exponentiation targets.
 The exact byte values are owned by
 `../../../configs/runner/modexp_runner_config.toml`; this page records what kind
 of values they are and why the symbolic inputs are shaped this way.
@@ -11,6 +11,22 @@ of values they are and why the symbolic inputs are shaped this way.
 Modular exponentiation computes `base^exp mod mod`. The benchmark models the
 common cryptographic setting where the exponent is private key material and the
 base and modulus are public operation parameters.
+
+| Selector target | Invoked backend shape | Repository implementation |
+| --- | --- | --- |
+| `bearssl:modexp` / `modexp` | BearSSL i32 modular exponentiation path. | Calls the BearSSL i32 backend with shared `exp`, `base`, and `mod` buffers. |
+| `libgcrypt:default` / `modexp` | Libgcrypt MPI exponentiation path. | Calls the Libgcrypt 1.10.1 MPI exponentiation implementation. |
+| `libgcrypt:sliced` / `modexp` | KLEE-CF sliced Libgcrypt exponentiation variant. | Uses the same inputs as `libgcrypt:default`; only the implementation body is sliced. |
+| `mbedtls:default` / `modexp` | `mbedtls_mpi_exp_mod` wrapper. | Calls the mbedTLS 3.2.1 modular exponentiation backend. |
+| `mbedtls:sliced` / `modexp` | KLEE-CF sliced mbedTLS exponentiation variant. | Uses the same inputs as `mbedtls:default`; only the implementation body is sliced. |
+| `openssl:default` / `recp` | OpenSSL reciprocal modular exponentiation backend. | Selects the reciprocal backend through the wrapper define. |
+| `openssl:default` / `mont` | OpenSSL Montgomery modular exponentiation backend. | Selects the Montgomery backend through the wrapper define. |
+| `openssl:default` / `mont_consttime` | OpenSSL constant-time Montgomery backend. | Selects the constant-time Montgomery backend through the wrapper define. |
+| `openssl:default` / `mont_word` | OpenSSL word-sized Montgomery backend. | Selects the word-sized Montgomery backend through the wrapper define. |
+| `openssl:sliced` / `recp`, `mont`, `mont_word` | KLEE-CF sliced OpenSSL variants. | Uses the same inputs as `openssl:default`; `mont_consttime` is excluded from the sliced selector. |
+
+All implemented targets intentionally use the same input model so differences
+come from library code and selected backend rather than from benchmark shape.
 
 | Generic input | Usual meaning | Active benchmark value |
 | --- | --- | --- |
@@ -23,17 +39,34 @@ not intended to be realistic production RSA key sizes. They are small symbolic
 models that let the tools reach exponentiation behavior while still exploring
 different operand widths.
 
+The repository-specific sliced selectors are part of this group. They use the
+same secret exponent and public base/modulus inputs as the unsliced modular
+exponentiation targets; only the implementation body is sliced for focused
+KLEE-CF experiments.
+
+## Detailed Input Variables
+
+The table below names every input variable used by every modular-exponentiation
+target. The concrete defaults are shared across targets and vary only by the
+selected `SYM_SIZE` preset.
+
+| Selector targets | Input variable | Kind | Size | Concrete value | Symbolic when | Rationale |
+| --- | --- | --- | --- | --- | --- | --- |
+| All modular-exponentiation targets | `exp` | Secret | `SYM_SIZE` bytes | Second largest prime representable in the selected width. | `fix_pub` and `var_pub`. | Starts from a nondegenerate exponent while keeping the exponent as the only secret in fixed-public runs. |
+| All modular-exponentiation targets | `base` | Public | `SYM_SIZE` bytes | Small prime: `0x03` for 1 byte, `0xfb` for wider presets. | `var_pub`. | Stable public representative that avoids a zero base and does not drive secret variation. |
+| All modular-exponentiation targets | `mod` | Public | `SYM_SIZE` bytes | Largest prime representable in the selected width. | `var_pub`. | Avoids invalid zero, collapsed modulus-one behavior, and small composite moduli. |
+
 ## Concrete Defaults
 
 The fixed-public defaults are intentionally prime and nontrivial. For an
 `N`-byte preset, "largest representable" means largest prime less than or equal
 to `2^(8N) - 1`; "second largest" means the prime immediately below that.
 
-| Input class | Concrete default kind | Symbolic part | Rationale and caveats |
+| Input class | Concrete value | Symbolic when | Rationale and caveats |
 | --- | --- | --- | --- |
-| Exponent `exp` | Second largest prime representable in the selected width. | Whole `exp` buffer is symbolic secret. | Avoids starting ABACUS from a degenerate zero exponent while keeping the actual benchmark domain symbolic. |
-| Base `base` | Small one-byte prime: `0x03` for the 1-byte preset and `0xfb` for wider presets. | Whole `base` buffer is symbolic public input in `var_pub`; fixed in `fix_pub`. | Gives a stable public representative without making the base the source of secret variation. |
-| Modulus `mod` | Largest prime representable in the selected width. | Whole `mod` buffer is symbolic public input in `var_pub`; fixed in `fix_pub`. | Avoids zero, one, and easy small composite moduli; prime values are expected to keep more intermediate residues active. |
+| Exponent `exp` | Second largest prime representable in the selected width. | `fix_pub` and `var_pub`. | Avoids starting concrete replay from a degenerate zero exponent while keeping the benchmark domain symbolic. |
+| Base `base` | Small one-byte prime: `0x03` for the 1-byte preset and `0xfb` for wider presets. | `var_pub`. | Gives a stable public representative without making the base the source of secret variation. |
+| Modulus `mod` | Largest prime representable in the selected width. | `var_pub`. | Avoids zero, one, and easy small composite moduli; prime values are expected to keep more intermediate residues active. |
 
 The current values are:
 
@@ -74,22 +107,21 @@ with secret exponent behavior. The public inputs are still public in the threat
 model; the tool should not report leakage merely because behavior depends on
 them.
 
-## Library Mapping
+## Sliced Variants
 
-| Selector target | Invoked backend shape | Input model |
+Slicing is currently a modular-exponentiation feature. The sliced selectors are
+therefore reported with the modular-exponentiation group rather than as a
+separate repository-specific benchmark family.
+
+| Selector | Coverage | Difference from the unsliced selector |
 | --- | --- | --- |
-| `bearssl:modexp` / `modexp` | BearSSL i32 modular exponentiation path. | Shared `exp`, `base`, `mod` model. |
-| `hacl_modexp:default` / `modexp32` | HACL 32-bit bignum modular exponentiation wrapper. | Shared `exp`, `base`, `mod` model. |
-| `hacl_modexp:default` / `modexp64` | HACL 64-bit bignum modular exponentiation wrapper. | Shared `exp`, `base`, `mod` model. |
-| `libgcrypt:default` / `modexp` | Libgcrypt MPI exponentiation path. | Shared `exp`, `base`, `mod` model. |
-| `libgcrypt:sliced` / `modexp` | KLEE-CF sliced Libgcrypt exponentiation variant. | Same input model; implementation body is sliced. |
-| `mbedtls:default` / `modexp` | `mbedtls_mpi_exp_mod` wrapper. | Shared `exp`, `base`, `mod` model. |
-| `mbedtls:sliced` / `modexp` | KLEE-CF sliced mbedTLS exponentiation variant. | Same input model; implementation body is sliced. |
-| `openssl:default` / `recp` | OpenSSL reciprocal modular exponentiation backend. | Shared `exp`, `base`, `mod` model. |
-| `openssl:default` / `mont` | OpenSSL Montgomery modular exponentiation backend. | Shared `exp`, `base`, `mod` model. |
-| `openssl:default` / `mont_consttime` | OpenSSL constant-time Montgomery backend. | Shared `exp`, `base`, `mod` model. |
-| `openssl:default` / `mont_word` | OpenSSL word-sized Montgomery backend. | Shared `exp`, `base`, `mod` model. |
-| `openssl:sliced` / selected targets | KLEE-CF sliced OpenSSL variants. | Same input model; `mont_consttime` is excluded from the sliced selector. |
+| `libgcrypt:sliced` | Libgcrypt `modexp`. | Same input model; reduced implementation body. |
+| `mbedtls:sliced` | mbedTLS `modexp`. | Same input model; reduced implementation body. |
+| `openssl:sliced` | OpenSSL `recp`, `mont`, and `mont_word`. | Same input model; excludes `mont_consttime`. |
+
+Report sliced and unsliced results together when the question is about modular
+exponentiation behavior. Report them separately only when the question is about
+the effect of slicing itself.
 
 ## Fidelity And Limits
 

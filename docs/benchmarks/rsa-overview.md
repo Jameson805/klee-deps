@@ -46,7 +46,7 @@ For RSA decryption-style code we currently use three target families.
      layer and from higher-level scheme handling.
 
 3. Full decrypt targets.
-   - Benchmark the complete public or EVP-facing decrypt path.
+   - Benchmark the complete library-facing decrypt path.
    - This captures the real library-visible control flow, including padding
      selection and any API-specific preprocessing or postprocessing.
 
@@ -129,14 +129,15 @@ OpenSSL RSA decryption has the following relevant layers.
    - `RSA_padding_check_SSLv23`.
 
 6. Higher-level public-key API.
-   - EVP decrypt through `EVP_PKEY_decrypt`, which reaches the RSA method via
-     `pkey_rsa_decrypt`.
+    - EVP decrypt through `EVP_PKEY_decrypt`, which reaches the RSA method via
+       `pkey_rsa_decrypt`. The ABACUS-aligned repository full-decrypt targets use
+       `RSA_private_decrypt` instead.
 
 The OpenSSL RSA benchmark set mirrors the same split:
 
 1. Padding-only utility targets.
 2. Internal private-primitive target through `rsa->meth->rsa_mod_exp`.
-3. Full EVP-facing decrypt targets.
+3. Full `RSA_private_decrypt` targets.
 
 ### Libgcrypt 1.10.1
 

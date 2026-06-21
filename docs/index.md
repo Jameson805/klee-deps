@@ -25,7 +25,11 @@ If you want to understand how the repository is wired together:
 - `architecture/runner-config.md`
 - `benchmarks/benchmark-inventory.md`
 - `benchmarks/rsa-overview.md`
-- `benchmarks/models/rsa-stages.md`
+- `benchmarks/models/modexp.md`
+- `benchmarks/models/constantine.md`
+- `benchmarks/models/bounded.md`
+- `benchmarks/models/abacus.md`
+- `benchmarks/models/other.md`
 
 If you want the implementation details behind a focused change or experiment:
 
@@ -53,10 +57,11 @@ If you want repository editing rules:
 - `architecture/runner-config.md`: runner-config schema, generated artifacts, and BINSEC cfg generation
 - `benchmarks/benchmark-inventory.md`: implemented and planned benchmark families, selectors, and classification gaps
 - `benchmarks/rsa-overview.md`: why RSA benchmarks are split into padding, primitive, and full decrypt layers
-- `benchmarks/models/rsa-stages.md`: RSA per-layer input model, defaults, fidelity limits, and validation checklist
 - `benchmarks/models/modexp.md`: modular-exponentiation input model, defaults, public modes, and backend mapping
-- `benchmarks/models/symmetric-and-known-violations.md`: symmetric-routine and historical known-violation input models
-- `benchmarks/models/constant-time-claims.md`: input models and defaults for functions with constant-time claims
+- `benchmarks/models/constantine.md`: Constantine-style known-violation rows and reused BINSEC/Rel2 rows
+- `benchmarks/models/bounded.md`: bounded verification rows from BINSEC/Rel2 and ABACUS constant-time-claim benchmarks
+- `benchmarks/models/abacus.md`: ABACUS overlap models, differences, and compatibility guidance
+- `benchmarks/models/other.md`: implemented targets whose primary source grouping is separate or ambiguous
 - `tools/klee-cf.md`: KLEE-CF usage, implementation model, and focused example links
 - `tools/klee-eager.md`: KLEE-Eager usage, runner surface, and eager-specific fallback notes
 - `tools/klee-self-comp.md`: self-composition model, output limitations, and performance notes
