@@ -2,31 +2,40 @@
 num_copies = 1
 max_parallel_workers = 96
 temp_dir = "/scratch/$USER/$SLURM_JOB_ID"
-output = "/work/yl925/klee-deps/libsodium_monocypher"
+# output = "/work/yl925/klee-deps/constantine_bench_test"
+output = "/dkucc/home/yl925/klee-results/constantine_bench_test_20260621"
+# run_time = "3m"
 run_time = "2h"
 sliced_map_csv = "configs/postprocess/sliced_map.csv"
 filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
-#ideal_config_selection_csv = "configs/postprocess/ideal_config_selection.csv"
+# ideal_config_selection_csv = "configs/postprocess/ideal_config_selection.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-all = [
-  "libsodium:curve25519",
-  "libsodium:salsa20",
-  "libsodium:chacha20",
-  "libsodium:sha256",
-  "libsodium:sha512",
-  "monocypher:chacha20",
-  "monocypher:poly1305",
-  "monocypher:argon2i",
-  "monocypher:ed25519",
-]
+all = ["appliedcryp:default", "bearssl:aes_des", "ghostrider:default", "libg:default", "openssl_almeida:default", "pycrypto:default"]
 
 [runs]
+klee_cf_default_4 = false
+klee_cf_default_16 = false
+klee_cf_dfs_4 = false
+klee_cf_dfs_16 = false
 klee_cf_rand_path_dfs_4 = true
+klee_cf_rand_path_dfs_16 = false
+klee_cf_no_cv_4 = false
+klee_eager_default_4 = false
+klee_eager_default_16 = false
+klee_eager_dfs_4 = false
+klee_eager_dfs_16 = false
 klee_eager_rand_path_dfs_4 = true
+klee_eager_rand_path_dfs_16 = false
+klee_self_comp_default_4 = false
+klee_self_comp_default_16 = false
+klee_self_comp_dfs_4 = false
+klee_self_comp_dfs_16 = false
 klee_self_comp_rand_path_dfs_4 = true
+klee_self_comp_rand_path_dfs_16 = false
 binsec_4 = true
+binsec_16 = false
 
 [run_definitions.klee_cf_rand_path_dfs_4]
 tag = "KLEE CF Rand Path DFS 4"

@@ -2,7 +2,7 @@
 num_copies = 10
 max_parallel_workers = 96
 temp_dir = "/scratch/$USER/$SLURM_JOB_ID"
-output = "/dkucc/home/yl925/klee-results/20260530"
+output = "/dkucc/home/yl925/klee-results/20260530_constantine_bench"
 run_time = "2h"
 klee_root = "/home/theta-lin/klee/build/bin"
 sliced_map_csv = "configs/postprocess/sliced_map.csv"
@@ -11,10 +11,7 @@ filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-# Leave arrays empty to keep each tool's default benchmark set.
-# Set `all = ["mbedtls:default"]` to run only Mbed TLS everywhere unless a tool-specific override is set.
-all = ["bearssl:modexp", "hacl_modexp:default", "libgcrypt:default", "mbedtls:default", "openssl:default"]
-klee_cf = ["bearssl:modexp", "hacl_modexp:default", "libgcrypt:default", "libgcrypt:sliced", "mbedtls:default", "mbedtls:sliced", "openssl:default", "openssl:sliced"]
+all = ["appliedcryp:default", "bearssl:aes_des", "ghostrider:default", "libg:default", "openssl_almeida:default", "pycrypto:default"]
 
 [runs]
 klee_cf_default_4 = true
@@ -24,7 +21,6 @@ klee_cf_dfs_16 = true
 klee_cf_rand_path_dfs_4 = true
 klee_cf_rand_path_dfs_16 = true
 klee_cf_no_cv_4 = true
-klee_cf_no_concrete_read_opt_4 = true
 klee_eager_default_4 = true
 klee_eager_default_16 = true
 klee_eager_dfs_4 = true
@@ -81,12 +77,6 @@ tag = "KLEE CF NO CV 4"
 tool = "klee_cf"
 destination = "klee_cf_no_cv_4"
 args = ["{run_time}", "--sym-size", "4", "--use-cv-model", "false"]
-
-[run_definitions.klee_cf_no_concrete_read_opt_4]
-tag = "KLEE CF No Concrete Read Opt 4"
-tool = "klee_cf"
-destination = "klee_cf_no_concrete_read_opt_4"
-args = ["{run_time}", "--sym-size", "4", "--optimize-concrete-object-state-reads", "false"]
 
 [run_definitions.klee_eager_default_4]
 tag = "KLEE Eager Default 4"
