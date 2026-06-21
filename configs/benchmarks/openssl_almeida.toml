@@ -35,13 +35,12 @@ config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
-public_layout = "options:4,s3_flags:4,flags:4,slicing_cheat:4,block_size:4,mac_size:4"
+public_layout = "options:4,s3_flags:4,flags:4,slicing_cheat:4,mac_size:4"
 public_inputs = [
     "options:4:options_buf",
     "s3_flags:4:s3_flags_buf",
     "flags:4:flags_buf",
     "slicing_cheat:4:slicing_cheat_buf",
-    "block_size:4:block_size_buf",
     "mac_size:4:mac_size_buf",
 ]
-klee_public_inputs = ["options", "s3_flags", "flags", "slicing_cheat", "block_size", "mac_size"]
+klee_public_inputs = ["options", "s3_flags", "flags", "slicing_cheat", "mac_size"]

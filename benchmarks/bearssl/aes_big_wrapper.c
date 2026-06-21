@@ -3,11 +3,11 @@
 
 int driver_main(void) {
   br_aes_big_cbcenc_keys ctx = {0};
-  unsigned char iv[br_aes_big_BLOCK_SIZE] = {0};
+  unsigned char iv[IV_LEN] = {0};
   unsigned char data[DATA_LEN] = {0};
 
-  /* Only the reduced-round prefix of the expanded key schedule is symbolic. */
   runner_copy_bytes(ctx.skey, skey_buf, sizeof(skey_buf));
+  runner_copy_bytes(iv, iv_buf, sizeof(iv));
   runner_copy_bytes(data, data_buf, sizeof(data));
   ctx.vtable = &br_aes_big_cbcenc_vtable;
   ctx.num_rounds = N_ROUND;

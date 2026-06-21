@@ -11,9 +11,13 @@ preset = "default"
 config = "configs/runner/libsodium_stream_runner_config.toml"
 preset = "default"
 
-[benchmarks.runner_profiles.hash]
+[benchmarks.runner_profiles.hash_sha256]
 config = "configs/runner/libsodium_hash_runner_config.toml"
-preset = "default"
+preset = "sha256"
+
+[benchmarks.runner_profiles.hash_sha512]
+config = "configs/runner/libsodium_hash_runner_config.toml"
+preset = "sha512"
 
 [benchmarks.build]
 preset = "default"
@@ -25,6 +29,8 @@ build_dep_commands = [
   "mkdir -p build",
   "cd libsodium-stable && ./autogen.sh -s",
   "cd build && ../libsodium-stable/configure --disable-shared --enable-static --disable-asm --prefix=\"$(pwd)/install\" CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\"",
+  "cd build && find . -name Makefile -exec perl -0pi -e 's/ -DHAVE_(?:MMINTRIN|EMMINTRIN|PMMINTRIN|TMMINTRIN|SMMINTRIN|AVXINTRIN|AVX2INTRIN|AVX512FINTRIN|WMMINTRIN)_H=1//g' {{}} +",
+  "cd build && ! grep -R -E -- '-DHAVE_(MMINTRIN|EMMINTRIN|PMMINTRIN|TMMINTRIN|SMMINTRIN|AVXINTRIN|AVX2INTRIN|AVX512FINTRIN|WMMINTRIN)_H=1' . --include=Makefile",
   "cd build && make -j {make_jobs}",
   "cd build && make install",
 ]
@@ -66,10 +72,10 @@ runner_profile = "stream"
 build_sources = ["salsa20_wrapper.c"]
 secret_layout = "key:32"
 secret_inputs = ["key:32:key_buf"]
-public_layout = "nonce:8,message:256"
-public_inputs = ["nonce:8:nonce_buf", "message:256:message_buf"]
+public_layout = "message:256,nonce:8"
+public_inputs = ["message:256:message_buf", "nonce:8:nonce_buf"]
 klee_secret_inputs = ["key"]
-klee_public_inputs = ["nonce", "message"]
+klee_public_inputs = ["message", "nonce"]
 
 [[benchmarks.variants.salsa20.configs]]
 config = "fix_pub"
@@ -91,10 +97,10 @@ runner_profile = "stream"
 build_sources = ["chacha20_wrapper.c"]
 secret_layout = "key:32"
 secret_inputs = ["key:32:key_buf"]
-public_layout = "nonce:8,message:256"
-public_inputs = ["nonce:8:nonce_buf", "message:256:message_buf"]
+public_layout = "message:256,nonce:8"
+public_inputs = ["message:256:message_buf", "nonce:8:nonce_buf"]
 klee_secret_inputs = ["key"]
-klee_public_inputs = ["nonce", "message"]
+klee_public_inputs = ["message", "nonce"]
 
 [[benchmarks.variants.chacha20.configs]]
 config = "fix_pub"
@@ -112,8 +118,8 @@ runner_profile = "stream"
 
 [[benchmarks.variants.sha256.targets]]
 target = "sha256"
-runner_profile = "hash"
 build_sources = ["sha256_wrapper.c"]
+runner_profile = "hash_sha256"
 secret_layout = "message:256"
 secret_inputs = ["message:256:message_buf"]
 klee_secret_inputs = ["message"]
@@ -121,14 +127,14 @@ klee_secret_inputs = ["message"]
 [[benchmarks.variants.sha256.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
-runner_profile = "hash"
+runner_profile = "hash_sha256"
 
 [benchmarks.variants.sha512]
 
 [[benchmarks.variants.sha512.targets]]
 target = "sha512"
-runner_profile = "hash"
 build_sources = ["sha512_wrapper.c"]
+runner_profile = "hash_sha512"
 secret_layout = "message:256"
 secret_inputs = ["message:256:message_buf"]
 klee_secret_inputs = ["message"]
@@ -136,4 +142,4 @@ klee_secret_inputs = ["message"]
 [[benchmarks.variants.sha512.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
-runner_profile = "hash"
+runner_profile = "hash_sha512"

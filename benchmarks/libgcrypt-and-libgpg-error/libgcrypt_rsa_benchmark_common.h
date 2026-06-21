@@ -2,7 +2,6 @@
 #define LIBGCRYPT_RSA_BENCHMARK_COMMON_H
 
 #include <stddef.h>
-#include <string.h>
 
 #include <gcrypt.h>
 
@@ -51,17 +50,6 @@ static const unsigned char RSA_U_BYTES[64] = {
 
 static const unsigned char RSA_E_BYTES[3] = { 0x01, 0x00, 0x01 };
 
-static inline void overwrite_suffix(unsigned char *dest, size_t dest_len,
-                                    const unsigned char *suffix, size_t suffix_len)
-{
-    if (suffix_len > dest_len) {
-        suffix += suffix_len - dest_len;
-        suffix_len = dest_len;
-    }
-
-    memcpy(dest + dest_len - suffix_len, suffix, suffix_len);
-}
-
 static int libgcrypt_rsa_init(void)
 {
     if (!gcry_check_version(NULL)) {
@@ -80,10 +68,9 @@ static gcry_error_t scan_mpi(gcry_mpi_t *mpi_value,
     return gcry_mpi_scan(mpi_value, GCRYMPI_FMT_USG, bytes, len, NULL);
 }
 
-static gcry_sexp_t load_symbolic_private_key(const unsigned char *d_suffix,
-                                             size_t d_suffix_len)
+static gcry_sexp_t load_symbolic_private_key(const unsigned char *d_bytes,
+                                             size_t d_len)
 {
-    unsigned char d_full[sizeof(RSA_D_BYTES)];
     gcry_sexp_t key = NULL;
     gcry_mpi_t mpi_n = NULL;
     gcry_mpi_t mpi_e = NULL;
@@ -93,9 +80,6 @@ static gcry_sexp_t load_symbolic_private_key(const unsigned char *d_suffix,
     gcry_mpi_t mpi_u = NULL;
     gcry_error_t err;
 
-    memcpy(d_full, RSA_D_BYTES, sizeof(d_full));
-    overwrite_suffix(d_full, sizeof(d_full), d_suffix, d_suffix_len);
-
     err = scan_mpi(&mpi_n, RSA_N_BYTES, sizeof(RSA_N_BYTES));
     if (err) {
         goto cleanup;
@@ -104,7 +88,7 @@ static gcry_sexp_t load_symbolic_private_key(const unsigned char *d_suffix,
     if (err) {
         goto cleanup;
     }
-    err = scan_mpi(&mpi_d, d_full, sizeof(d_full));
+    err = scan_mpi(&mpi_d, d_bytes, d_len);
     if (err) {
         goto cleanup;
     }

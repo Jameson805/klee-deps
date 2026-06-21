@@ -1,15 +1,16 @@
 BearSSL Runner Integration
 ==========================
 
-This directory contains three BearSSL CBC benchmarks integrated with the shared
+This directory contains four BearSSL CBC benchmarks integrated with the shared
 runner artifact generator:
 
 - `aes_big`, the original table-based AES benchmark, configured by `configs/runner/bearssl_aes_big_runner_config.toml`
-- `aes_ct`, the constant-time AES benchmark, which reuses `configs/runner/bearssl_aes_big_runner_config.toml`
+- `aes_ct`, the constant-time AES benchmark, configured by `configs/runner/bearssl_aes_ct_runner_config.toml`
 - `des_tab`, configured by `configs/runner/bearssl_des_tab_runner_config.toml`
+- `des_ct`, configured by `configs/runner/bearssl_des_ct_runner_config.toml`
 
-The integration intentionally preserves the original benchmark shape as closely
-as possible while reducing unnecessary symbolic state.
+The integration keeps the original schedule-and-data input shape while using
+target-specific schedule widths for the local benchmark model.
 
 Configuration Choices
 ---------------------
@@ -17,81 +18,43 @@ Configuration Choices
 The original Binsec benchmark wrappers treated only the expanded key schedule
 and the input data as secret inputs. They did not model public symbolic inputs.
 
-The runner-based integration keeps that structure.
+The runner-based integration keeps the same key-schedule focus, but uses public
+symbolic data and IV inputs for the repository model.
 
 - `skey_buf` is secret.
-- `data_buf` is secret.
-- There are no public symbolic inputs.
-- The IV stays fixed to all-zero bytes.
+- `data_buf` is public.
+- `iv_buf` is public.
 - `N_ROUND` stays fixed at `2`.
 - Each benchmark currently exposes exactly one preset, named `default`.
 
 This means the generated fix-pub and var-pub artifacts still exist for tooling
-uniformity, but there are no public buffers that differ between those modes.
+uniformity, and var-pub makes the public data and IV buffers symbolic.
 
-Why Use The Effective Length Of `ctx.skey`
-------------------------------------------
+Schedule Input Widths
+---------------------
 
 The original wrappers made the full `ctx.skey` storage symbolic.
 
 - `aes_big` stores `uint32_t skey[60]`, which is 240 bytes.
 - `aes_ct` stores `uint32_t skey[60]`, which is 240 bytes.
 - `des_tab` stores `uint32_t skey[96]`, which is 384 bytes.
+- `des_ct` stores `uint32_t skey[96]`, which is 384 bytes.
 
-That is larger than what the current wrappers actually read, because all three
-wrappers hardcode `N_ROUND=2`.
+The runner uses the full `ctx.skey` storage for all four CBC targets. This keeps
+the schedule input width aligned with the Constantine/BINSEC wrappers instead of
+optimizing away schedule words that the reduced-round execution does not read.
 
-For `aes_big`, the encryption path consumes only 12 schedule words when
-`num_rounds == 2`.
+Why Use Full Expanded Schedules
+-------------------------------
 
-- 4 words for the initial AddRoundKey
-- 4 words for the one middle-round key
-- 4 words for the final-round key
+The wrappers expose expanded schedule storage directly. They do not call the
+library key-schedule initializers, so `skey_buf` is not a raw AES or DES key.
 
-That is 12 `uint32_t` values, or 48 bytes.
-
-This is exactly what the code does in `br_aes_big_encrypt(...)`.
-
-- It first xors `skey[0]` through `skey[3]` into the state.
-- The loop `for (u = 1; u < num_rounds; u++)` runs once when `num_rounds == 2`
-	and consumes `skey[4]` through `skey[7]`.
-- The final round then consumes `skey[8]` through `skey[11]`.
-
-For `aes_ct`, the reduced-round CBC encryption path also consumes only 12
-schedule words when `num_rounds == 2`.
-
-- `br_aes_ct_cbcenc_run(...)` calls `br_aes_ct_ortho_keysched(...)` on the
-	compressed schedule and then invokes `br_aes_ct_bitslice_encrypt(...)`.
-- With `N_ROUND=2`, the same 12 compressed schedule words are consumed:
-	4 for the initial key addition, 4 for the middle round, and 4 for the final
-	round.
-
-That is again 12 `uint32_t` values, or 48 bytes, so `aes_ct` can safely reuse
-the same runner sizing as `aes_big` even though the implementation strategy is
-different.
-
-For `des_tab`, the block-processing loop advances the schedule pointer by 32
-words per round block. With `num_rounds == 2`, the wrapper reads 64 schedule
-words.
-
-- 2 round blocks
-- 32 `uint32_t` words per block
-
-That is 64 `uint32_t` values, or 256 bytes.
-
-Again, this follows directly from the implementation.
-
-- `br_des_tab_process_block(...)` calls `process_block_unit(&l, &r, skey)`.
-- After each call it advances the schedule pointer with `skey += 32`.
-- With `num_rounds == 2`, the loop runs twice, so the code reads two distinct
-	32-word schedule blocks.
-
-The integration therefore makes only the effective prefix symbolic and copies
-that prefix into `ctx.skey` with `runner_copy_bytes(...)`. The remainder stays
-zero because the context is zero-initialized before the copy.
-
-This reduces unnecessary symbolic bytes for KLEE, BINSEC, and ABACUS without
-changing the part of the schedule that the current wrappers actually use.
+The fixed `N_ROUND=2` execution may consume only a prefix of that schedule, but
+the source benchmark model marks the full storage as high input. The repository
+therefore keeps the full 240-byte AES schedule and full 384-byte DES schedule
+for parity with the external model while still treating data and IV as public
+repository inputs.
 
 Why Not Reuse Mod-Exp Style Sizes Like 4 Or 16 Bytes
 ----------------------------------------------------
@@ -114,18 +77,22 @@ Because of that, choosing 4 or 16 bytes for `skey_buf` would not give a
 smaller but equivalent benchmark. It would give a partially symbolic schedule
 and force the rest of the schedule words to stay zero.
 
-For `aes_big` at `N_ROUND=2`:
+For AES at `N_ROUND=2`:
 
-- 48 bytes covers all 12 schedule words that the wrapper actually reads.
+- 240 bytes matches the full `uint32_t skey[60]` source model.
+- 48 bytes would cover all 12 schedule words that `aes_big` actually reads,
+	but it would no longer match the Constantine/BINSEC high-input size.
 - 16 bytes would cover only the first 4 words, i.e. only the initial
 	AddRoundKey.
 - The next 8 words used by the middle and final rounds would stay zero because
 	the context is zero-initialized.
 - 4 bytes would cover only one of those 12 words.
 
-For `des_tab` at `N_ROUND=2`:
+For DES at `N_ROUND=2`:
 
-- 256 bytes covers all 64 schedule words that the wrapper actually reads.
+- 384 bytes matches the full `uint32_t skey[96]` source model.
+- 256 bytes would cover all 64 schedule words that `des_tab` actually reads,
+	but it would no longer match the Constantine/BINSEC high-input size.
 - 16 bytes would cover only the first 4 words of the first 32-word schedule
 	block.
 - The remaining 60 words actually consumed by the two-round wrapper would stay
@@ -136,6 +103,9 @@ So 4-byte or 16-byte schedule buffers are not wrong in the sense of C memory
 safety if copied into a zero-initialized `ctx.skey`, but they define a very
 different benchmark: most of the schedule used by the cipher becomes fixed zero
 instead of symbolic.
+
+For `aes_ct` and `des_ct`, smaller schedule buffers would also stop matching the
+BINSEC-style full-schedule high input.
 
 If the goal is to use small semantic key sizes such as 16-byte AES keys or
 8-byte DES keys, then the benchmark should switch to a raw-key model and call
@@ -148,27 +118,34 @@ Chosen Sizes
 
 The single presets currently use these macro values.
 
-- `aes_big`: `EFFECTIVE_SKEY_LEN=48`, `DATA_LEN=32`, `N_ROUND=2`
-- `aes_ct`: `EFFECTIVE_SKEY_LEN=48`, `DATA_LEN=32`, `N_ROUND=2`
-- `des_tab`: `EFFECTIVE_SKEY_LEN=256`, `DATA_LEN=16`, `N_ROUND=2`
+- `aes_big`: `SKEY_LEN=240`, `DATA_LEN=32`, `IV_LEN=16`, `N_ROUND=2`
+- `aes_ct`: `SKEY_LEN=240`, `DATA_LEN=32`, `N_ROUND=2`
+- `des_tab`: `SKEY_LEN=384`, `DATA_LEN=16`, `IV_LEN=8`, `N_ROUND=2`
+- `des_ct`: `SKEY_LEN=384`, `DATA_LEN=32`, `N_ROUND=2`
 
-The data lengths intentionally keep the original wrapper values.
+The data lengths are fixed per target for the default materialization.
 
 - `aes_big` keeps 32 bytes, which is two AES blocks.
-- `aes_ct` keeps 32 bytes, which is two AES blocks.
+- `aes_ct` uses 32 bytes, the smallest BINSEC bounded data length for this
+	target. Other BINSEC sources also use 48, 64, 80, and 96 bytes.
 - `des_tab` keeps 16 bytes, which is two DES blocks.
+- `des_ct` uses 32 bytes, one of the BINSEC bounded data lengths for this
+	target. Other BINSEC sources also use 16, 24, and 40 bytes.
 
-The IV is not configurable in the current presets because the original wrappers
-used an all-zero IV and did not mark it as symbolic.
+The IV has a public runner buffer. The default and fix-pub materializations keep
+it all zero, matching the original wrappers; var-pub can make it symbolic for
+repository comparisons that treat IV as public input.
 
 Why Only One Preset
 -------------------
 
 These benchmarks currently have one supported materialization each.
 
-- The schedule width is derived from the effective prefix consumed at `N_ROUND=2`.
-- The data length is inherited from the original wrapper.
-- There are no public defaults to vary.
+- The schedule widths match the full BINSEC-style high schedule input.
+- The data length is fixed per target; `aes_ct` chooses the smallest BINSEC
+	bounded length, and `des_ct` chooses the 32-byte bounded length.
+- Public data and IV defaults are fixed by the single preset and become symbolic
+	in var-pub mode.
 - Smaller `size_N` labels such as 4 or 16 would be misleading because, in this
 	benchmark model, they would mean partially symbolic schedule prefixes rather
 	than semantic AES or DES key sizes.
@@ -192,11 +169,12 @@ Generated Artifacts
 -------------------
 
 The generic benchmark builder emits target-local generated artifacts because
-the three wrappers do not all share one concrete materialization.
+the wrappers do not all share one concrete materialization.
 
 - `generated/aes_big/runner_config.generated.h`
 - `generated/aes_ct/runner_config.generated.h`
 - `generated/des_tab/runner_config.generated.h`
+- `generated/des_ct/runner_config.generated.h`
 - target-local BINSEC cfgs under the same directories when BINSEC mode is built
 - built executables and bitcode under `artifacts/<mode>/<target>/`
 

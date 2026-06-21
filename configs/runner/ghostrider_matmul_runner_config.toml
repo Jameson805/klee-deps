@@ -17,4 +17,4 @@ public_fixed = true
 [presets.default.vars]
 
 [presets.default.abacus_secrets]
-data_buf = 0
+data_buf = 0x5a

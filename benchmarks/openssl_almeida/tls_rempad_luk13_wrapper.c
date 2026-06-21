@@ -14,7 +14,7 @@ int driver_main(void) {
   long s3_flags = (long)load_u32(s3_flags_buf);
   unsigned long flags = (unsigned long)load_u32(flags_buf);
   int slicing_cheat = (int)load_u32(slicing_cheat_buf);
-  unsigned int block_size = load_u32(block_size_buf);
+  unsigned int block_size = 16;
   unsigned int mac_size = load_u32(mac_size_buf);
   unsigned char data[DATA_LEN] = {0};
   SSL3_STATE s3_obj = {0};

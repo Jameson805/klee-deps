@@ -16,13 +16,11 @@ static BIGNUM *bn_from_bytes(const unsigned char *bytes, size_t len)
     return BN_bin2bn(bytes, (int) len, NULL);
 }
 
-static RSA *load_symbolic_crt_key(const unsigned char *dp_suffix,
-                                  size_t dp_suffix_len,
-                                  const unsigned char *dq_suffix,
-                                  size_t dq_suffix_len)
+static RSA *load_symbolic_crt_key(const unsigned char *dp_bytes,
+                                  size_t dp_len,
+                                  const unsigned char *dq_bytes,
+                                  size_t dq_len)
 {
-    unsigned char dmp1_full[sizeof(RSA_DP_BYTES)];
-    unsigned char dmq1_full[sizeof(RSA_DQ_BYTES)];
     RSA *rsa = NULL;
     BIGNUM *n = NULL;
     BIGNUM *e = NULL;
@@ -32,11 +30,6 @@ static RSA *load_symbolic_crt_key(const unsigned char *dp_suffix,
     BIGNUM *dmp1 = NULL;
     BIGNUM *dmq1 = NULL;
     BIGNUM *iqmp = NULL;
-
-    memcpy(dmp1_full, RSA_DP_BYTES, sizeof(dmp1_full));
-    memcpy(dmq1_full, RSA_DQ_BYTES, sizeof(dmq1_full));
-    overwrite_suffix(dmp1_full, sizeof(dmp1_full), dp_suffix, dp_suffix_len);
-    overwrite_suffix(dmq1_full, sizeof(dmq1_full), dq_suffix, dq_suffix_len);
 
     rsa = RSA_new();
     if (rsa == NULL) {
@@ -48,8 +41,8 @@ static RSA *load_symbolic_crt_key(const unsigned char *dp_suffix,
     d = bn_from_bytes(RSA_D_BYTES, sizeof(RSA_D_BYTES));
     p = bn_from_bytes(RSA_P_BYTES, sizeof(RSA_P_BYTES));
     q = bn_from_bytes(RSA_Q_BYTES, sizeof(RSA_Q_BYTES));
-    dmp1 = bn_from_bytes(dmp1_full, sizeof(dmp1_full));
-    dmq1 = bn_from_bytes(dmq1_full, sizeof(dmq1_full));
+    dmp1 = bn_from_bytes(dp_bytes, dp_len);
+    dmq1 = bn_from_bytes(dq_bytes, dq_len);
     iqmp = bn_from_bytes(RSA_QP_BYTES, sizeof(RSA_QP_BYTES));
     if (n == NULL || e == NULL || d == NULL || p == NULL || q == NULL
         || dmp1 == NULL || dmq1 == NULL || iqmp == NULL) {

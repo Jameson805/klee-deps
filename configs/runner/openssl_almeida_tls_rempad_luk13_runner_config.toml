@@ -29,12 +29,6 @@ kind = "public"
 size = 4
 
 [[inputs]]
-id = "block_size_buf"
-name = "block_size"
-kind = "public"
-size = 4
-
-[[inputs]]
 id = "mac_size_buf"
 name = "mac_size"
 kind = "public"
@@ -58,7 +52,6 @@ options_buf = 0
 s3_flags_buf = 0
 flags_buf = 0
 slicing_cheat_buf = 0
-block_size_buf = 16
 mac_size_buf = 20
 
 [presets.default.abacus_secrets]

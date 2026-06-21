@@ -15,14 +15,12 @@ static int zero_rng(void *rng_state, unsigned char *output, size_t len)
 }
 
 static int load_symbolic_crt_key(mbedtls_rsa_context *rsa,
-                                 const unsigned char *dp_suffix,
-                                 size_t dp_suffix_len,
-                                 const unsigned char *dq_suffix,
-                                 size_t dq_suffix_len)
+                                 const unsigned char *dp_bytes,
+                                 size_t dp_len,
+                                 const unsigned char *dq_bytes,
+                                 size_t dq_len)
 {
     int ret;
-    unsigned char dp_full[sizeof(RSA_DP_BYTES)];
-    unsigned char dq_full[sizeof(RSA_DQ_BYTES)];
 
     ret = mbedtls_rsa_import_raw(rsa,
                                  RSA_N_BYTES, sizeof(RSA_N_BYTES),
@@ -39,16 +37,11 @@ static int load_symbolic_crt_key(mbedtls_rsa_context *rsa,
         return ret;
     }
 
-    memcpy(dp_full, RSA_DP_BYTES, sizeof(dp_full));
-    memcpy(dq_full, RSA_DQ_BYTES, sizeof(dq_full));
-    overwrite_suffix(dp_full, sizeof(dp_full), dp_suffix, dp_suffix_len);
-    overwrite_suffix(dq_full, sizeof(dq_full), dq_suffix, dq_suffix_len);
-
     mbedtls_mpi_free(&rsa->MBEDTLS_PRIVATE(DP));
     mbedtls_mpi_free(&rsa->MBEDTLS_PRIVATE(DQ));
 
-    if ((ret = mbedtls_mpi_read_binary(&rsa->MBEDTLS_PRIVATE(DP), dp_full, sizeof(dp_full))) != 0 ||
-        (ret = mbedtls_mpi_read_binary(&rsa->MBEDTLS_PRIVATE(DQ), dq_full, sizeof(dq_full))) != 0 ||
+    if ((ret = mbedtls_mpi_read_binary(&rsa->MBEDTLS_PRIVATE(DP), dp_bytes, dp_len)) != 0 ||
+        (ret = mbedtls_mpi_read_binary(&rsa->MBEDTLS_PRIVATE(DQ), dq_bytes, dq_len)) != 0 ||
         (ret = mbedtls_mpi_lset(&rsa->MBEDTLS_PRIVATE(Vi), 1)) != 0 ||
         (ret = mbedtls_mpi_lset(&rsa->MBEDTLS_PRIVATE(Vf), 1)) != 0) {
         return ret;

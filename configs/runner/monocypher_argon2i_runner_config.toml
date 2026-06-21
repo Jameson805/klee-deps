@@ -21,7 +21,7 @@ secret_inputs = ["password_buf"]
 public_fixed = true
 
 [presets.default.macros]
-PASSWORD_LEN = 16
+PASSWORD_LEN = 5
 SALT_LEN = 16
 HASH_LEN = 32
 ARGON2_BLOCKS = 8

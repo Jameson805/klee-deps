@@ -42,8 +42,8 @@ build_sources = [
 ]
 secret_layout = "key:32"
 secret_inputs = ["key:32:key_buf"]
-public_layout = "nonce:8,message:64"
-public_inputs = ["nonce:8:nonce_buf", "message:64:message_buf"]
+public_layout = "nonce:8,message:128"
+public_inputs = ["nonce:8:nonce_buf", "message:128:message_buf"]
 klee_secret_inputs = ["key"]
 klee_public_inputs = ["nonce", "message"]
 
@@ -68,13 +68,23 @@ build_sources = [
   "poly1305_wrapper.c",
   "monocypher-3.0.0/src/monocypher.c",
 ]
-secret_layout = "key:32,message:64"
-secret_inputs = ["key:32:key_buf", "message:64:message_buf"]
-klee_secret_inputs = ["key", "message"]
+secret_layout = "key:32"
+secret_inputs = ["key:32:key_buf"]
+public_layout = "message:64"
+public_inputs = ["message:64:message_buf"]
+klee_secret_inputs = ["key"]
+klee_public_inputs = ["message"]
 
 [[benchmarks.variants.poly1305.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
+runner_profile = "poly1305"
+
+[[benchmarks.variants.poly1305.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+use_public_inputs = true
 runner_profile = "poly1305"
 
 [benchmarks.variants.argon2i]
@@ -86,8 +96,8 @@ build_sources = [
   "argon2i_wrapper.c",
   "monocypher-3.0.0/src/monocypher.c",
 ]
-secret_layout = "password:16"
-secret_inputs = ["password:16:password_buf"]
+secret_layout = "password:5"
+secret_inputs = ["password:5:password_buf"]
 public_layout = "salt:16"
 public_inputs = ["salt:16:salt_buf"]
 klee_secret_inputs = ["password"]
@@ -113,23 +123,12 @@ runner_profile = "ed25519"
 build_sources = [
   "ed25519_wrapper.c",
   "monocypher-3.0.0/src/monocypher.c",
-  "monocypher-3.0.0/src/optional/monocypher-ed25519.c",
 ]
 secret_layout = "secret_key:32"
 secret_inputs = ["secret_key:32:secret_key_buf"]
-public_layout = "message:64"
-public_inputs = ["message:64:message_buf"]
 klee_secret_inputs = ["secret_key"]
-klee_public_inputs = ["message"]
 
 [[benchmarks.variants.ed25519.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
-runner_profile = "ed25519"
-
-[[benchmarks.variants.ed25519.configs]]
-config = "var_pub"
-public_mode = "var_pub"
-tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
-use_public_inputs = true
 runner_profile = "ed25519"

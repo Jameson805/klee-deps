@@ -2,8 +2,8 @@
 #include <sodium.h>
 
 int driver_main(void) {
-  unsigned char ciphertext[sizeof message_buf] = {0};
+  unsigned char output[MESSAGE_LEN];
 
-  return crypto_stream_chacha20_xor(ciphertext, message_buf,
+  return crypto_stream_chacha20_xor(output, message_buf,
                                     sizeof message_buf, nonce_buf, key_buf);
 }

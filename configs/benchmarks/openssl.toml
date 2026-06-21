@@ -26,11 +26,23 @@ preset = "size_{sym_size}"
 
 [benchmarks.runner_profiles.rsa_private]
 config = "configs/runner/openssl_rsa_private_runner_config.toml"
-preset = "size_{sym_size}"
+preset = "size_64"
 
 [benchmarks.runner_profiles.rsa_padding]
 config = "configs/runner/openssl_rsa_padding_runner_config.toml"
 preset = "size_{sym_size}"
+
+[benchmarks.runner_profiles.aes]
+config = "configs/runner/openssl_symmetric_aes_runner_config.toml"
+preset = "default"
+
+[benchmarks.runner_profiles.des]
+config = "configs/runner/openssl_symmetric_des_runner_config.toml"
+preset = "default"
+
+[benchmarks.runner_profiles.ecdsa]
+config = "configs/runner/openssl_ecdsa_sign_runner_config.toml"
+preset = "default"
 
 [benchmarks.tool_defaults.klee]
 code_path = "openssl-1.1.1q"
@@ -52,6 +64,52 @@ tools = ["klee_cf"]
 [benchmarks.variants.rsa_stages.tool_defaults.klee]
 code_path = "openssl-1.1.1q"
 extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
+[benchmarks.variants.aes_des.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+variables = { openssl_arch = "linux-generic64" }
+build_dep_commands = [
+	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"make clean",
+	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
+]
+
+[benchmarks.variants.aes_des.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = true
+variables = { openssl_arch = "linux-generic32" }
+
+[benchmarks.variants.aes_des.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto"]
+secret_inputs = ["key"]
+public_inputs = ["data", "iv"]
+
+[benchmarks.variants.ecdsa.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+variables = { openssl_arch = "linux-generic64" }
+build_dep_commands = [
+	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}",
+	"make clean",
+	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
+]
+
+[benchmarks.variants.ecdsa.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = true
+variables = { openssl_arch = "linux-generic32" }
+
+[benchmarks.variants.ecdsa.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/ec"]
+secret_inputs = ["private_key", "nonce"]
+public_inputs = ["digest"]
 
 [benchmarks.variants.sliced.build]
 preset = "size_{sym_size}"
@@ -142,8 +200,8 @@ target = "mont_consttime"
 [[benchmarks.variants.rsa_stages.targets]]
 target = "rsa_private_core"
 runner_profile = "rsa_private"
-secret_layout = "dp:{sym_size},dq:{sym_size}"
-secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+secret_layout = "dp:64,dq:64"
+secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
 public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["rsa_private_core_wrapper.c"]
@@ -173,43 +231,43 @@ build_sources = ["padding_check_wrapper.c"]
 defines = ["OPENSSL_RSA_PADDING_CHECK_SSLV23"]
 
 [[benchmarks.variants.rsa_stages.targets]]
-target = "pkey_rsa_pkcs1_decrypt"
+target = "rsa_private_decrypt_pkcs1"
 runner_profile = "rsa_private"
-secret_layout = "dp:{sym_size},dq:{sym_size}"
-secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+secret_layout = "dp:64,dq:64"
+secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
 public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["pkey_rsa_decrypt_wrapper.c"]
+build_sources = ["rsa_private_decrypt_wrapper.c"]
 defines = ["OPENSSL_RSA_DECRYPT_PKCS1"]
 
 [[benchmarks.variants.rsa_stages.targets]]
-target = "pkey_rsa_oaep_decrypt"
+target = "rsa_private_decrypt_oaep"
 runner_profile = "rsa_private"
-secret_layout = "dp:{sym_size},dq:{sym_size}"
-secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+secret_layout = "dp:64,dq:64"
+secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
 public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["pkey_rsa_decrypt_wrapper.c"]
+build_sources = ["rsa_private_decrypt_wrapper.c"]
 defines = ["OPENSSL_RSA_DECRYPT_OAEP"]
 
 [[benchmarks.variants.rsa_stages.targets]]
-target = "pkey_rsa_sslv23_decrypt"
+target = "rsa_private_decrypt_sslv23"
 runner_profile = "rsa_private"
-secret_layout = "dp:{sym_size},dq:{sym_size}"
-secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+secret_layout = "dp:64,dq:64"
+secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
 public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["pkey_rsa_decrypt_wrapper.c"]
+build_sources = ["rsa_private_decrypt_wrapper.c"]
 defines = ["OPENSSL_RSA_DECRYPT_SSLV23"]
 
 [[benchmarks.variants.rsa_stages.targets]]
-target = "pkey_rsa_no_padding_decrypt"
+target = "rsa_private_decrypt_no_padding"
 runner_profile = "rsa_private"
-secret_layout = "dp:{sym_size},dq:{sym_size}"
-secret_inputs = ["dp:{sym_size}:dp_buf", "dq:{sym_size}:dq_buf"]
+secret_layout = "dp:64,dq:64"
+secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
 public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["pkey_rsa_decrypt_wrapper.c"]
+build_sources = ["rsa_private_decrypt_wrapper.c"]
 defines = ["OPENSSL_RSA_DECRYPT_NO_PADDING"]
 
 [[benchmarks.variants.rsa_stages.configs]]
@@ -220,4 +278,56 @@ public_mode = "fix_pub"
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[[benchmarks.variants.aes_des.targets]]
+target = "aes_encrypt"
+runner_profile = "aes"
+secret_layout = "key:16"
+secret_inputs = ["key:16:key_buf"]
+public_layout = "data:16,iv:16"
+public_inputs = ["data:16:data_buf", "iv:16:iv_buf"]
+klee_secret_inputs = ["key"]
+klee_public_inputs = ["data", "iv"]
+build_sources = ["aes_encrypt_wrapper.c"]
+
+[[benchmarks.variants.aes_des.targets]]
+target = "des_encrypt"
+runner_profile = "des"
+secret_layout = "key:8"
+secret_inputs = ["key:8:key_buf"]
+public_layout = "data:8,iv:8"
+public_inputs = ["data:8:data_buf", "iv:8:iv_buf"]
+klee_secret_inputs = ["key"]
+klee_public_inputs = ["data", "iv"]
+build_sources = ["des_encrypt_wrapper.c"]
+
+[[benchmarks.variants.aes_des.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.aes_des.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[[benchmarks.variants.ecdsa.targets]]
+target = "ecdsa_sign"
+runner_profile = "ecdsa"
+secret_layout = "private_key:24,nonce:24"
+secret_inputs = ["private_key:24:private_key_buf", "nonce:24:nonce_buf"]
+public_layout = "digest:20"
+public_inputs = ["digest:20:digest_buf"]
+klee_secret_inputs = ["private_key", "nonce"]
+klee_public_inputs = ["digest"]
+build_sources = ["ecdsa_sign_wrapper.c"]
+
+[[benchmarks.variants.ecdsa.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.ecdsa.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true

@@ -9,11 +9,23 @@ preset = "size_{sym_size}"
 
 [benchmarks.runner_profiles.rsa_private]
 config = "configs/runner/libgcrypt_rsa_private_runner_config.toml"
-preset = "size_{sym_size}"
+preset = "size_128"
 
 [benchmarks.runner_profiles.rsa_padding]
 config = "configs/runner/libgcrypt_rsa_padding_runner_config.toml"
 preset = "size_{sym_size}"
+
+[benchmarks.runner_profiles.aes]
+config = "configs/runner/symmetric_aes_runner_config.toml"
+preset = "default"
+
+[benchmarks.runner_profiles.des]
+config = "configs/runner/symmetric_des_runner_config.toml"
+preset = "default"
+
+[benchmarks.runner_profiles.ecdsa]
+config = "configs/runner/ecdsa_sign_runner_config.toml"
+preset = "default"
 
 [benchmarks.build]
 preset = "size_{sym_size}"
@@ -98,11 +110,52 @@ variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
 code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
 extra_args = ["--ctchecker-prefix", "cipher"]
 
+[benchmarks.variants.aes_des.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1" }
+build_dep_commands = [
+	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
+	"cd {libgcrypt_dir} && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
+]
+
+[benchmarks.variants.aes_des.build.tools.abacus]
+concrete_pubs = true
+variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
+
+[benchmarks.variants.aes_des.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+secret_inputs = ["key", "data"]
+
+[benchmarks.variants.ecdsa.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1" }
+build_dep_commands = [
+	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
+	"cd {libgcrypt_dir} && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
+]
+
+[benchmarks.variants.ecdsa.build.tools.abacus]
+concrete_pubs = true
+variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
+
+[benchmarks.variants.ecdsa.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+secret_inputs = ["private_key"]
+public_inputs = ["digest"]
+
 [[benchmarks.variants.rsa_stages.targets]]
 target = "gcry_pk_decrypt_pkcs1"
 runner_profile = "rsa_private"
-secret_layout = "d:{sym_size}"
-secret_inputs = ["d:{sym_size}:d_buf"]
+secret_layout = "d:128"
+secret_inputs = ["d:128:d_buf"]
 public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
@@ -111,8 +164,8 @@ defines = ["LIBGCRYPT_RSA_DECRYPT_PKCS1"]
 [[benchmarks.variants.rsa_stages.targets]]
 target = "gcry_pk_decrypt_oaep"
 runner_profile = "rsa_private"
-secret_layout = "d:{sym_size}"
-secret_inputs = ["d:{sym_size}:d_buf"]
+secret_layout = "d:128"
+secret_inputs = ["d:128:d_buf"]
 public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
@@ -121,8 +174,8 @@ defines = ["LIBGCRYPT_RSA_DECRYPT_OAEP"]
 [[benchmarks.variants.rsa_stages.targets]]
 target = "gcry_pk_decrypt_raw"
 runner_profile = "rsa_private"
-secret_layout = "d:{sym_size}"
-secret_inputs = ["d:{sym_size}:d_buf"]
+secret_layout = "d:128"
+secret_inputs = ["d:128:d_buf"]
 public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
@@ -202,4 +255,52 @@ use_public_inputs = true
 config = "var_pub_lim_loop_break"
 public_mode = "var_pub"
 preprocess = "lim_loop_break"
+use_public_inputs = true
+
+[[benchmarks.variants.aes_des.targets]]
+target = "aes_encrypt"
+runner_profile = "aes"
+secret_layout = "key:16,data:16"
+secret_inputs = ["key:16:key_buf", "data:16:data_buf"]
+klee_secret_inputs = ["key", "data"]
+build_sources = ["cipher_encrypt_wrapper.c"]
+defines = ["LIBGCRYPT_CIPHER_AES128"]
+
+[[benchmarks.variants.aes_des.targets]]
+target = "des_encrypt"
+runner_profile = "des"
+secret_layout = "key:8,data:8"
+secret_inputs = ["key:8:key_buf", "data:8:data_buf"]
+klee_secret_inputs = ["key", "data"]
+build_sources = ["cipher_encrypt_wrapper.c"]
+defines = ["LIBGCRYPT_CIPHER_DES"]
+
+[[benchmarks.variants.aes_des.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.aes_des.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[[benchmarks.variants.ecdsa.targets]]
+target = "ecdsa_sign"
+runner_profile = "ecdsa"
+secret_layout = "private_key:32"
+secret_inputs = ["private_key:32:private_key_buf"]
+public_layout = "digest:32"
+public_inputs = ["digest:32:digest_buf"]
+klee_secret_inputs = ["private_key"]
+klee_public_inputs = ["digest"]
+build_sources = ["ecdsa_sign_wrapper.c"]
+
+[[benchmarks.variants.ecdsa.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.variants.ecdsa.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true

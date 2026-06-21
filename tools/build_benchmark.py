@@ -386,6 +386,19 @@ def _resolve_runner_config_path(
     return str(_resolve_workspace_path(workspace_root, profile.config))
 
 
+def _resolve_runner_preset(
+    benchmark_definition,
+    target_table: dict[str, object],
+    target_location: str,
+    requested_preset: str | None,
+) -> str | None:
+    profile_id = optional_string(target_table, "runner_profile", target_location)
+    _, profile = runner_profile_for_definition(benchmark_definition, profile_id)
+    if "{sym_size}" in profile.preset:
+        return requested_preset
+    return profile.preset
+
+
 def _include_flags(include_dirs: tuple[str, ...], *, code_path: Path, target_id: str, output_target: str) -> list[str]:
     flags: list[str] = []
     for include_dir in include_dirs:
@@ -627,7 +640,12 @@ def main(argv: list[str] | None = None) -> int:
             target_table=target_table,
             target_location=target_location,
             generated_dir=generated_dir,
-            preset=args.preset,
+            preset=_resolve_runner_preset(
+                benchmark_definition,
+                target_table,
+                target_location,
+                args.preset,
+            ),
             mode=mode,
         )
         artifact_dir = _artifact_dir(code_path, mode, output_target)

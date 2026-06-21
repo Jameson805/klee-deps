@@ -1,0 +1,33 @@
+[[inputs]]
+id = "key_buf"
+name = "key"
+kind = "secret"
+size = "KEY_LEN"
+
+[[inputs]]
+id = "data_buf"
+name = "data"
+kind = "secret"
+size = "DATA_LEN"
+
+[mode_policy.var_pub]
+public_symbolic = true
+
+[mode_policy.fix_pub]
+public_symbolic = false
+
+[mode_policy.abacus]
+secret_inputs = ["key_buf", "data_buf"]
+public_fixed = true
+
+[presets.default.macros]
+KEY_LEN = 8
+DATA_LEN = 8
+
+[presets.default.vars]
+
+[presets.default.abacus_secrets]
+key_buf = 0x4037d652dffbd00e
+data_buf = [
+	0x4b, 0x21, 0x30, 0xa3, 0x94, 0x18, 0xb6, 0x0b,
+]
