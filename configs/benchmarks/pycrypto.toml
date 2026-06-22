@@ -3,6 +3,8 @@ library = "pycrypto"
 code_path = "benchmarks/pycrypto"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
+[benchmarks.runner_profiles]
+
 [benchmarks.runner_profiles.default]
 config = "configs/runner/pycrypto_arc4_runner_config.toml"
 preset = "default"
@@ -12,18 +14,10 @@ preset = "default"
 common_flags = ["-g", "-O0", "-std=gnu89"]
 include_dirs = ["{repo_root}/include"]
 
+[benchmarks.build.tools]
+
 [benchmarks.build.tools.abacus]
 concrete_pubs = true
-
-[benchmarks.variants.default]
-
-[[benchmarks.targets]]
-target = "arc4"
-runner_profile = "default"
-build_sources = ["arc4_wrapper.c"]
-secret_layout = "key:32"
-secret_inputs = ["key:32:key_buf"]
-klee_secret_inputs = ["key"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -33,3 +27,10 @@ public_mode = "fix_pub"
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[benchmarks.targets.arc4]
+runner_profile = "default"
+build_sources = ["arc4_wrapper.c"]
+secret_layout = "key:32"
+secret_inputs = ["key:32:key_buf"]
+klee_secret_inputs = ["key"]

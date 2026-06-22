@@ -66,11 +66,10 @@ def _load_abacus_cases(benchmark_definition) -> list[dict[str, object]]:
     cases: list[dict[str, object]] = []
     for expanded_case in expand_benchmark_cases(benchmark_definition, "abacus"):
         case = {
-            "executable": f"{benchmark_definition.code_path}/artifacts/abacus/{expanded_case.output_target}/{expanded_case.public_mode}",
-            "outfile": f"{canonical_case_id(benchmark_definition.library_id, benchmark_definition.variant_id, expanded_case.target_id, expanded_case.config_id)}.txt",
-            "source_column_suffix": expanded_case.public_mode,
-            "public_mode": expanded_case.public_mode,
-            "sliced": expanded_case.variant_id == "sliced",
+            "executable": f"{benchmark_definition.code_path}/artifacts/abacus/{expanded_case.output_target}/{expanded_case.artifact_config}",
+            "outfile": f"{canonical_case_id(benchmark_definition.library_id, benchmark_definition.target_id, expanded_case.config_id)}.txt",
+            "config": expanded_case.config_id,
+            "sliced": benchmark_definition.target_id.endswith("_sliced"),
         }
         runner_profile = optional_string(
             expanded_case.config_table,
@@ -114,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         "--benchmarks",
         help=(
             "Comma-separated benchmark groups to run. Valid: "
-            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in selected_benchmarks("abacus", None))
+            + ",".join(format_benchmark_selector(library_id, target_id) for library_id, target_id in selected_benchmarks("abacus", None))
         ),
     )
     args = parser.parse_args(argv)
@@ -147,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
         context.log(f"results_dir={results_dir}")
         context.log(
             "benchmarks="
-            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in benchmarks)
+            + ",".join(format_benchmark_selector(library_id, target_id) for library_id, target_id in benchmarks)
         )
         context.log("##########")
         launched_runs: list[LaunchedProcess] = []
@@ -162,8 +161,8 @@ def main(argv: list[str] | None = None) -> int:
 
         seen_case_outputs: set[str] = set()
         try:
-            for library_id, variant_id in benchmarks:
-                benchmark_definition = definition(library_id, variant_id)
+            for library_id, target_id in benchmarks:
+                benchmark_definition = definition(library_id, target_id)
                 case_entries = _load_abacus_cases(benchmark_definition)
                 if not case_entries:
                     continue
@@ -179,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
                     if output_stem in seen_case_outputs:
                         raise SystemExit(f"duplicate ABACUS output stem across selected cases: {output_stem}")
                     seen_case_outputs.add(output_stem)
-                    worker_tag = f"{format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.variant_id)} ({Path(executable).name})"
+                    worker_tag = f"{format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.target_id)} ({Path(executable).name})"
                     worker_log_path = results_dir / "_worker_logs" / f"{output_stem}.log"
                     worker_log_path.parent.mkdir(parents=True, exist_ok=True)
                     context.log(
@@ -189,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
                         launch_output_captured_process(
                             worker_tag,
                             run_benchmark,
-                            (None, str(results_dir), args, library_id, variant_id, index),
+                            (None, str(results_dir), args, library_id, target_id, index),
                             log_path=worker_log_path,
                             verbose=args.verbose,
                         )
@@ -207,18 +206,18 @@ def run_benchmark(
     results_dir,
     args,
     library_id,
-    variant_id,
+    target_id,
     case_index,
     output_queue=None,
 ):
-    """Build one benchmark variant and execute exactly one selected ABACUS case."""
+    """Build one benchmark target and execute exactly one selected ABACUS case."""
     def worker_main() -> None:
         local_context = context or ExperimentContext()
         local_results_dir = Path(results_dir)
         abacus_root = Path(args.abacus_root)
-        benchmark_definition = definition(library_id, variant_id)
+        benchmark_definition = definition(library_id, target_id)
         build = build_for_tool(benchmark_definition, "abacus")
-        selector_text = format_benchmark_selector(library_id, variant_id)
+        selector_text = format_benchmark_selector(library_id, target_id)
         local_context.log("##########")
         local_context.log(f"Begin experiments for {selector_text}")
         local_context.log("##########")
@@ -266,7 +265,8 @@ def run_benchmark(
                 )
             output_metadata = {
                 **normalized_case_output_metadata(case_table, case_location),
-                "library_key": benchmark_definition.library_id,
+                "library": benchmark_definition.library_id,
+                "target": benchmark_definition.target_id,
             }
             run_case(
                 local_context,

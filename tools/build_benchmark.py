@@ -363,16 +363,13 @@ def _tool_mode(tool_id: str) -> str:
     raise ValueError(f"unsupported build tool {tool_id!r}")
 
 
-def _load_build_config(benchmark_definition) -> tuple[dict[str, object], list[dict[str, object]]]:
+def _load_build_config(benchmark_definition) -> tuple[dict[str, object], dict[str, object]]:
     location = benchmark_definition.config_location
     build = expect_table(
         benchmark_definition.extra_config.get("build"),
         f"{location}.build",
     )
-    targets = expect_array(benchmark_definition.extra_config.get("targets"), f"{location}.targets")
-    if not targets:
-        raise ValueError(f"{location}.targets must not be empty")
-    return build, [expect_table(raw_target, f"{location}.targets[{index}]") for index, raw_target in enumerate(targets)]
+    return build, benchmark_definition.extra_config
 
 
 def _resolve_runner_config_path(
@@ -417,12 +414,6 @@ def _render_path_list(
         _render(value, code_path=code_path, target_id=target_id, output_target=output_target)
         for value in values
     ]
-
-
-def _output_target(target_id: str, variant_id: str) -> str:
-    if variant_id == "default":
-        return target_id
-    return f"{target_id}_{variant_id}"
 
 
 def _artifact_dir(code_path: Path, mode: str, output_target: str) -> Path:
@@ -511,7 +502,7 @@ def _generate_runner_artifacts(
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build one benchmark through the shared config-driven builder.")
-    parser.add_argument("--benchmark", required=True, help="Benchmark selector in LIBRARY:VARIANT form")
+    parser.add_argument("--benchmark", required=True, help="Benchmark selector in LIBRARY:TARGET form")
     parser.add_argument(
         "--tool",
         required=True,
@@ -526,9 +517,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     workspace_root = _workspace_root()
-    library_id, variant_id = parse_benchmark_selector(args.benchmark)
-    benchmark_definition = definition(library_id, variant_id)
-    build_table, targets = _load_build_config(benchmark_definition)
+    library_id, target_id = parse_benchmark_selector(args.benchmark)
+    benchmark_definition = definition(library_id, target_id)
+    build_table, target_table = _load_build_config(benchmark_definition)
 
     mode = _tool_mode(args.tool)
     code_path = _resolve_workspace_path(workspace_root, benchmark_definition.code_path)
@@ -592,7 +583,7 @@ def main(argv: list[str] | None = None) -> int:
         "repo_root": str(workspace_root),
         "code_path": str(code_path),
         "mode": mode,
-        "variant": variant_id,
+        "target": target_id,
         "preset": args.preset or "",
         "cc": dep_cc,
         "dep_cflags": " ".join(dep_cflags),
@@ -614,10 +605,9 @@ def main(argv: list[str] | None = None) -> int:
         _run_shared_commands(build_dep_commands, cwd=code_path, env=shared_env, variables=command_vars)
 
     built_targets = 0
-    for index, target_table in enumerate(targets):
-        target_location = f"{benchmark_definition.config_location}.targets[{index}]"
-        target_id = expect_string(target_table, "target", target_location)
-        output_target = _output_target(target_id, variant_id)
+    for target_table in (target_table,):
+        target_location = f"{benchmark_definition.config_location}.targets.{target_id}"
+        output_target = target_id
         generated_dir = code_path / "generated" / output_target
         sources = [
             _render(source, code_path=code_path, target_id=target_id, output_target=output_target)

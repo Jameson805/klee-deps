@@ -3,6 +3,8 @@ library = "openssl_almeida"
 code_path = "benchmarks/openssl_almeida"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
+[benchmarks.runner_profiles]
+
 [benchmarks.runner_profiles.default]
 config = "configs/runner/openssl_almeida_tls_rempad_luk13_runner_config.toml"
 preset = "default"
@@ -12,18 +14,10 @@ preset = "default"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include", "{code_path}"]
 
+[benchmarks.build.tools]
+
 [benchmarks.build.tools.abacus]
 concrete_pubs = false
-
-[benchmarks.variants.default]
-
-[[benchmarks.targets]]
-target = "tls_rempad_luk13"
-runner_profile = "default"
-build_sources = ["tls_rempad_luk13_wrapper.c"]
-secret_layout = "data:63"
-secret_inputs = ["data:63:data_buf"]
-klee_secret_inputs = ["data"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -36,11 +30,12 @@ public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 public_layout = "options:4,s3_flags:4,flags:4,slicing_cheat:4,mac_size:4"
-public_inputs = [
-    "options:4:options_buf",
-    "s3_flags:4:s3_flags_buf",
-    "flags:4:flags_buf",
-    "slicing_cheat:4:slicing_cheat_buf",
-    "mac_size:4:mac_size_buf",
-]
+public_inputs = ["options:4:options_buf", "s3_flags:4:s3_flags_buf", "flags:4:flags_buf", "slicing_cheat:4:slicing_cheat_buf", "mac_size:4:mac_size_buf"]
 klee_public_inputs = ["options", "s3_flags", "flags", "slicing_cheat", "mac_size"]
+
+[benchmarks.targets.tls_rempad_luk13]
+runner_profile = "default"
+build_sources = ["tls_rempad_luk13_wrapper.c"]
+secret_layout = "data:63"
+secret_inputs = ["data:63:data_buf"]
+klee_secret_inputs = ["data"]

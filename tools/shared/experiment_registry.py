@@ -36,35 +36,31 @@ def _expect_string_list(table: dict[str, object], key: str, location: str) -> li
     return list(values)
 
 
-def format_benchmark_selector(library_id: str, variant_id: str) -> str:
-    """Render the canonical CLI selector for one benchmark variant."""
-    return f"{library_id}:{variant_id}"
+def format_benchmark_selector(library_id: str, target_id: str) -> str:
+    """Render the canonical CLI selector for one benchmark target."""
+    return f"{library_id}:{target_id}"
 
 
 def parse_benchmark_selector(raw_value: str) -> tuple[str, str]:
-    """Parse the ``LIBRARY:VARIANT`` selectors accepted by runner CLIs."""
-    library_id, separator, variant_id = raw_value.partition(":")
-    if not separator or not library_id or not variant_id:
+    """Parse the ``LIBRARY:TARGET`` selectors accepted by runner CLIs."""
+    library_id, separator, target_id = raw_value.partition(":")
+    if not separator or not library_id or not target_id:
         raise ValueError(
-            f"invalid benchmark selector {raw_value!r}; expected LIBRARY:VARIANT"
+            f"invalid benchmark selector {raw_value!r}; expected LIBRARY:TARGET"
         )
-    return (library_id, variant_id)
+    return (library_id, target_id)
 
 
-def canonical_case_id(library_id: str, variant_id: str, target_id: str, config_id: str) -> str:
+def canonical_case_id(library_id: str, target_id: str, config_id: str) -> str:
     """Build the stable machine-oriented id for one expanded case."""
-    parts = [f"{library_id}_{variant_id}"]
-    if target_id:
-        parts.append(target_id)
+    parts = [f"{library_id}_{target_id}"]
     parts.append(config_id)
     return "_".join(parts)
 
 
-def canonical_case_title(library_id: str, variant_id: str, target_id: str, config_id: str) -> str:
+def canonical_case_title(library_id: str, target_id: str, config_id: str) -> str:
     """Build the stable human-readable title for one expanded case."""
-    selector = format_benchmark_selector(library_id, variant_id)
-    if target_id:
-        return f"{selector} {target_id} ({config_id})"
+    selector = format_benchmark_selector(library_id, target_id)
     return f"{selector} ({config_id})"
 
 
@@ -91,7 +87,7 @@ class BenchmarkRunnerProfile:
 class BenchmarkDefinition:
     config_location: str
     library_id: str
-    variant_id: str
+    target_id: str
     code_path: str
     tools: frozenset[str]
     runner_profiles: dict[str, BenchmarkRunnerProfile]
@@ -99,19 +95,19 @@ class BenchmarkDefinition:
 
 
 @dataclass(frozen=True)
-class _ParsedVariant:
-    variant_id: str
+class _ParsedTarget:
+    target_id: str
     tools: frozenset[str]
     overrides: dict[str, object]
 
 
-def definition(library_id: str, variant_id: str) -> BenchmarkDefinition:
-    """Return the parsed benchmark definition for one ``library:variant``."""
+def definition(library_id: str, target_id: str) -> BenchmarkDefinition:
+    """Return the parsed benchmark definition for one ``library:target``."""
     try:
-        return _BENCHMARKS_BY_IDENTITY[(library_id, variant_id)]
+        return _BENCHMARKS_BY_IDENTITY[(library_id, target_id)]
     except KeyError as error:
         raise ValueError(
-            f"unknown benchmark {format_benchmark_selector(library_id, variant_id)!r}"
+            f"unknown benchmark {format_benchmark_selector(library_id, target_id)!r}"
         ) from error
 
 
@@ -119,7 +115,7 @@ def build_for_tool(benchmark_definition: BenchmarkDefinition, tool_id: str) -> B
     """Resolve the benchmark build configuration for a given tool."""
     if tool_id not in benchmark_definition.tools:
         raise ValueError(
-            f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.variant_id)!r} does not support tool {tool_id!r}"
+            f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.target_id)!r} does not support tool {tool_id!r}"
         )
     build_location = f"{benchmark_definition.config_location}.build"
     build_table = expect_table(benchmark_definition.extra_config.get("build"), build_location)
@@ -136,7 +132,7 @@ def runner_profile_for_definition(
     runner_profiles = benchmark_definition.runner_profiles
     if not runner_profiles:
         raise ValueError(
-            f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.variant_id)!r} does not define runner profiles"
+            f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.target_id)!r} does not define runner profiles"
         )
 
     if profile_id is None:
@@ -145,7 +141,7 @@ def runner_profile_for_definition(
             return resolved_profile_id, runner_profiles[resolved_profile_id]
         available_profiles = ", ".join(sorted(runner_profiles))
         raise ValueError(
-            f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.variant_id)!r} requires an explicit runner profile; expected one of {available_profiles}"
+            f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.target_id)!r} requires an explicit runner profile; expected one of {available_profiles}"
         )
 
     try:
@@ -153,12 +149,12 @@ def runner_profile_for_definition(
     except KeyError as error:
         available_profiles = ", ".join(sorted(runner_profiles))
         raise ValueError(
-            f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.variant_id)!r} does not define runner profile {profile_id!r}; expected one of {available_profiles}"
+            f"benchmark {format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.target_id)!r} does not define runner profile {profile_id!r}; expected one of {available_profiles}"
         ) from error
 
 
 def selected_benchmarks(tool_id: str, benchmark_csv: str | None) -> list[tuple[str, str]]:
-    """Return selected ``(library_id, variant_id)`` pairs for one tool."""
+    """Return selected ``(library_id, target_id)`` pairs for one tool."""
     try:
         benchmark_selectors = list(_BENCHMARK_IDENTITIES_BY_TOOL[tool_id])
     except KeyError as error:
@@ -217,34 +213,34 @@ def _parse_runner_profiles(
     return profiles
 
 
-def _parse_variant(
-    variant_id: str,
-    raw_variant: object,
+def _parse_target(
+    target_id: str,
+    raw_target: object,
     location: str,
     default_tools: frozenset[str],
-) -> _ParsedVariant:
-    if not variant_id:
-        raise ValueError(f"{location}.variants contains an empty variant key")
+) -> _ParsedTarget:
+    if not target_id:
+        raise ValueError(f"{location}.targets contains an empty target key")
 
-    variant_table = expect_table(raw_variant, location)
-    raw_variant_tools = variant_table.get("tools")
-    variant_tools = (
-        frozenset(_expect_string_list(variant_table, "tools", location))
-        if raw_variant_tools is not None
+    target_table = expect_table(raw_target, location)
+    raw_target_tools = target_table.get("tools")
+    target_tools = (
+        frozenset(_expect_string_list(target_table, "tools", location))
+        if raw_target_tools is not None
         else default_tools
     )
-    invalid_tools = sorted(variant_tools - default_tools)
+    invalid_tools = sorted(target_tools - default_tools)
     if invalid_tools:
         raise ValueError(
             f"{location}.tools lists unsupported tools: {', '.join(invalid_tools)}"
         )
 
-    return _ParsedVariant(
-        variant_id=variant_id,
-        tools=variant_tools,
+    return _ParsedTarget(
+        target_id=target_id,
+        tools=target_tools,
         overrides={
             key: value
-            for key, value in variant_table.items()
+            for key, value in target_table.items()
             if key not in {"tools"}
         },
     )
@@ -258,13 +254,13 @@ def _generated_definitions(
     code_path = expect_string(definition_table, "code_path", location)
     tools = frozenset(_expect_string_list(definition_table, "tools", location))
     runner_profiles = _parse_runner_profiles(definition_table.get("runner_profiles"), location)
-    variants_table = expect_table(definition_table.get("variants"), f"{location}.variants")
-    if not variants_table:
-        raise ValueError(f"{location}.variants must not be empty")
+    targets_table = expect_table(definition_table.get("targets"), f"{location}.targets")
+    if not targets_table:
+        raise ValueError(f"{location}.targets must not be empty")
 
-    parsed_variants = [
-        _parse_variant(variant_id, raw_variant, f"{location}.variants.{variant_id}", tools)
-        for variant_id, raw_variant in variants_table.items()
+    parsed_targets = [
+        _parse_target(target_id, raw_target, f"{location}.targets.{target_id}", tools)
+        for target_id, raw_target in targets_table.items()
     ]
 
     generic_fields = frozenset(
@@ -273,14 +269,14 @@ def _generated_definitions(
             "code_path",
             "tools",
             "runner_profiles",
-            "variants",
+            "targets",
         }
     )
 
     definitions: list[BenchmarkDefinition] = []
-    for parsed_variant in parsed_variants:
+    for parsed_target in parsed_targets:
         merged_definition_table = dict(definition_table)
-        merged_definition_table.update(parsed_variant.overrides)
+        merged_definition_table.update(parsed_target.overrides)
         merged_extra_config = {
             key: value
             for key, value in merged_definition_table.items()
@@ -290,9 +286,9 @@ def _generated_definitions(
             BenchmarkDefinition(
                 config_location=location,
                 library_id=library_id,
-                variant_id=parsed_variant.variant_id,
+                target_id=parsed_target.target_id,
                 code_path=code_path,
-                tools=parsed_variant.tools,
+                tools=parsed_target.tools,
                 runner_profiles=runner_profiles,
                 extra_config=merged_extra_config,
             )
@@ -315,7 +311,7 @@ def _load_registry() -> tuple[
             "code_path",
             "tools",
             "runner_profiles",
-            "variants",
+            "targets",
         }
     )
     for config_path in sorted(BENCHMARK_CONFIG_DIR.glob("*.toml")):
@@ -328,14 +324,14 @@ def _load_registry() -> tuple[
         for index, raw_definition in enumerate(benchmarks):
             location = f"{config_path.relative_to(REPO_ROOT)}.benchmarks[{index}]"
             definition_table = expect_table(raw_definition, location)
-            if "variants" not in definition_table:
-                raise ValueError(f"{location} must define variants")
+            if "targets" not in definition_table:
+                raise ValueError(f"{location} must define targets")
             loaded_definitions = _generated_definitions(definition_table, location)
             for benchmark_definition in loaded_definitions:
-                identity = (benchmark_definition.library_id, benchmark_definition.variant_id)
+                identity = (benchmark_definition.library_id, benchmark_definition.target_id)
                 if identity in seen_identities:
                     raise ValueError(
-                        f"duplicate benchmark selector '{format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.variant_id)}' in {config_path.relative_to(REPO_ROOT)}"
+                        f"duplicate benchmark selector '{format_benchmark_selector(benchmark_definition.library_id, benchmark_definition.target_id)}' in {config_path.relative_to(REPO_ROOT)}"
                     )
                 definitions.append(benchmark_definition)
                 seen_identities.add(identity)
@@ -347,7 +343,7 @@ def _load_registry() -> tuple[
     return (
         tuple(definitions),
         {
-            (benchmark_definition.library_id, benchmark_definition.variant_id): benchmark_definition
+            (benchmark_definition.library_id, benchmark_definition.target_id): benchmark_definition
             for benchmark_definition in definitions
         },
         {

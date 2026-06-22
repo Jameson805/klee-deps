@@ -3,6 +3,8 @@ library = "hacl_modexp"
 code_path = "benchmarks/hacl-packages-c-v0.6.0"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
+[benchmarks.runner_profiles]
+
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
@@ -10,41 +12,21 @@ preset = "size_{sym_size}"
 [benchmarks.build]
 preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
-include_dirs = [
-    "{repo_root}/include",
-    "include",
-    "karamel/include",
-    "karamel/krmllib/dist/minimal",
-    "build",
-]
-prepare_commands = [
-    "mkdir -p build",
-]
+include_dirs = ["{repo_root}/include", "include", "karamel/include", "karamel/krmllib/dist/minimal", "build"]
+prepare_commands = ["mkdir -p build"]
+
+[benchmarks.build.tools]
 
 [benchmarks.build.tools.abacus]
 concrete_pubs = false
+
+[benchmarks.tool_defaults]
 
 [benchmarks.tool_defaults.klee]
 code_path = "hacl-packages-c-v0.6.0"
 extra_args = ["--ctchecker-prefix", "src"]
 secret_inputs = ["exp"]
 public_inputs = ["base", "mod"]
-
-[benchmarks.variants.default]
-
-[[benchmarks.targets]]
-target = "modexp32"
-runner_profile = "default"
-secret_inputs = ["exp:{sym_size}:exp_buf"]
-public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
-build_sources = ["modexp32_wrapper.c", "src/Hacl_Bignum32.c", "src/Hacl_Bignum.c"]
-
-[[benchmarks.targets]]
-target = "modexp64"
-runner_profile = "default"
-secret_inputs = ["exp:{sym_size}:exp_buf"]
-public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
-build_sources = ["modexp64_wrapper.c", "src/Hacl_Bignum64.c", "src/Hacl_Bignum.c"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -57,10 +39,24 @@ public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 
+[benchmarks.targets.modexp32]
+runner_profile = "default"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp32_wrapper.c", "src/Hacl_Bignum32.c", "src/Hacl_Bignum.c"]
+
+[benchmarks.targets.modexp64]
+runner_profile = "default"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp64_wrapper.c", "src/Hacl_Bignum64.c", "src/Hacl_Bignum.c"]
+
 [[benchmarks]]
 library = "hacl"
 code_path = "benchmarks/hacl-packages-c-v0.6.0"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[benchmarks.runner_profiles]
 
 [benchmarks.runner_profiles.chacha20]
 config = "configs/runner/hacl_chacha20_runner_config.toml"
@@ -81,25 +77,16 @@ preset = "sha512"
 [benchmarks.build]
 preset = "default"
 common_flags = ["-g", "-O0"]
-include_dirs = [
-    "{repo_root}/include",
-    "include",
-    "karamel/include",
-    "karamel/krmllib/dist/minimal",
-    "build",
-]
-prepare_commands = [
-    "mkdir -p build",
-]
+include_dirs = ["{repo_root}/include", "include", "karamel/include", "karamel/krmllib/dist/minimal", "build"]
+prepare_commands = ["mkdir -p build"]
+
+[benchmarks.tool_defaults]
 
 [benchmarks.tool_defaults.klee]
 code_path = "hacl-packages-c-v0.6.0"
 extra_args = ["--ctchecker-prefix", "src"]
 
-[benchmarks.variants.chacha20]
-
-[[benchmarks.variants.chacha20.targets]]
-target = "chacha20"
+[benchmarks.targets.chacha20]
 runner_profile = "chacha20"
 build_sources = ["chacha20_wrapper.c", "src/Hacl_Chacha20.c"]
 secret_layout = "key:32,message:256,output:256"
@@ -109,62 +96,68 @@ public_inputs = ["nonce:12:nonce_buf"]
 klee_secret_inputs = ["key", "message", "output"]
 klee_public_inputs = ["nonce"]
 
-[[benchmarks.variants.chacha20.configs]]
+[[benchmarks.targets.chacha20.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "chacha20"
 
-[[benchmarks.variants.chacha20.configs]]
+[[benchmarks.targets.chacha20.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 runner_profile = "chacha20"
 
-[benchmarks.variants.curve25519]
-
-[[benchmarks.variants.curve25519.targets]]
-target = "curve25519"
+[benchmarks.targets.curve25519]
 runner_profile = "curve25519"
-build_sources = [
-    "curve25519_wrapper.c",
-    "src/Hacl_Curve25519_51.c",
-]
+build_sources = ["curve25519_wrapper.c", "src/Hacl_Curve25519_51.c"]
 secret_layout = "scalar:32,output:32"
 secret_inputs = ["scalar:32:scalar_buf", "output:32:output_buf", "point:32:point_buf"]
 klee_secret_inputs = ["scalar", "output", "point"]
 
-[[benchmarks.variants.curve25519.configs]]
+[[benchmarks.targets.curve25519.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "curve25519"
 
-[benchmarks.variants.sha256]
+[[benchmarks.targets.curve25519.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+runner_profile = "curve25519"
 
-[[benchmarks.variants.sha256.targets]]
-target = "sha256"
+[benchmarks.targets.sha256]
 runner_profile = "sha256"
 build_sources = ["sha256_wrapper.c", "src/Hacl_Hash_SHA2.c"]
 secret_layout = "message:256"
 secret_inputs = ["message:256:message_buf"]
 klee_secret_inputs = ["message"]
 
-[[benchmarks.variants.sha256.configs]]
+[[benchmarks.targets.sha256.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "sha256"
 
-[benchmarks.variants.sha512]
+[[benchmarks.targets.sha256.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+runner_profile = "sha256"
 
-[[benchmarks.variants.sha512.targets]]
-target = "sha512"
+[benchmarks.targets.sha512]
 runner_profile = "sha512"
 build_sources = ["sha512_wrapper.c", "src/Hacl_Hash_SHA2.c"]
 secret_layout = "message:256"
 secret_inputs = ["message:256:message_buf"]
 klee_secret_inputs = ["message"]
 
-[[benchmarks.variants.sha512.configs]]
+[[benchmarks.targets.sha512.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
+runner_profile = "sha512"
+
+[[benchmarks.targets.sha512.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 runner_profile = "sha512"

@@ -17,7 +17,7 @@ RUN_METADATA_FILENAME = "_run_metadata.json"
 LABEL_FIELDS = (
     "searcher",
     "sym_size",
-    "public_mode",
+    "config",
     "cv_model",
 )
 
@@ -55,21 +55,22 @@ def derive_run_configuration(
 def case_output_metadata(case_table: Mapping[str, Any]) -> dict[str, Any]:
     """Normalize the case-level metadata required by postprocessing.
 
-    Runners must provide either ``source_column_suffix`` or ``public_mode``.
-    The helper mirrors one to the other, but intentionally does not infer them
-    from filenames or tool-specific naming conventions.
+    Runners provide the explicit benchmark config id, such as ``fix_pub`` or
+    ``var_pub``. The helper keeps older metadata names readable as input only
+    for existing tests and generated results.
     """
-    explicit_suffix = case_table.get("source_column_suffix")
+    explicit_config = case_table.get("config")
     explicit_public_mode = case_table.get("public_mode")
+    explicit_suffix = case_table.get("source_column_suffix")
     explicit_sliced = case_table.get("sliced")
 
     if explicit_sliced is not None and not isinstance(explicit_sliced, bool):
         raise ValueError("case metadata field 'sliced' must be a boolean")
 
     sliced = bool(explicit_sliced)
-    source_column_suffix = (
-        explicit_suffix.strip()
-        if isinstance(explicit_suffix, str) and explicit_suffix.strip()
+    config = (
+        explicit_config.strip()
+        if isinstance(explicit_config, str) and explicit_config.strip()
         else None
     )
     public_mode = (
@@ -77,20 +78,20 @@ def case_output_metadata(case_table: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(explicit_public_mode, str) and explicit_public_mode.strip()
         else None
     )
+    source_column_suffix = (
+        explicit_suffix.strip()
+        if isinstance(explicit_suffix, str) and explicit_suffix.strip()
+        else None
+    )
 
-    if source_column_suffix is None:
-        source_column_suffix = public_mode
-    if public_mode is None:
-        public_mode = source_column_suffix
+    if config is None:
+        config = public_mode or source_column_suffix
 
-    if source_column_suffix is None or public_mode is None:
-        raise ValueError(
-            "case metadata must define source_column_suffix or public_mode explicitly"
-        )
+    if config is None:
+        raise ValueError("case metadata must define config explicitly")
 
     return {
-        "source_column_suffix": source_column_suffix,
-        "public_mode": public_mode,
+        "config": config,
         "sliced": sliced,
     }
 
@@ -108,7 +109,7 @@ def configuration_label(metadata: Mapping[str, Any]) -> str:
 def build_source_column(run_metadata: Mapping[str, Any], case_metadata: Mapping[str, Any]) -> str:
     """Build the merged-CSV source column for one run/case combination."""
     prefix = str(run_metadata["source_column_prefix"])
-    suffix = str(case_metadata["source_column_suffix"])
+    suffix = str(case_metadata["config"])
     if bool(case_metadata.get("sliced")):
         return f"{prefix}_sliced_{suffix}"
     return f"{prefix}_{suffix}"
@@ -119,19 +120,18 @@ def build_column_metadata(
     case_metadata: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Combine run metadata and case metadata into one column record."""
+    normalized_case_metadata = case_output_metadata(case_metadata)
     tool_family = str(run_metadata["tool_family"])
-    sliced = bool(case_metadata.get("sliced"))
+    sliced = bool(normalized_case_metadata.get("sliced"))
     metadata = {
-        "source_column": build_source_column(run_metadata, case_metadata),
+        "source_column": build_source_column(run_metadata, normalized_case_metadata),
         "tool_family": tool_family,
         "comparison_tool": f"{tool_family}_sliced" if sliced else tool_family,
         "sliced": sliced,
         "searcher": str(run_metadata["searcher"]),
         "sym_size": str(run_metadata["sym_size"]),
-        "public_mode": str(case_metadata["public_mode"]),
+        "config": str(normalized_case_metadata["config"]),
         "cv_model": str(run_metadata["cv_model"]),
-        "raw_suffix": str(case_metadata["source_column_suffix"]),
-        "normalized_suffix": str(case_metadata["public_mode"]),
     }
     metadata["configuration_label"] = configuration_label(metadata)
     return metadata

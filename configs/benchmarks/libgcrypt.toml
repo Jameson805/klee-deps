@@ -3,6 +3,8 @@ library = "libgcrypt"
 code_path = "benchmarks/libgcrypt-and-libgpg-error"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
+[benchmarks.runner_profiles]
+
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
@@ -32,16 +34,22 @@ preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
 link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
-variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1" }
 prepare_commands = ["mkdir -p generated/modexp"]
-build_dep_commands = [
-	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-	"cd {libgcrypt_dir} && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd {libgcrypt_dir} && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1"
+
+[benchmarks.build.tools]
 
 [benchmarks.build.tools.abacus]
 concrete_pubs = false
-variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
+
+[benchmarks.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.tool_defaults]
 
 [benchmarks.tool_defaults.klee]
 code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/mpi"
@@ -49,19 +57,10 @@ secret_inputs = ["exp"]
 public_inputs = ["base", "mod"]
 mod_exp_extra_args = ["--filename", "mpi-pow.c", "--lines", "404:771"]
 
+[benchmarks.tool_defaults.klee.preprocess_profiles]
+
 [benchmarks.tool_defaults.klee.preprocess_profiles.lim_loop_break]
 arguments = ["-break", "-o", "{output}", "{input}"]
-
-[benchmarks.variants.default]
-
-[[benchmarks.targets]]
-target = "modexp"
-runner_profile = "default"
-secret_layout = "exp:{sym_size}"
-secret_inputs = ["exp:{sym_size}:exp_buf"]
-public_layout = "base:{sym_size},mod:{sym_size}"
-public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
-build_sources = ["modexp_wrapper.c"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -81,159 +80,16 @@ tools = ["klee_cf", "klee_eager"]
 preprocess = "lim_loop_break"
 use_public_inputs = true
 
-[benchmarks.variants.sliced]
+[benchmarks.targets.modexp]
+runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp_wrapper.c"]
+
+[benchmarks.targets.modexp_sliced]
 tools = ["klee_cf"]
-
-[benchmarks.variants.rsa_stages.build]
-preset = "size_{sym_size}"
-common_flags = ["-g", "-O0"]
-include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
-link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
-variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1" }
-build_dep_commands = [
-	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-	"cd {libgcrypt_dir} && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-]
-
-[benchmarks.variants.rsa_stages.build.tools.klee]
-link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
-
-[benchmarks.variants.rsa_stages.build.tools.binsec]
-link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
-
-[benchmarks.variants.rsa_stages.build.tools.abacus]
-link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
-concrete_pubs = false
-variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
-
-[benchmarks.variants.rsa_stages.tool_defaults.klee]
-code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
-extra_args = ["--ctchecker-prefix", "cipher"]
-
-[benchmarks.variants.aes_des.build]
-preset = "default"
-common_flags = ["-g", "-O0"]
-include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
-link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
-variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1" }
-build_dep_commands = [
-	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-	"cd {libgcrypt_dir} && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-]
-
-[benchmarks.variants.aes_des.build.tools.abacus]
-concrete_pubs = true
-variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
-
-[benchmarks.variants.aes_des.tool_defaults.klee]
-code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
-extra_args = ["--ctchecker-prefix", "cipher"]
-secret_inputs = ["key", "data"]
-
-[benchmarks.variants.ecdsa.build]
-preset = "default"
-common_flags = ["-g", "-O0"]
-include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
-link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
-variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1" }
-build_dep_commands = [
-	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-	"cd {libgcrypt_dir} && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-]
-
-[benchmarks.variants.ecdsa.build.tools.abacus]
-concrete_pubs = true
-variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
-
-[benchmarks.variants.ecdsa.tool_defaults.klee]
-code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
-extra_args = ["--ctchecker-prefix", "cipher"]
-secret_inputs = ["private_key"]
-public_inputs = ["digest"]
-
-[[benchmarks.variants.rsa_stages.targets]]
-target = "gcry_pk_decrypt_pkcs1"
-runner_profile = "rsa_private"
-secret_layout = "d:128"
-secret_inputs = ["d:128:d_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
-defines = ["LIBGCRYPT_RSA_DECRYPT_PKCS1"]
-
-[[benchmarks.variants.rsa_stages.targets]]
-target = "gcry_pk_decrypt_oaep"
-runner_profile = "rsa_private"
-secret_layout = "d:128"
-secret_inputs = ["d:128:d_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
-defines = ["LIBGCRYPT_RSA_DECRYPT_OAEP"]
-
-[[benchmarks.variants.rsa_stages.targets]]
-target = "gcry_pk_decrypt_raw"
-runner_profile = "rsa_private"
-secret_layout = "d:128"
-secret_inputs = ["d:128:d_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
-defines = ["LIBGCRYPT_RSA_DECRYPT_RAW"]
-
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_pkcs1_decode_for_enc"
-runner_profile = "rsa_padding"
-secret_layout = "encoded:128"
-secret_inputs = ["encoded:128:encoded_buf"]
-build_sources = ["rsa_padding_decode_wrapper.c", "libgcrypt_randomize_wrapper.c"]
-defines = ["LIBGCRYPT_RSA_PKCS1_DECODE_FOR_ENC"]
-
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_oaep_decode"
-runner_profile = "rsa_padding"
-secret_layout = "encoded:128"
-secret_inputs = ["encoded:128:encoded_buf"]
-build_sources = ["rsa_padding_decode_wrapper.c", "libgcrypt_randomize_wrapper.c"]
-defines = ["LIBGCRYPT_RSA_OAEP_DECODE"]
-
-[[benchmarks.variants.rsa_stages.configs]]
-config = "fix_pub"
-public_mode = "fix_pub"
-
-[[benchmarks.variants.rsa_stages.configs]]
-config = "var_pub"
-public_mode = "var_pub"
-tools = ["klee_cf", "klee_eager", "binsec"]
-use_public_inputs = true
-
-[benchmarks.variants.sliced.build]
-preset = "size_{sym_size}"
-common_flags = ["-g", "-O0"]
-include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
-link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
-variables = { libgcrypt_host = "", libgcrypt_dir = "libgcrypt-1.10.1-sliced" }
-prepare_commands = ["mkdir -p generated/modexp_sliced"]
-build_dep_commands = [
-	"cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-	"cd libgcrypt-1.10.1-sliced && ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install",
-]
-
-[benchmarks.variants.sliced.build.tools.abacus]
-concrete_pubs = false
-variables = { libgcrypt_host = "--host=i686-pc-linux-gnu" }
-
-[benchmarks.variants.sliced.tool_defaults.klee]
-code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi"
-secret_inputs = ["exp"]
-public_inputs = ["base", "mod"]
-mod_exp_extra_args = ["--filename", "mpi-pow.c", "--lines", "404:771"]
-
-[benchmarks.variants.sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
-arguments = ["-break", "-o", "{output}", "{input}"]
-
-[[benchmarks.variants.sliced.targets]]
-target = "modexp"
 runner_profile = "default"
 secret_layout = "exp:{sym_size}"
 secret_inputs = ["exp:{sym_size}:exp_buf"]
@@ -242,23 +98,306 @@ public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
 build_sources = ["modexp_wrapper.c", "powm_sliced.c"]
 defines = ["USE_SLICED"]
 
-[[benchmarks.variants.sliced.configs]]
+[benchmarks.targets.modexp_sliced.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+prepare_commands = ["mkdir -p generated/modexp_sliced"]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd libgcrypt-1.10.1-sliced && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.targets.modexp_sliced.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1-sliced"
+
+[benchmarks.targets.modexp_sliced.build.tools]
+
+[benchmarks.targets.modexp_sliced.build.tools.abacus]
+concrete_pubs = false
+
+[benchmarks.targets.modexp_sliced.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.targets.modexp_sliced.tool_defaults]
+
+[benchmarks.targets.modexp_sliced.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1-sliced/mpi"
+secret_inputs = ["exp"]
+public_inputs = ["base", "mod"]
+mod_exp_extra_args = ["--filename", "mpi-pow.c", "--lines", "404:771"]
+
+[benchmarks.targets.modexp_sliced.tool_defaults.klee.preprocess_profiles]
+
+[benchmarks.targets.modexp_sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
+arguments = ["-break", "-o", "{output}", "{input}"]
+
+[[benchmarks.targets.modexp_sliced.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.sliced.configs]]
+[[benchmarks.targets.modexp_sliced.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 use_public_inputs = true
 
-[[benchmarks.variants.sliced.configs]]
+[[benchmarks.targets.modexp_sliced.configs]]
 config = "var_pub_lim_loop_break"
 public_mode = "var_pub"
 preprocess = "lim_loop_break"
 use_public_inputs = true
 
-[[benchmarks.variants.aes_des.targets]]
-target = "aes_encrypt"
+[benchmarks.targets.gcry_pk_decrypt_pkcs1]
+runner_profile = "rsa_private"
+secret_layout = "d:128"
+secret_inputs = ["d:128:d_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_DECRYPT_PKCS1"]
+
+[benchmarks.targets.gcry_pk_decrypt_pkcs1.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd {libgcrypt_dir} && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.targets.gcry_pk_decrypt_pkcs1.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1"
+
+[benchmarks.targets.gcry_pk_decrypt_pkcs1.build.tools]
+
+[benchmarks.targets.gcry_pk_decrypt_pkcs1.build.tools.klee]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.gcry_pk_decrypt_pkcs1.build.tools.binsec]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.gcry_pk_decrypt_pkcs1.build.tools.abacus]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+concrete_pubs = false
+
+[benchmarks.targets.gcry_pk_decrypt_pkcs1.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.targets.gcry_pk_decrypt_pkcs1.tool_defaults]
+
+[benchmarks.targets.gcry_pk_decrypt_pkcs1.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+
+[[benchmarks.targets.gcry_pk_decrypt_pkcs1.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.gcry_pk_decrypt_pkcs1.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.gcry_pk_decrypt_oaep]
+runner_profile = "rsa_private"
+secret_layout = "d:128"
+secret_inputs = ["d:128:d_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_DECRYPT_OAEP"]
+
+[benchmarks.targets.gcry_pk_decrypt_oaep.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd {libgcrypt_dir} && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.targets.gcry_pk_decrypt_oaep.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1"
+
+[benchmarks.targets.gcry_pk_decrypt_oaep.build.tools]
+
+[benchmarks.targets.gcry_pk_decrypt_oaep.build.tools.klee]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.gcry_pk_decrypt_oaep.build.tools.binsec]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.gcry_pk_decrypt_oaep.build.tools.abacus]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+concrete_pubs = false
+
+[benchmarks.targets.gcry_pk_decrypt_oaep.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.targets.gcry_pk_decrypt_oaep.tool_defaults]
+
+[benchmarks.targets.gcry_pk_decrypt_oaep.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+
+[[benchmarks.targets.gcry_pk_decrypt_oaep.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.gcry_pk_decrypt_oaep.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.gcry_pk_decrypt_raw]
+runner_profile = "rsa_private"
+secret_layout = "d:128"
+secret_inputs = ["d:128:d_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["gcry_pk_decrypt_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_DECRYPT_RAW"]
+
+[benchmarks.targets.gcry_pk_decrypt_raw.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd {libgcrypt_dir} && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.targets.gcry_pk_decrypt_raw.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1"
+
+[benchmarks.targets.gcry_pk_decrypt_raw.build.tools]
+
+[benchmarks.targets.gcry_pk_decrypt_raw.build.tools.klee]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.gcry_pk_decrypt_raw.build.tools.binsec]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.gcry_pk_decrypt_raw.build.tools.abacus]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+concrete_pubs = false
+
+[benchmarks.targets.gcry_pk_decrypt_raw.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.targets.gcry_pk_decrypt_raw.tool_defaults]
+
+[benchmarks.targets.gcry_pk_decrypt_raw.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+
+[[benchmarks.targets.gcry_pk_decrypt_raw.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.gcry_pk_decrypt_raw.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc]
+runner_profile = "rsa_padding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["rsa_padding_decode_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_PKCS1_DECODE_FOR_ENC"]
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd {libgcrypt_dir} && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1"
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc.build.tools]
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc.build.tools.klee]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc.build.tools.binsec]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc.build.tools.abacus]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+concrete_pubs = false
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc.tool_defaults]
+
+[benchmarks.targets.rsa_pkcs1_decode_for_enc.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+
+[[benchmarks.targets.rsa_pkcs1_decode_for_enc.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.rsa_pkcs1_decode_for_enc.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.rsa_oaep_decode]
+runner_profile = "rsa_padding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["rsa_padding_decode_wrapper.c", "libgcrypt_randomize_wrapper.c"]
+defines = ["LIBGCRYPT_RSA_OAEP_DECODE"]
+
+[benchmarks.targets.rsa_oaep_decode.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd {libgcrypt_dir} && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.targets.rsa_oaep_decode.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1"
+
+[benchmarks.targets.rsa_oaep_decode.build.tools]
+
+[benchmarks.targets.rsa_oaep_decode.build.tools.klee]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.rsa_oaep_decode.build.tools.binsec]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+
+[benchmarks.targets.rsa_oaep_decode.build.tools.abacus]
+link_flags = ["-Wl,--wrap=_gcry_mpi_randomize"]
+concrete_pubs = false
+
+[benchmarks.targets.rsa_oaep_decode.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.targets.rsa_oaep_decode.tool_defaults]
+
+[benchmarks.targets.rsa_oaep_decode.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+
+[[benchmarks.targets.rsa_oaep_decode.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.rsa_oaep_decode.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.aes_encrypt]
 runner_profile = "aes"
 secret_layout = "key:16,data:16"
 secret_inputs = ["key:16:key_buf", "data:16:data_buf"]
@@ -266,8 +405,42 @@ klee_secret_inputs = ["key", "data"]
 build_sources = ["cipher_encrypt_wrapper.c"]
 defines = ["LIBGCRYPT_CIPHER_AES128"]
 
-[[benchmarks.variants.aes_des.targets]]
-target = "des_encrypt"
+[benchmarks.targets.aes_encrypt.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd {libgcrypt_dir} && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.targets.aes_encrypt.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1"
+
+[benchmarks.targets.aes_encrypt.build.tools]
+
+[benchmarks.targets.aes_encrypt.build.tools.abacus]
+concrete_pubs = true
+
+[benchmarks.targets.aes_encrypt.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.targets.aes_encrypt.tool_defaults]
+
+[benchmarks.targets.aes_encrypt.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+secret_inputs = ["key", "data"]
+
+[[benchmarks.targets.aes_encrypt.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.aes_encrypt.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[benchmarks.targets.des_encrypt]
 runner_profile = "des"
 secret_layout = "key:8,data:8"
 secret_inputs = ["key:8:key_buf", "data:8:data_buf"]
@@ -275,17 +448,42 @@ klee_secret_inputs = ["key", "data"]
 build_sources = ["cipher_encrypt_wrapper.c"]
 defines = ["LIBGCRYPT_CIPHER_DES"]
 
-[[benchmarks.variants.aes_des.configs]]
+[benchmarks.targets.des_encrypt.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd {libgcrypt_dir} && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.targets.des_encrypt.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1"
+
+[benchmarks.targets.des_encrypt.build.tools]
+
+[benchmarks.targets.des_encrypt.build.tools.abacus]
+concrete_pubs = true
+
+[benchmarks.targets.des_encrypt.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.targets.des_encrypt.tool_defaults]
+
+[benchmarks.targets.des_encrypt.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+secret_inputs = ["key", "data"]
+
+[[benchmarks.targets.des_encrypt.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.aes_des.configs]]
+[[benchmarks.targets.des_encrypt.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 
-[[benchmarks.variants.ecdsa.targets]]
-target = "ecdsa_sign"
+[benchmarks.targets.ecdsa_sign]
 runner_profile = "ecdsa"
 secret_layout = "private_key:32"
 secret_inputs = ["private_key:32:private_key_buf"]
@@ -295,11 +493,38 @@ klee_secret_inputs = ["private_key"]
 klee_public_inputs = ["digest"]
 build_sources = ["ecdsa_sign_wrapper.c"]
 
-[[benchmarks.variants.ecdsa.configs]]
+[benchmarks.targets.ecdsa_sign.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "generated/{target_output}", "{code_path}/build/include"]
+link_libraries = ["{code_path}/build/lib/libgcrypt.a", "{code_path}/build/lib/libgpg-error.a"]
+build_dep_commands = ["cd libgpg-error-1.44 && ./configure CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-doc --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install", "cd {libgcrypt_dir} && gcry_cv_have_asm_volatile_memory=no ./configure CC={cc} CFLAGS=\"{dep_cflags} -DNO_ASM\" LDFLAGS=\"{dep_ldflags}\" --enable-static --disable-shared --disable-asm --disable-doc --with-libgpg-error-prefix=\"{install_root}\" --with-sysroot=\"{install_root}\" --prefix=\"{install_root}\" {libgcrypt_host} && make clean && make -j{make_jobs} && make install"]
+
+[benchmarks.targets.ecdsa_sign.build.variables]
+libgcrypt_host = ""
+libgcrypt_dir = "libgcrypt-1.10.1"
+
+[benchmarks.targets.ecdsa_sign.build.tools]
+
+[benchmarks.targets.ecdsa_sign.build.tools.abacus]
+concrete_pubs = true
+
+[benchmarks.targets.ecdsa_sign.build.tools.abacus.variables]
+libgcrypt_host = "--host=i686-pc-linux-gnu"
+
+[benchmarks.targets.ecdsa_sign.tool_defaults]
+
+[benchmarks.targets.ecdsa_sign.tool_defaults.klee]
+code_path = "benchmarks/libgcrypt-and-libgpg-error/libgcrypt-1.10.1/cipher"
+extra_args = ["--ctchecker-prefix", "cipher"]
+secret_inputs = ["private_key"]
+public_inputs = ["digest"]
+
+[[benchmarks.targets.ecdsa_sign.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.ecdsa.configs]]
+[[benchmarks.targets.ecdsa_sign.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]

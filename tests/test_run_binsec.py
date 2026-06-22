@@ -34,8 +34,8 @@ class RunBinsecTest(unittest.TestCase):
             def log(self, _message: str) -> None:
                 return
 
-            def run(self, _argv: list[str], cwd: Path | None = None) -> None:
-                return
+            def run(self, _argv: list[str], cwd: Path | None = None, check: bool = True) -> int:
+                return 0
 
         class DummyWorkspace:
             def __init__(self, root: Path) -> None:
@@ -94,7 +94,12 @@ class RunBinsecTest(unittest.TestCase):
                     "configs/sample.cfg",
                     "sample_case.toml",
                     "artifacts/fix_pub",
-                    {},
+                    {
+                        "library": "openssl_almeida",
+                        "target": "tls_rempad_luk13",
+                        "config": "fix_pub",
+                        "sliced": False,
+                    },
                 )
 
             self.assertEqual(convert_mock.call_count, 1)
@@ -118,7 +123,7 @@ PUBLIC_BYTES = 16
             benchmark_definition = BenchmarkDefinition(
                 config_location="configs/benchmarks/example.toml",
                 library_id="example",
-                variant_id="default",
+                target_id="default",
                 code_path="benchmarks/example",
                 tools=frozenset({"binsec"}),
                 runner_profiles={
@@ -163,7 +168,7 @@ PUBLIC_BYTES = 16
         benchmark_definition = BenchmarkDefinition(
             config_location="configs/benchmarks/example.toml",
             library_id="example",
-            variant_id="default",
+            target_id="default",
             code_path="benchmarks/example",
             tools=frozenset({"binsec"}),
             runner_profiles={
@@ -176,27 +181,34 @@ PUBLIC_BYTES = 16
         )
         expanded_case = SimpleNamespace(
             config_table={"use_public_inputs": True},
-            config_location="configs/benchmarks/example.toml.variants.default.configs.default",
+            config_location="configs/benchmarks/example.toml.targets.default.configs.default",
             target_table={
                 "runner_profile": "default",
                 "secret_inputs": ["secret:{sym_size}:secret_buf"],
                 "public_inputs": ["public:{sym_size}:public_buf"],
             },
-            target_location="configs/benchmarks/example.toml.variants.default.targets[0]",
+            target_location="configs/benchmarks/example.toml.targets.default",
             target_id="demo",
             config_id="default",
+            config="default",
+            artifact_config="var_pub",
             output_target="demo_default",
-            public_mode="var_pub",
-            variant_id="default",
         )
 
         with patch("scripts.experiments.run_binsec.expand_benchmark_cases", return_value=[expanded_case]):
             [case] = _load_binsec_cases(benchmark_definition)
 
         self.assertEqual(case["runner_profile"], "default")
+        self.assertEqual(case["title"], "example:demo (default)")
+        self.assertEqual(case["stats_file"], "example_demo_default.toml")
+        self.assertEqual(case["sse_script"], "benchmarks/example/generated/demo_default/binsec_var_pub.cfg")
+        self.assertEqual(case["executable"], "benchmarks/example/artifacts/binsec/demo_default/var_pub")
         self.assertEqual(case["secret_inputs"], ["secret:{sym_size}:secret_buf"])
         self.assertEqual(case["public_inputs"], ["public:{sym_size}:public_buf"])
-        self.assertEqual(case["public_mode"], "var_pub")
+        self.assertEqual(case["config"], "default")
+        self.assertNotIn("variant_key", case)
+        self.assertNotIn("target_key", case)
+        self.assertNotIn("public_mode", case)
 
 
 if __name__ == "__main__":

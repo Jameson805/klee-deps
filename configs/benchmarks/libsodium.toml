@@ -3,6 +3,8 @@ library = "libsodium"
 code_path = "benchmarks/libsodium"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
+[benchmarks.runner_profiles]
+
 [benchmarks.runner_profiles.default]
 config = "configs/runner/libsodium_curve25519_runner_config.toml"
 preset = "default"
@@ -24,26 +26,14 @@ preset = "default"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include", "{code_path}/build/install/include"]
 link_libraries = ["{code_path}/build/install/lib/libsodium.a"]
-build_dep_commands = [
-  "rm -rf build",
-  "mkdir -p build",
-  "cd libsodium-stable && ./autogen.sh -s",
-  "cd build && ../libsodium-stable/configure --disable-shared --enable-static --disable-asm --prefix=\"$(pwd)/install\" CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\"",
-  "cd build && find . -name Makefile -exec perl -0pi -e 's/ -DHAVE_(?:MMINTRIN|EMMINTRIN|PMMINTRIN|TMMINTRIN|SMMINTRIN|AVXINTRIN|AVX2INTRIN|AVX512FINTRIN|WMMINTRIN)_H=1//g' {{}} +",
-  "cd build && ! grep -R -E -- '-DHAVE_(MMINTRIN|EMMINTRIN|PMMINTRIN|TMMINTRIN|SMMINTRIN|AVXINTRIN|AVX2INTRIN|AVX512FINTRIN|WMMINTRIN)_H=1' . --include=Makefile",
-  "cd build && make -j {make_jobs}",
-  "cd build && make install",
-]
+build_dep_commands = ["rm -rf build", "mkdir -p build", "cd libsodium-stable && ./autogen.sh -s", "cd build && ../libsodium-stable/configure --disable-shared --enable-static --disable-asm --prefix=\"$(pwd)/install\" CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\"", "cd build && find . -name Makefile -exec perl -0pi -e 's/ -DHAVE_(?:MMINTRIN|EMMINTRIN|PMMINTRIN|TMMINTRIN|SMMINTRIN|AVXINTRIN|AVX2INTRIN|AVX512FINTRIN|WMMINTRIN)_H=1//g' {{}} +", "cd build && ! grep -R -E -- '-DHAVE_(MMINTRIN|EMMINTRIN|PMMINTRIN|TMMINTRIN|SMMINTRIN|AVXINTRIN|AVX2INTRIN|AVX512FINTRIN|WMMINTRIN)_H=1' . --include=Makefile", "cd build && make -j {make_jobs}", "cd build && make install"]
+
+[benchmarks.build.tools]
 
 [benchmarks.build.tools.abacus]
 concrete_pubs = true
 
-[benchmarks.variants.curve25519]
-
-# Keep the selector explicit so campaigns do not silently widen if new
-# libsodium targets are added later.
-[[benchmarks.variants.curve25519.targets]]
-target = "curve25519_scalarmult"
+[benchmarks.targets.curve25519_scalarmult]
 runner_profile = "default"
 build_sources = ["curve25519_scalarmult_wrapper.c"]
 secret_layout = "scalar:32"
@@ -53,21 +43,18 @@ public_inputs = ["point:32:point_buf"]
 klee_secret_inputs = ["scalar"]
 klee_public_inputs = ["point"]
 
-[[benchmarks.variants.curve25519.configs]]
+[[benchmarks.targets.curve25519_scalarmult.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "default"
 
-[[benchmarks.variants.curve25519.configs]]
+[[benchmarks.targets.curve25519_scalarmult.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 
-[benchmarks.variants.salsa20]
-
-[[benchmarks.variants.salsa20.targets]]
-target = "salsa20"
+[benchmarks.targets.salsa20]
 runner_profile = "stream"
 build_sources = ["salsa20_wrapper.c"]
 secret_layout = "key:32"
@@ -77,22 +64,19 @@ public_inputs = ["message:256:message_buf", "nonce:8:nonce_buf"]
 klee_secret_inputs = ["key"]
 klee_public_inputs = ["message", "nonce"]
 
-[[benchmarks.variants.salsa20.configs]]
+[[benchmarks.targets.salsa20.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "stream"
 
-[[benchmarks.variants.salsa20.configs]]
+[[benchmarks.targets.salsa20.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 runner_profile = "stream"
 
-[benchmarks.variants.chacha20]
-
-[[benchmarks.variants.chacha20.targets]]
-target = "chacha20"
+[benchmarks.targets.chacha20]
 runner_profile = "stream"
 build_sources = ["chacha20_wrapper.c"]
 secret_layout = "key:32"
@@ -102,44 +86,50 @@ public_inputs = ["message:256:message_buf", "nonce:8:nonce_buf"]
 klee_secret_inputs = ["key"]
 klee_public_inputs = ["message", "nonce"]
 
-[[benchmarks.variants.chacha20.configs]]
+[[benchmarks.targets.chacha20.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "stream"
 
-[[benchmarks.variants.chacha20.configs]]
+[[benchmarks.targets.chacha20.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 runner_profile = "stream"
 
-[benchmarks.variants.sha256]
-
-[[benchmarks.variants.sha256.targets]]
-target = "sha256"
+[benchmarks.targets.sha256]
 build_sources = ["sha256_wrapper.c"]
 runner_profile = "hash_sha256"
 secret_layout = "message:256"
 secret_inputs = ["message:256:message_buf"]
 klee_secret_inputs = ["message"]
 
-[[benchmarks.variants.sha256.configs]]
+[[benchmarks.targets.sha256.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "hash_sha256"
 
-[benchmarks.variants.sha512]
+[[benchmarks.targets.sha256.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+runner_profile = "hash_sha256"
 
-[[benchmarks.variants.sha512.targets]]
-target = "sha512"
+[benchmarks.targets.sha512]
 build_sources = ["sha512_wrapper.c"]
 runner_profile = "hash_sha512"
 secret_layout = "message:256"
 secret_inputs = ["message:256:message_buf"]
 klee_secret_inputs = ["message"]
 
-[[benchmarks.variants.sha512.configs]]
+[[benchmarks.targets.sha512.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
+runner_profile = "hash_sha512"
+
+[[benchmarks.targets.sha512.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 runner_profile = "hash_sha512"

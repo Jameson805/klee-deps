@@ -3,6 +3,8 @@ library = "mbedtls"
 code_path = "benchmarks/mbedtls-3.2.1"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
+[benchmarks.runner_profiles]
+
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
 preset = "size_{sym_size}"
@@ -31,20 +33,15 @@ preset = "default"
 preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include", "include"]
-link_libraries = [
-	"{code_path}/build/library/libmbedtls.a",
-	"{code_path}/build/library/libmbedx509.a",
-	"{code_path}/build/library/libmbedcrypto.a",
-]
-build_dep_commands = [
-	"rm -rf build",
-	"mkdir -p build",
-	"cd build && cmake -DENABLE_TESTING=Off -DCMAKE_C_COMPILER={cc} -DCMAKE_C_FLAGS=\"{dep_cflags}\" -DCMAKE_EXE_LINKER_FLAGS=\"{dep_ldflags}\" ..",
-	"cd build && cmake --build . -j {make_jobs}",
-]
+link_libraries = ["{code_path}/build/library/libmbedtls.a", "{code_path}/build/library/libmbedx509.a", "{code_path}/build/library/libmbedcrypto.a"]
+build_dep_commands = ["rm -rf build", "mkdir -p build", "cd build && cmake -DENABLE_TESTING=Off -DCMAKE_C_COMPILER={cc} -DCMAKE_C_FLAGS=\"{dep_cflags}\" -DCMAKE_EXE_LINKER_FLAGS=\"{dep_ldflags}\" ..", "cd build && cmake --build . -j {make_jobs}"]
+
+[benchmarks.build.tools]
 
 [benchmarks.build.tools.abacus]
 concrete_pubs = false
+
+[benchmarks.tool_defaults]
 
 [benchmarks.tool_defaults.klee]
 code_path = "mbedtls-3.2.1"
@@ -53,53 +50,10 @@ public_inputs = ["base", "mod"]
 extra_args = ["--ctchecker-prefix", "library"]
 mod_exp_extra_args = ["--filename", "bignum.c", "--lines", "1968:2202"]
 
+[benchmarks.tool_defaults.klee.preprocess_profiles]
+
 [benchmarks.tool_defaults.klee.preprocess_profiles.lim_loop_break]
 arguments = ["-break", "-o", "{output}", "{input}"]
-
-[benchmarks.variants.default]
-
-[[benchmarks.targets]]
-target = "modexp"
-runner_profile = "default"
-secret_layout = "exp:{sym_size}"
-secret_inputs = ["exp:{sym_size}:exp_buf"]
-public_layout = "base:{sym_size},mod:{sym_size}"
-public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
-build_sources = ["modexp_wrapper.c"]
-
-[[benchmarks.targets]]
-target = "rsa_private"
-runner_profile = "rsa_private"
-secret_layout = "dp:64,dq:64"
-secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["rsa_private_wrapper.c"]
-
-[[benchmarks.targets]]
-target = "rsa_rsaes_pkcs1_v15_decrypt"
-runner_profile = "rsa_private"
-secret_layout = "dp:64,dq:64"
-secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["rsa_rsaes_pkcs1_v15_decrypt_wrapper.c"]
-
-[[benchmarks.targets]]
-target = "rsa_rsaes_oaep_decrypt"
-runner_profile = "rsa_private"
-secret_layout = "dp:64,dq:64"
-secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["rsa_rsaes_oaep_decrypt_wrapper.c"]
-
-[[benchmarks.targets]]
-target = "pkcs1_v15_unpadding"
-runner_profile = "pkcs1_v15_unpadding"
-secret_layout = "encoded:128"
-secret_inputs = ["encoded:128:encoded_buf"]
-build_sources = ["pkcs1_v15_unpadding_wrapper.c"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -119,10 +73,15 @@ tools = ["klee_cf", "klee_eager"]
 preprocess = "lim_loop_break"
 use_public_inputs = true
 
-[benchmarks.variants.rsa_stages]
+[benchmarks.targets.modexp]
+runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp_wrapper.c"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_private"
+[benchmarks.targets.rsa_private]
 runner_profile = "rsa_private"
 secret_layout = "dp:64,dq:64"
 secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
@@ -130,114 +89,69 @@ public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["rsa_private_wrapper.c"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_rsaes_pkcs1_v15_decrypt"
-runner_profile = "rsa_private"
-secret_layout = "dp:64,dq:64"
-secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["rsa_rsaes_pkcs1_v15_decrypt_wrapper.c"]
-
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_rsaes_oaep_decrypt"
-runner_profile = "rsa_private"
-secret_layout = "dp:64,dq:64"
-secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["rsa_rsaes_oaep_decrypt_wrapper.c"]
-
-[[benchmarks.variants.rsa_stages.targets]]
-target = "pkcs1_v15_unpadding"
-runner_profile = "pkcs1_v15_unpadding"
-secret_layout = "encoded:128"
-secret_inputs = ["encoded:128:encoded_buf"]
-build_sources = ["pkcs1_v15_unpadding_wrapper.c"]
-
-[[benchmarks.variants.rsa_stages.configs]]
+[[benchmarks.targets.rsa_private.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.rsa_stages.configs]]
-config = "var_pub"
-public_mode = "var_pub"
-tools = ["klee_cf", "binsec"]
-use_public_inputs = true
-
-[benchmarks.variants.rsa_decrypt_only]
-
-[[benchmarks.variants.rsa_decrypt_only.targets]]
-target = "rsa_private"
-runner_profile = "rsa_private"
-secret_layout = "dp:64,dq:64"
-secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["rsa_private_wrapper.c"]
-
-[[benchmarks.variants.rsa_decrypt_only.targets]]
-target = "rsa_rsaes_pkcs1_v15_decrypt"
-runner_profile = "rsa_private"
-secret_layout = "dp:64,dq:64"
-secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["rsa_rsaes_pkcs1_v15_decrypt_wrapper.c"]
-
-[[benchmarks.variants.rsa_decrypt_only.targets]]
-target = "rsa_rsaes_oaep_decrypt"
-runner_profile = "rsa_private"
-secret_layout = "dp:64,dq:64"
-secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
-public_layout = "ciphertext:128"
-public_inputs = ["ciphertext:128:ciphertext_buf"]
-build_sources = ["rsa_rsaes_oaep_decrypt_wrapper.c"]
-
-[[benchmarks.variants.rsa_decrypt_only.targets]]
-target = "pkcs1_v15_unpadding"
-runner_profile = "pkcs1_v15_unpadding"
-secret_layout = "encoded:128"
-secret_inputs = ["encoded:128:encoded_buf"]
-build_sources = ["pkcs1_v15_unpadding_wrapper.c"]
-
-[[benchmarks.variants.rsa_decrypt_only.configs]]
-config = "fix_pub"
-public_mode = "fix_pub"
-
-[[benchmarks.variants.rsa_decrypt_only.configs]]
+[[benchmarks.targets.rsa_private.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "binsec"]
 use_public_inputs = true
 
-[benchmarks.variants.aes_des.build]
-preset = "default"
-common_flags = ["-g", "-O0"]
-include_dirs = ["{repo_root}/include", "include"]
-link_libraries = [
-	"{code_path}/build/library/libmbedtls.a",
-	"{code_path}/build/library/libmbedx509.a",
-	"{code_path}/build/library/libmbedcrypto.a",
-]
-build_dep_commands = [
-	"rm -rf build",
-	"mkdir -p build",
-	"cd build && cmake -DENABLE_TESTING=Off -DCMAKE_C_COMPILER={cc} -DCMAKE_C_FLAGS=\"{dep_cflags}\" -DCMAKE_EXE_LINKER_FLAGS=\"{dep_ldflags}\" ..",
-	"cd build && cmake --build . -j {make_jobs}",
-]
+[benchmarks.targets.rsa_rsaes_pkcs1_v15_decrypt]
+runner_profile = "rsa_private"
+secret_layout = "dp:64,dq:64"
+secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_rsaes_pkcs1_v15_decrypt_wrapper.c"]
 
-[benchmarks.variants.aes_des.build.tools.abacus]
-concrete_pubs = true
+[[benchmarks.targets.rsa_rsaes_pkcs1_v15_decrypt.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
 
-[benchmarks.variants.aes_des.tool_defaults.klee]
-code_path = "mbedtls-3.2.1"
-extra_args = ["--ctchecker-prefix", "library"]
-secret_inputs = ["key"]
-public_inputs = ["data", "iv"]
+[[benchmarks.targets.rsa_rsaes_pkcs1_v15_decrypt.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
 
-[[benchmarks.variants.aes_des.targets]]
-target = "aes_encrypt"
+[benchmarks.targets.rsa_rsaes_oaep_decrypt]
+runner_profile = "rsa_private"
+secret_layout = "dp:64,dq:64"
+secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
+public_layout = "ciphertext:128"
+public_inputs = ["ciphertext:128:ciphertext_buf"]
+build_sources = ["rsa_rsaes_oaep_decrypt_wrapper.c"]
+
+[[benchmarks.targets.rsa_rsaes_oaep_decrypt.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.rsa_rsaes_oaep_decrypt.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.pkcs1_v15_unpadding]
+runner_profile = "pkcs1_v15_unpadding"
+secret_layout = "encoded:128"
+secret_inputs = ["encoded:128:encoded_buf"]
+build_sources = ["pkcs1_v15_unpadding_wrapper.c"]
+
+[[benchmarks.targets.pkcs1_v15_unpadding.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.pkcs1_v15_unpadding.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.aes_encrypt]
 runner_profile = "aes"
 secret_layout = "key:16"
 secret_inputs = ["key:16:key_buf"]
@@ -247,8 +161,37 @@ klee_secret_inputs = ["key"]
 klee_public_inputs = ["data", "iv"]
 build_sources = ["aes_encrypt_wrapper.c"]
 
-[[benchmarks.variants.aes_des.targets]]
-target = "des_encrypt"
+[benchmarks.targets.aes_encrypt.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["{code_path}/build/library/libmbedtls.a", "{code_path}/build/library/libmbedx509.a", "{code_path}/build/library/libmbedcrypto.a"]
+build_dep_commands = ["rm -rf build", "mkdir -p build", "cd build && cmake -DENABLE_TESTING=Off -DCMAKE_C_COMPILER={cc} -DCMAKE_C_FLAGS=\"{dep_cflags}\" -DCMAKE_EXE_LINKER_FLAGS=\"{dep_ldflags}\" ..", "cd build && cmake --build . -j {make_jobs}"]
+
+[benchmarks.targets.aes_encrypt.build.tools]
+
+[benchmarks.targets.aes_encrypt.build.tools.abacus]
+concrete_pubs = true
+
+[benchmarks.targets.aes_encrypt.tool_defaults]
+
+[benchmarks.targets.aes_encrypt.tool_defaults.klee]
+code_path = "mbedtls-3.2.1"
+extra_args = ["--ctchecker-prefix", "library"]
+secret_inputs = ["key"]
+public_inputs = ["data", "iv"]
+
+[[benchmarks.targets.aes_encrypt.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.aes_encrypt.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.des_encrypt]
 runner_profile = "des"
 secret_layout = "key:8"
 secret_inputs = ["key:8:key_buf"]
@@ -258,26 +201,37 @@ klee_secret_inputs = ["key"]
 klee_public_inputs = ["data"]
 build_sources = ["des_encrypt_wrapper.c"]
 
-[[benchmarks.variants.aes_des.configs]]
+[benchmarks.targets.des_encrypt.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["{code_path}/build/library/libmbedtls.a", "{code_path}/build/library/libmbedx509.a", "{code_path}/build/library/libmbedcrypto.a"]
+build_dep_commands = ["rm -rf build", "mkdir -p build", "cd build && cmake -DENABLE_TESTING=Off -DCMAKE_C_COMPILER={cc} -DCMAKE_C_FLAGS=\"{dep_cflags}\" -DCMAKE_EXE_LINKER_FLAGS=\"{dep_ldflags}\" ..", "cd build && cmake --build . -j {make_jobs}"]
+
+[benchmarks.targets.des_encrypt.build.tools]
+
+[benchmarks.targets.des_encrypt.build.tools.abacus]
+concrete_pubs = true
+
+[benchmarks.targets.des_encrypt.tool_defaults]
+
+[benchmarks.targets.des_encrypt.tool_defaults.klee]
+code_path = "mbedtls-3.2.1"
+extra_args = ["--ctchecker-prefix", "library"]
+secret_inputs = ["key"]
+public_inputs = ["data", "iv"]
+
+[[benchmarks.targets.des_encrypt.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.aes_des.configs]]
+[[benchmarks.targets.des_encrypt.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 
-[benchmarks.variants.ecdsa]
-
-[benchmarks.variants.ecdsa.tool_defaults.klee]
-code_path = "mbedtls-3.2.1"
-extra_args = ["--ctchecker-prefix", "library"]
-secret_inputs = ["private_key", "nonce"]
-public_inputs = ["digest"]
-
-[[benchmarks.variants.ecdsa.targets]]
-target = "ecdsa_sign"
+[benchmarks.targets.ecdsa_sign]
 runner_profile = "ecdsa"
 secret_layout = "private_key:24,nonce:24"
 secret_inputs = ["private_key:24:private_key_buf", "nonce:24:nonce_buf"]
@@ -287,31 +241,26 @@ klee_secret_inputs = ["private_key", "nonce"]
 klee_public_inputs = ["digest"]
 build_sources = ["ecdsa_sign_wrapper.c"]
 
-[[benchmarks.variants.ecdsa.configs]]
+[benchmarks.targets.ecdsa_sign.tool_defaults]
+
+[benchmarks.targets.ecdsa_sign.tool_defaults.klee]
+code_path = "mbedtls-3.2.1"
+extra_args = ["--ctchecker-prefix", "library"]
+secret_inputs = ["private_key", "nonce"]
+public_inputs = ["digest"]
+
+[[benchmarks.targets.ecdsa_sign.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.ecdsa.configs]]
+[[benchmarks.targets.ecdsa_sign.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 
-[benchmarks.variants.sliced]
+[benchmarks.targets.modexp_sliced]
 tools = ["klee_cf"]
-
-[benchmarks.variants.sliced.tool_defaults.klee]
-code_path = "mbedtls-3.2.1"
-secret_inputs = ["exp"]
-public_inputs = ["base", "mod"]
-extra_args = ["--ctchecker-prefix", "library"]
-mod_exp_extra_args = ["--filename", "bignum.c", "--lines", "1968:2202"]
-
-[benchmarks.variants.sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
-arguments = ["-break", "-o", "{output}", "{input}"]
-
-[[benchmarks.variants.sliced.targets]]
-target = "modexp"
 runner_profile = "default"
 secret_layout = "exp:{sym_size}"
 secret_inputs = ["exp:{sym_size}:exp_buf"]
@@ -320,16 +269,30 @@ public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
 build_sources = ["modexp_wrapper.c", "bignum_sliced.c"]
 defines = ["USE_SLICED"]
 
-[[benchmarks.variants.sliced.configs]]
+[benchmarks.targets.modexp_sliced.tool_defaults]
+
+[benchmarks.targets.modexp_sliced.tool_defaults.klee]
+code_path = "mbedtls-3.2.1"
+secret_inputs = ["exp"]
+public_inputs = ["base", "mod"]
+extra_args = ["--ctchecker-prefix", "library"]
+mod_exp_extra_args = ["--filename", "bignum.c", "--lines", "1968:2202"]
+
+[benchmarks.targets.modexp_sliced.tool_defaults.klee.preprocess_profiles]
+
+[benchmarks.targets.modexp_sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
+arguments = ["-break", "-o", "{output}", "{input}"]
+
+[[benchmarks.targets.modexp_sliced.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.sliced.configs]]
+[[benchmarks.targets.modexp_sliced.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 use_public_inputs = true
 
-[[benchmarks.variants.sliced.configs]]
+[[benchmarks.targets.modexp_sliced.configs]]
 config = "var_pub_lim_loop_break"
 public_mode = "var_pub"
 preprocess = "lim_loop_break"

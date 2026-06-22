@@ -24,7 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     """Resolve one benchmark-owned runner profile field for shell tooling."""
     parser = argparse.ArgumentParser(description="Resolve a benchmark runner profile field.")
     parser.add_argument("--library", required=True, help="Benchmark library id from configs/benchmarks")
-    parser.add_argument("--variant", required=True, help="Benchmark variant id from configs/benchmarks")
+    parser.add_argument("--target", required=True, help="Benchmark target id from configs/benchmarks")
     parser.add_argument("--profile", help="Runner profile id; omit only when the benchmark defines one profile")
     parser.add_argument("--field", choices=("config", "preset", "profile"), default="config")
     parser.add_argument(
@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         resolved_profile_id, runner_profile = runner_profile_for_definition(
-            definition(args.library, args.variant),
+            definition(args.library, args.target),
             args.profile,
         )
         if args.field == "profile":

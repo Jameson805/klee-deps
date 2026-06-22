@@ -96,12 +96,12 @@ def _mode_profile(mode: str) -> KleeModeProfile:
         raise ValueError(f"unknown KLEE-family mode {mode!r}; expected one of {supported}") from error
 
 
-def _format_replay_opts(secret_inputs: list[str], public_inputs: list[str], public_mode: str) -> str:
+def _format_replay_opts(secret_inputs: list[str], public_inputs: list[str], artifact_config: str) -> str:
     """Build replay CLI options for the selected secret/public input layout."""
     options: list[str] = []
     if secret_inputs:
         options.extend(["--secret", ",".join(secret_inputs)])
-    if public_mode != "fix_pub" and public_inputs:
+    if artifact_config != "fix_pub" and public_inputs:
         options.extend(["--public", ",".join(public_inputs)])
     return " ".join(options)
 
@@ -166,7 +166,6 @@ def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, objec
         case = {
             "title": canonical_case_title(
                 benchmark_definition.library_id,
-                benchmark_definition.variant_id,
                 expanded_case.target_id,
                 expanded_case.config_id,
             ),
@@ -174,22 +173,19 @@ def _load_klee_cases(benchmark_definition, tool_id: str) -> list[dict[str, objec
             "bitcode": f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.config_id}.bc",
             "result_name": canonical_case_id(
                 benchmark_definition.library_id,
-                benchmark_definition.variant_id,
                 expanded_case.target_id,
                 expanded_case.config_id,
             ),
-            "replay_script": f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}_replay",
+            "replay_script": f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.artifact_config}_replay",
             "code_path": code_path,
-            "replay_opts": _format_replay_opts(secret_inputs, public_inputs, expanded_case.public_mode),
-            "source_column_suffix": expanded_case.public_mode,
-            "public_mode": expanded_case.public_mode,
-            "target_key": expanded_case.target_id,
-            "sliced": expanded_case.variant_id == "sliced",
+            "replay_opts": _format_replay_opts(secret_inputs, public_inputs, expanded_case.artifact_config),
+            "config": expanded_case.config,
+            "sliced": expanded_case.target_id.endswith("_sliced"),
         }
         raw_use_public_inputs = expanded_case.config_table.get("use_public_inputs")
         if raw_use_public_inputs is not None and not isinstance(raw_use_public_inputs, bool):
             raise ValueError(f"{expanded_case.config_location}.use_public_inputs must be a boolean")
-        if raw_use_public_inputs and public_inputs:
+        if (raw_use_public_inputs or expanded_case.artifact_config != "fix_pub") and public_inputs:
             case["public_inputs"] = public_inputs
         if secret_inputs:
             case["secret_inputs"] = secret_inputs
@@ -246,7 +242,7 @@ def _load_klee_preprocess_profiles(benchmark_definition, tool_id: str) -> list[d
         arguments = optional_string_list(preprocess_table, "arguments", preprocess_location)
         if not arguments:
             raise ValueError(f"{preprocess_location}.arguments must not be empty")
-        base_bitcode = f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}.bc"
+        base_bitcode = f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.artifact_config}.bc"
         output_bitcode = f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.config_id}.bc"
         profiles.append(
             {
@@ -305,7 +301,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         "--benchmarks",
         help=(
             "Comma-separated benchmark groups to run. Valid: "
-            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in selected_benchmarks(mode, None))
+            + ",".join(format_benchmark_selector(library_id, target_id) for library_id, target_id in selected_benchmarks(mode, None))
         ),
     )
     parser.add_argument(
@@ -384,7 +380,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
         context.log(f"loop_limiter_plugin={loop_limiter_plugin}")
         context.log(
             "benchmarks="
-            + ",".join(format_benchmark_selector(library_id, variant_id) for library_id, variant_id in benchmarks)
+            + ",".join(format_benchmark_selector(library_id, target_id) for library_id, target_id in benchmarks)
         )
         context.log("##########")
 
@@ -426,8 +422,8 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
 
         seen_result_names: set[str] = set()
         try:
-            for library_id, variant_id in benchmarks:
-                benchmark_definition = definition(library_id, variant_id)
+            for library_id, target_id in benchmarks:
+                benchmark_definition = definition(library_id, target_id)
                 case_entries = _filter_klee_cases(
                     _load_klee_cases(benchmark_definition, mode),
                     args.config,
@@ -470,7 +466,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
                                 loop_limiter_plugin,
                                 mode,
                                 library_id,
-                                variant_id,
+                                target_id,
                                 index,
                             ),
                             log_path=worker_log_path,
@@ -496,7 +492,7 @@ def run_benchmark(
     loop_limiter_plugin: str,
     mode: str,
     library_id: str,
-    variant_id: str,
+    target_id: str,
     case_index: int | None = None,
     output_queue: object | None = None,
 ) -> None:
@@ -508,9 +504,9 @@ def run_benchmark(
         local_results_dir = Path(results_dir)
         local_env["KLEE_TOOL_ID"] = local_profile.executable_artifact
 
-        benchmark_definition = definition(library_id, variant_id)
+        benchmark_definition = definition(library_id, target_id)
         build = build_for_tool(benchmark_definition, mode)
-        selector_text = format_benchmark_selector(library_id, variant_id)
+        selector_text = format_benchmark_selector(library_id, target_id)
         local_context.log("##########")
         local_context.log(f"Begin experiments for {selector_text}")
         local_context.log("##########")
@@ -613,8 +609,8 @@ def run_benchmark(
                 code_path = expect_string(case_table, "code_path", case_location)
                 output_metadata = {
                     **normalized_case_output_metadata(case_table, case_location),
-                    "library_key": benchmark_definition.library_id,
-                    "variant_key": benchmark_definition.variant_id,
+                    "library": benchmark_definition.library_id,
+                    "target": benchmark_definition.target_id,
                 }
 
                 bitcode_path = workspace.resolve_repo_path(bitcode)

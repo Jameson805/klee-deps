@@ -62,18 +62,17 @@ def _build_case_index() -> dict[str, AbacusValidationCase]:
     """Index merged ABACUS output stems by the replay data needed to validate them."""
 
     cases_by_stem: dict[str, AbacusValidationCase] = {}
-    for library_id, variant_id in selected_benchmarks("abacus", None):
-        benchmark_definition = definition(library_id, variant_id)
+    for library_id, target_id in selected_benchmarks("abacus", None):
+        benchmark_definition = definition(library_id, target_id)
         klee_build = build_for_tool(benchmark_definition, "klee_cf")
-        selector_text = f"{benchmark_definition.library_id}:{benchmark_definition.variant_id}"
+        selector_text = f"{benchmark_definition.library_id}:{benchmark_definition.target_id}"
         for expanded_case in expand_benchmark_cases(benchmark_definition, "abacus"):
             output_stem = canonical_case_id(
                 benchmark_definition.library_id,
-                benchmark_definition.variant_id,
-                expanded_case.target_id,
+                benchmark_definition.target_id,
                 expanded_case.config_id,
             )
-            replay_executable = f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.public_mode}_replay"
+            replay_executable = f"{benchmark_definition.code_path}/artifacts/klee/{expanded_case.output_target}/{expanded_case.artifact_config}_replay"
             if output_stem in cases_by_stem:
                 raise ValueError(f"duplicate ABACUS validation case id: {output_stem}")
             cases_by_stem[output_stem] = AbacusValidationCase(

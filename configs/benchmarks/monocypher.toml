@@ -3,6 +3,8 @@ library = "monocypher"
 code_path = "benchmarks/monocypher"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
+[benchmarks.runner_profiles]
+
 [benchmarks.runner_profiles.chacha20]
 config = "configs/runner/monocypher_chacha20_runner_config.toml"
 preset = "default"
@@ -22,24 +24,16 @@ preset = "default"
 [benchmarks.build]
 preset = "default"
 common_flags = ["-g", "-O0"]
-include_dirs = [
-  "{repo_root}/include",
-  "{code_path}/monocypher-3.0.0/src",
-  "{code_path}/monocypher-3.0.0/src/optional",
-]
+include_dirs = ["{repo_root}/include", "{code_path}/monocypher-3.0.0/src", "{code_path}/monocypher-3.0.0/src/optional"]
+
+[benchmarks.build.tools]
 
 [benchmarks.build.tools.abacus]
 concrete_pubs = true
 
-[benchmarks.variants.chacha20]
-
-[[benchmarks.variants.chacha20.targets]]
-target = "chacha20"
+[benchmarks.targets.chacha20]
 runner_profile = "chacha20"
-build_sources = [
-  "chacha20_wrapper.c",
-  "monocypher-3.0.0/src/monocypher.c",
-]
+build_sources = ["chacha20_wrapper.c", "monocypher-3.0.0/src/monocypher.c"]
 secret_layout = "key:32"
 secret_inputs = ["key:32:key_buf"]
 public_layout = "nonce:8,message:128"
@@ -47,27 +41,21 @@ public_inputs = ["nonce:8:nonce_buf", "message:128:message_buf"]
 klee_secret_inputs = ["key"]
 klee_public_inputs = ["nonce", "message"]
 
-[[benchmarks.variants.chacha20.configs]]
+[[benchmarks.targets.chacha20.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "chacha20"
 
-[[benchmarks.variants.chacha20.configs]]
+[[benchmarks.targets.chacha20.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 runner_profile = "chacha20"
 
-[benchmarks.variants.poly1305]
-
-[[benchmarks.variants.poly1305.targets]]
-target = "poly1305"
+[benchmarks.targets.poly1305]
 runner_profile = "poly1305"
-build_sources = [
-  "poly1305_wrapper.c",
-  "monocypher-3.0.0/src/monocypher.c",
-]
+build_sources = ["poly1305_wrapper.c", "monocypher-3.0.0/src/monocypher.c"]
 secret_layout = "key:32"
 secret_inputs = ["key:32:key_buf"]
 public_layout = "message:64"
@@ -75,27 +63,21 @@ public_inputs = ["message:64:message_buf"]
 klee_secret_inputs = ["key"]
 klee_public_inputs = ["message"]
 
-[[benchmarks.variants.poly1305.configs]]
+[[benchmarks.targets.poly1305.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "poly1305"
 
-[[benchmarks.variants.poly1305.configs]]
+[[benchmarks.targets.poly1305.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 runner_profile = "poly1305"
 
-[benchmarks.variants.argon2i]
-
-[[benchmarks.variants.argon2i.targets]]
-target = "argon2i"
+[benchmarks.targets.argon2i]
 runner_profile = "argon2i"
-build_sources = [
-  "argon2i_wrapper.c",
-  "monocypher-3.0.0/src/monocypher.c",
-]
+build_sources = ["argon2i_wrapper.c", "monocypher-3.0.0/src/monocypher.c"]
 secret_layout = "password:5"
 secret_inputs = ["password:5:password_buf"]
 public_layout = "salt:16"
@@ -103,32 +85,32 @@ public_inputs = ["salt:16:salt_buf"]
 klee_secret_inputs = ["password"]
 klee_public_inputs = ["salt"]
 
-[[benchmarks.variants.argon2i.configs]]
+[[benchmarks.targets.argon2i.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 runner_profile = "argon2i"
 
-[[benchmarks.variants.argon2i.configs]]
+[[benchmarks.targets.argon2i.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 use_public_inputs = true
 runner_profile = "argon2i"
 
-[benchmarks.variants.ed25519]
-
-[[benchmarks.variants.ed25519.targets]]
-target = "ed25519"
+[benchmarks.targets.ed25519]
 runner_profile = "ed25519"
-build_sources = [
-  "ed25519_wrapper.c",
-  "monocypher-3.0.0/src/monocypher.c",
-]
+build_sources = ["ed25519_wrapper.c", "monocypher-3.0.0/src/monocypher.c"]
 secret_layout = "secret_key:32"
 secret_inputs = ["secret_key:32:secret_key_buf"]
 klee_secret_inputs = ["secret_key"]
 
-[[benchmarks.variants.ed25519.configs]]
+[[benchmarks.targets.ed25519.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
+runner_profile = "ed25519"
+
+[[benchmarks.targets.ed25519.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 runner_profile = "ed25519"

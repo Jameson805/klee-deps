@@ -3,6 +3,8 @@ library = "ghostrider"
 code_path = "benchmarks/ghostrider"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
+[benchmarks.runner_profiles]
+
 [benchmarks.runner_profiles.findmax]
 config = "configs/runner/ghostrider_findmax_runner_config.toml"
 preset = "default"
@@ -16,26 +18,10 @@ preset = "default"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include"]
 
+[benchmarks.build.tools]
+
 [benchmarks.build.tools.abacus]
 concrete_pubs = true
-
-[benchmarks.variants.default]
-
-[[benchmarks.targets]]
-target = "findmax"
-runner_profile = "findmax"
-build_sources = ["findmax_wrapper.c"]
-secret_layout = "data:2000"
-secret_inputs = ["data:2000:data_buf"]
-klee_secret_inputs = ["data"]
-
-[[benchmarks.targets]]
-target = "matmul"
-runner_profile = "matmul"
-build_sources = ["matmul_wrapper.c"]
-secret_layout = "data:32768"
-secret_inputs = ["data:32768:data_buf"]
-klee_secret_inputs = ["data"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -45,3 +31,17 @@ public_mode = "fix_pub"
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[benchmarks.targets.findmax]
+runner_profile = "findmax"
+build_sources = ["findmax_wrapper.c"]
+secret_layout = "data:2000"
+secret_inputs = ["data:2000:data_buf"]
+klee_secret_inputs = ["data"]
+
+[benchmarks.targets.matmul]
+runner_profile = "matmul"
+build_sources = ["matmul_wrapper.c"]
+secret_layout = "data:32768"
+secret_inputs = ["data:32768:data_buf"]
+klee_secret_inputs = ["data"]

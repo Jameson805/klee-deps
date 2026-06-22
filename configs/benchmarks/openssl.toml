@@ -2,23 +2,28 @@
 library = "openssl"
 code_path = "benchmarks/openssl-1.1.1q"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
+
 [benchmarks.build]
 preset = "size_{sym_size}"
 common_flags = ["-g", "-O0"]
 include_dirs = ["{repo_root}/include", "include"]
 link_libraries = ["libcrypto.a"]
-variables = { openssl_arch = "linux-generic64" }
 prepare_commands = ["cp -f crypto/bn/bn_exp_orig.c crypto/bn/bn_exp.c"]
-build_dep_commands = [
-	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}",
-	"make clean",
-	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
-]
+build_dep_commands = ["env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}", "make clean", "make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}"]
+
+[benchmarks.build.variables]
+openssl_arch = "linux-generic64"
+
+[benchmarks.build.tools]
 
 [benchmarks.build.tools.abacus]
 link_flags = ["-pthread", "-ldl"]
 concrete_pubs = false
-variables = { openssl_arch = "linux-generic32" }
+
+[benchmarks.build.tools.abacus.variables]
+openssl_arch = "linux-generic32"
+
+[benchmarks.runner_profiles]
 
 [benchmarks.runner_profiles.default]
 config = "configs/runner/modexp_runner_config.toml"
@@ -44,136 +49,21 @@ preset = "default"
 config = "configs/runner/openssl_ecdsa_sign_runner_config.toml"
 preset = "default"
 
+[benchmarks.tool_defaults]
+
 [benchmarks.tool_defaults.klee]
 code_path = "openssl-1.1.1q"
 extra_args = ["--ctchecker-prefix", "crypto/bn"]
 secret_inputs = ["exp"]
 public_inputs = ["base", "mod"]
 
+[benchmarks.tool_defaults.klee.preprocess_profiles]
+
 [benchmarks.tool_defaults.klee.preprocess_profiles.lim_loop]
 arguments = ["-o", "{output}", "{input}"]
 
 [benchmarks.tool_defaults.klee.preprocess_profiles.lim_loop_break]
 arguments = ["-break", "-o", "{output}", "{input}"]
-
-[benchmarks.variants.default]
-
-[benchmarks.variants.sliced]
-tools = ["klee_cf"]
-
-[benchmarks.variants.rsa_stages.tool_defaults.klee]
-code_path = "openssl-1.1.1q"
-extra_args = ["--ctchecker-prefix", "crypto/rsa"]
-
-[benchmarks.variants.aes_des.build]
-preset = "default"
-common_flags = ["-g", "-O0"]
-include_dirs = ["{repo_root}/include", "include"]
-link_libraries = ["libcrypto.a"]
-variables = { openssl_arch = "linux-generic64" }
-build_dep_commands = [
-	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}",
-	"make clean",
-	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
-]
-
-[benchmarks.variants.aes_des.build.tools.abacus]
-link_flags = ["-pthread", "-ldl"]
-concrete_pubs = true
-variables = { openssl_arch = "linux-generic32" }
-
-[benchmarks.variants.aes_des.tool_defaults.klee]
-code_path = "openssl-1.1.1q"
-extra_args = ["--ctchecker-prefix", "crypto"]
-secret_inputs = ["key"]
-public_inputs = ["data", "iv"]
-
-[benchmarks.variants.ecdsa.build]
-preset = "default"
-common_flags = ["-g", "-O0"]
-include_dirs = ["{repo_root}/include", "include"]
-link_libraries = ["libcrypto.a"]
-variables = { openssl_arch = "linux-generic64" }
-build_dep_commands = [
-	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}",
-	"make clean",
-	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
-]
-
-[benchmarks.variants.ecdsa.build.tools.abacus]
-link_flags = ["-pthread", "-ldl"]
-concrete_pubs = true
-variables = { openssl_arch = "linux-generic32" }
-
-[benchmarks.variants.ecdsa.tool_defaults.klee]
-code_path = "openssl-1.1.1q"
-extra_args = ["--ctchecker-prefix", "crypto/ec"]
-secret_inputs = ["private_key", "nonce"]
-public_inputs = ["digest"]
-
-[benchmarks.variants.sliced.build]
-preset = "size_{sym_size}"
-common_flags = ["-g", "-O0"]
-include_dirs = ["{repo_root}/include", "include"]
-link_libraries = ["libcrypto.a"]
-variables = { openssl_arch = "linux-generic64" }
-prepare_commands = ["cp -f crypto/bn/bn_exp_sliced.c crypto/bn/bn_exp.c"]
-build_dep_commands = [
-	"env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}",
-	"make clean",
-	"make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}",
-]
-
-[benchmarks.variants.sliced.build.tools.abacus]
-link_flags = ["-pthread", "-ldl"]
-concrete_pubs = false
-variables = { openssl_arch = "linux-generic32" }
-
-[benchmarks.variants.sliced.tool_defaults.klee.preprocess_profiles.lim_loop]
-arguments = ["-o", "{output}", "{input}"]
-
-[benchmarks.variants.sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
-arguments = ["-break", "-o", "{output}", "{input}"]
-
-[[benchmarks.targets]]
-target = "recp"
-runner_profile = "default"
-secret_layout = "exp:{sym_size}"
-secret_inputs = ["exp:{sym_size}:exp_buf"]
-public_layout = "base:{sym_size},mod:{sym_size}"
-public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
-build_sources = ["modexp_wrapper.c"]
-defines = ["RECP"]
-
-[[benchmarks.targets]]
-target = "mont"
-runner_profile = "default"
-secret_layout = "exp:{sym_size}"
-secret_inputs = ["exp:{sym_size}:exp_buf"]
-public_layout = "base:{sym_size},mod:{sym_size}"
-public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
-build_sources = ["modexp_wrapper.c"]
-defines = ["MONT"]
-
-[[benchmarks.targets]]
-target = "mont_consttime"
-runner_profile = "default"
-secret_layout = "exp:{sym_size}"
-secret_inputs = ["exp:{sym_size}:exp_buf"]
-public_layout = "base:{sym_size},mod:{sym_size}"
-public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
-build_sources = ["modexp_wrapper.c"]
-defines = ["MONT_CONSTTIME"]
-
-[[benchmarks.targets]]
-target = "mont_word"
-runner_profile = "default"
-secret_layout = "exp:{sym_size}"
-secret_inputs = ["exp:{sym_size}:exp_buf"]
-public_layout = "base:{sym_size},mod:{sym_size}"
-public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
-build_sources = ["modexp_wrapper.c"]
-defines = ["MONT_WORD"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -193,12 +83,169 @@ tools = ["klee_cf", "klee_eager"]
 preprocess = "lim_loop_break"
 use_public_inputs = true
 
-[[benchmarks.exclusions]]
-variant = "sliced"
-target = "mont_consttime"
+[benchmarks.targets.recp]
+runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp_wrapper.c"]
+defines = ["RECP"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_private_core"
+[benchmarks.targets.mont]
+runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp_wrapper.c"]
+defines = ["MONT"]
+
+[benchmarks.targets.mont_consttime]
+runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp_wrapper.c"]
+defines = ["MONT_CONSTTIME"]
+
+[benchmarks.targets.mont_word]
+runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp_wrapper.c"]
+defines = ["MONT_WORD"]
+
+[benchmarks.targets.recp_sliced]
+tools = ["klee_cf"]
+runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp_wrapper.c"]
+defines = ["RECP"]
+
+[benchmarks.targets.recp_sliced.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+prepare_commands = ["cp -f crypto/bn/bn_exp_sliced.c crypto/bn/bn_exp.c"]
+build_dep_commands = ["env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}", "make clean", "make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}"]
+
+[benchmarks.targets.recp_sliced.build.variables]
+openssl_arch = "linux-generic64"
+
+[benchmarks.targets.recp_sliced.build.tools]
+
+[benchmarks.targets.recp_sliced.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = false
+
+[benchmarks.targets.recp_sliced.build.tools.abacus.variables]
+openssl_arch = "linux-generic32"
+
+[benchmarks.targets.recp_sliced.tool_defaults]
+
+[benchmarks.targets.recp_sliced.tool_defaults.klee]
+
+[benchmarks.targets.recp_sliced.tool_defaults.klee.preprocess_profiles]
+
+[benchmarks.targets.recp_sliced.tool_defaults.klee.preprocess_profiles.lim_loop]
+arguments = ["-o", "{output}", "{input}"]
+
+[benchmarks.targets.recp_sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
+arguments = ["-break", "-o", "{output}", "{input}"]
+
+[benchmarks.targets.mont_sliced]
+tools = ["klee_cf"]
+runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp_wrapper.c"]
+defines = ["MONT"]
+
+[benchmarks.targets.mont_sliced.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+prepare_commands = ["cp -f crypto/bn/bn_exp_sliced.c crypto/bn/bn_exp.c"]
+build_dep_commands = ["env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}", "make clean", "make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}"]
+
+[benchmarks.targets.mont_sliced.build.variables]
+openssl_arch = "linux-generic64"
+
+[benchmarks.targets.mont_sliced.build.tools]
+
+[benchmarks.targets.mont_sliced.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = false
+
+[benchmarks.targets.mont_sliced.build.tools.abacus.variables]
+openssl_arch = "linux-generic32"
+
+[benchmarks.targets.mont_sliced.tool_defaults]
+
+[benchmarks.targets.mont_sliced.tool_defaults.klee]
+
+[benchmarks.targets.mont_sliced.tool_defaults.klee.preprocess_profiles]
+
+[benchmarks.targets.mont_sliced.tool_defaults.klee.preprocess_profiles.lim_loop]
+arguments = ["-o", "{output}", "{input}"]
+
+[benchmarks.targets.mont_sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
+arguments = ["-break", "-o", "{output}", "{input}"]
+
+[benchmarks.targets.mont_word_sliced]
+tools = ["klee_cf"]
+runner_profile = "default"
+secret_layout = "exp:{sym_size}"
+secret_inputs = ["exp:{sym_size}:exp_buf"]
+public_layout = "base:{sym_size},mod:{sym_size}"
+public_inputs = ["base:{sym_size}:base_buf", "mod:{sym_size}:mod_buf"]
+build_sources = ["modexp_wrapper.c"]
+defines = ["MONT_WORD"]
+
+[benchmarks.targets.mont_word_sliced.build]
+preset = "size_{sym_size}"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+prepare_commands = ["cp -f crypto/bn/bn_exp_sliced.c crypto/bn/bn_exp.c"]
+build_dep_commands = ["env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}", "make clean", "make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}"]
+
+[benchmarks.targets.mont_word_sliced.build.variables]
+openssl_arch = "linux-generic64"
+
+[benchmarks.targets.mont_word_sliced.build.tools]
+
+[benchmarks.targets.mont_word_sliced.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = false
+
+[benchmarks.targets.mont_word_sliced.build.tools.abacus.variables]
+openssl_arch = "linux-generic32"
+
+[benchmarks.targets.mont_word_sliced.tool_defaults]
+
+[benchmarks.targets.mont_word_sliced.tool_defaults.klee]
+
+[benchmarks.targets.mont_word_sliced.tool_defaults.klee.preprocess_profiles]
+
+[benchmarks.targets.mont_word_sliced.tool_defaults.klee.preprocess_profiles.lim_loop]
+arguments = ["-o", "{output}", "{input}"]
+
+[benchmarks.targets.mont_word_sliced.tool_defaults.klee.preprocess_profiles.lim_loop_break]
+arguments = ["-break", "-o", "{output}", "{input}"]
+
+[benchmarks.targets.rsa_private_core]
 runner_profile = "rsa_private"
 secret_layout = "dp:64,dq:64"
 secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
@@ -206,32 +253,92 @@ public_layout = "ciphertext:128"
 public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["rsa_private_core_wrapper.c"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "padding_check_pkcs1_type_2"
+[benchmarks.targets.rsa_private_core.tool_defaults]
+
+[benchmarks.targets.rsa_private_core.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
+[[benchmarks.targets.rsa_private_core.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.rsa_private_core.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.padding_check_pkcs1_type_2]
 runner_profile = "rsa_padding"
 secret_layout = "encoded:128"
 secret_inputs = ["encoded:128:encoded_buf"]
 build_sources = ["padding_check_wrapper.c"]
 defines = ["OPENSSL_RSA_PADDING_CHECK_PKCS1_TYPE_2"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "padding_check_oaep_mgf1"
+[benchmarks.targets.padding_check_pkcs1_type_2.tool_defaults]
+
+[benchmarks.targets.padding_check_pkcs1_type_2.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
+[[benchmarks.targets.padding_check_pkcs1_type_2.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.padding_check_pkcs1_type_2.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.padding_check_oaep_mgf1]
 runner_profile = "rsa_padding"
 secret_layout = "encoded:128"
 secret_inputs = ["encoded:128:encoded_buf"]
 build_sources = ["padding_check_wrapper.c"]
 defines = ["OPENSSL_RSA_PADDING_CHECK_OAEP_MGF1"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "padding_check_sslv23"
+[benchmarks.targets.padding_check_oaep_mgf1.tool_defaults]
+
+[benchmarks.targets.padding_check_oaep_mgf1.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
+[[benchmarks.targets.padding_check_oaep_mgf1.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.padding_check_oaep_mgf1.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.padding_check_sslv23]
 runner_profile = "rsa_padding"
 secret_layout = "encoded:128"
 secret_inputs = ["encoded:128:encoded_buf"]
 build_sources = ["padding_check_wrapper.c"]
 defines = ["OPENSSL_RSA_PADDING_CHECK_SSLV23"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_private_decrypt_pkcs1"
+[benchmarks.targets.padding_check_sslv23.tool_defaults]
+
+[benchmarks.targets.padding_check_sslv23.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
+[[benchmarks.targets.padding_check_sslv23.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.padding_check_sslv23.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.rsa_private_decrypt_pkcs1]
 runner_profile = "rsa_private"
 secret_layout = "dp:64,dq:64"
 secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
@@ -240,8 +347,23 @@ public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["rsa_private_decrypt_wrapper.c"]
 defines = ["OPENSSL_RSA_DECRYPT_PKCS1"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_private_decrypt_oaep"
+[benchmarks.targets.rsa_private_decrypt_pkcs1.tool_defaults]
+
+[benchmarks.targets.rsa_private_decrypt_pkcs1.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
+[[benchmarks.targets.rsa_private_decrypt_pkcs1.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.rsa_private_decrypt_pkcs1.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.rsa_private_decrypt_oaep]
 runner_profile = "rsa_private"
 secret_layout = "dp:64,dq:64"
 secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
@@ -250,8 +372,23 @@ public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["rsa_private_decrypt_wrapper.c"]
 defines = ["OPENSSL_RSA_DECRYPT_OAEP"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_private_decrypt_sslv23"
+[benchmarks.targets.rsa_private_decrypt_oaep.tool_defaults]
+
+[benchmarks.targets.rsa_private_decrypt_oaep.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
+[[benchmarks.targets.rsa_private_decrypt_oaep.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.rsa_private_decrypt_oaep.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.rsa_private_decrypt_sslv23]
 runner_profile = "rsa_private"
 secret_layout = "dp:64,dq:64"
 secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
@@ -260,8 +397,23 @@ public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["rsa_private_decrypt_wrapper.c"]
 defines = ["OPENSSL_RSA_DECRYPT_SSLV23"]
 
-[[benchmarks.variants.rsa_stages.targets]]
-target = "rsa_private_decrypt_no_padding"
+[benchmarks.targets.rsa_private_decrypt_sslv23.tool_defaults]
+
+[benchmarks.targets.rsa_private_decrypt_sslv23.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
+[[benchmarks.targets.rsa_private_decrypt_sslv23.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.rsa_private_decrypt_sslv23.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "binsec"]
+use_public_inputs = true
+
+[benchmarks.targets.rsa_private_decrypt_no_padding]
 runner_profile = "rsa_private"
 secret_layout = "dp:64,dq:64"
 secret_inputs = ["dp:64:dp_buf", "dq:64:dq_buf"]
@@ -270,18 +422,23 @@ public_inputs = ["ciphertext:128:ciphertext_buf"]
 build_sources = ["rsa_private_decrypt_wrapper.c"]
 defines = ["OPENSSL_RSA_DECRYPT_NO_PADDING"]
 
-[[benchmarks.variants.rsa_stages.configs]]
+[benchmarks.targets.rsa_private_decrypt_no_padding.tool_defaults]
+
+[benchmarks.targets.rsa_private_decrypt_no_padding.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/rsa"]
+
+[[benchmarks.targets.rsa_private_decrypt_no_padding.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.rsa_stages.configs]]
+[[benchmarks.targets.rsa_private_decrypt_no_padding.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "binsec"]
 use_public_inputs = true
 
-[[benchmarks.variants.aes_des.targets]]
-target = "aes_encrypt"
+[benchmarks.targets.aes_encrypt]
 runner_profile = "aes"
 secret_layout = "key:16"
 secret_inputs = ["key:16:key_buf"]
@@ -291,8 +448,43 @@ klee_secret_inputs = ["key"]
 klee_public_inputs = ["data", "iv"]
 build_sources = ["aes_encrypt_wrapper.c"]
 
-[[benchmarks.variants.aes_des.targets]]
-target = "des_encrypt"
+[benchmarks.targets.aes_encrypt.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+build_dep_commands = ["env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}", "make clean", "make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}"]
+
+[benchmarks.targets.aes_encrypt.build.variables]
+openssl_arch = "linux-generic64"
+
+[benchmarks.targets.aes_encrypt.build.tools]
+
+[benchmarks.targets.aes_encrypt.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = true
+
+[benchmarks.targets.aes_encrypt.build.tools.abacus.variables]
+openssl_arch = "linux-generic32"
+
+[benchmarks.targets.aes_encrypt.tool_defaults]
+
+[benchmarks.targets.aes_encrypt.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto"]
+secret_inputs = ["key"]
+public_inputs = ["data", "iv"]
+
+[[benchmarks.targets.aes_encrypt.configs]]
+config = "fix_pub"
+public_mode = "fix_pub"
+
+[[benchmarks.targets.aes_encrypt.configs]]
+config = "var_pub"
+public_mode = "var_pub"
+tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[benchmarks.targets.des_encrypt]
 runner_profile = "des"
 secret_layout = "key:8"
 secret_inputs = ["key:8:key_buf"]
@@ -302,17 +494,43 @@ klee_secret_inputs = ["key"]
 klee_public_inputs = ["data", "iv"]
 build_sources = ["des_encrypt_wrapper.c"]
 
-[[benchmarks.variants.aes_des.configs]]
+[benchmarks.targets.des_encrypt.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+build_dep_commands = ["env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}", "make clean", "make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}"]
+
+[benchmarks.targets.des_encrypt.build.variables]
+openssl_arch = "linux-generic64"
+
+[benchmarks.targets.des_encrypt.build.tools]
+
+[benchmarks.targets.des_encrypt.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = true
+
+[benchmarks.targets.des_encrypt.build.tools.abacus.variables]
+openssl_arch = "linux-generic32"
+
+[benchmarks.targets.des_encrypt.tool_defaults]
+
+[benchmarks.targets.des_encrypt.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto"]
+secret_inputs = ["key"]
+public_inputs = ["data", "iv"]
+
+[[benchmarks.targets.des_encrypt.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.aes_des.configs]]
+[[benchmarks.targets.des_encrypt.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
 
-[[benchmarks.variants.ecdsa.targets]]
-target = "ecdsa_sign"
+[benchmarks.targets.ecdsa_sign]
 runner_profile = "ecdsa"
 secret_layout = "private_key:24,nonce:24"
 secret_inputs = ["private_key:24:private_key_buf", "nonce:24:nonce_buf"]
@@ -322,11 +540,38 @@ klee_secret_inputs = ["private_key", "nonce"]
 klee_public_inputs = ["digest"]
 build_sources = ["ecdsa_sign_wrapper.c"]
 
-[[benchmarks.variants.ecdsa.configs]]
+[benchmarks.targets.ecdsa_sign.build]
+preset = "default"
+common_flags = ["-g", "-O0"]
+include_dirs = ["{repo_root}/include", "include"]
+link_libraries = ["libcrypto.a"]
+build_dep_commands = ["env CC={cc} CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS= ./Configure --debug no-shared no-asm no-tests no-threads -DOPENSSL_AES_CONST_TIME {openssl_arch}", "make clean", "make CC={cc} CFLAGS=\"{dep_cflags}\" LDFLAGS=\"{dep_ldflags}\" -j{make_jobs}"]
+
+[benchmarks.targets.ecdsa_sign.build.variables]
+openssl_arch = "linux-generic64"
+
+[benchmarks.targets.ecdsa_sign.build.tools]
+
+[benchmarks.targets.ecdsa_sign.build.tools.abacus]
+link_flags = ["-pthread", "-ldl"]
+concrete_pubs = true
+
+[benchmarks.targets.ecdsa_sign.build.tools.abacus.variables]
+openssl_arch = "linux-generic32"
+
+[benchmarks.targets.ecdsa_sign.tool_defaults]
+
+[benchmarks.targets.ecdsa_sign.tool_defaults.klee]
+code_path = "openssl-1.1.1q"
+extra_args = ["--ctchecker-prefix", "crypto/ec"]
+secret_inputs = ["private_key", "nonce"]
+public_inputs = ["digest"]
+
+[[benchmarks.targets.ecdsa_sign.configs]]
 config = "fix_pub"
 public_mode = "fix_pub"
 
-[[benchmarks.variants.ecdsa.configs]]
+[[benchmarks.targets.ecdsa_sign.configs]]
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]

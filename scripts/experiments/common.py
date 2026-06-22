@@ -684,13 +684,13 @@ def optional_string_list(table: dict[str, object], key: str, location: str) -> t
 
 @dataclass(frozen=True)
 class ExpandedBenchmarkCase:
-    """One generic benchmark case produced from targets, configs, and filters."""
+    """One generic benchmark case produced from one target and its configs."""
 
-    variant_id: str
-    tool_id: str
     target_id: str
+    tool_id: str
     config_id: str
-    public_mode: str
+    config: str
+    artifact_config: str
     target_location: str
     config_location: str
     target_table: dict[str, object]
@@ -698,11 +698,7 @@ class ExpandedBenchmarkCase:
 
     @property
     def output_target(self) -> str:
-        if not self.target_id:
-            return self.target_id
-        if self.variant_id == "default":
-            return self.target_id
-        return f"{self.target_id}_{self.variant_id}"
+        return self.target_id
 
     @property
     def target_suffix(self) -> str:
@@ -712,21 +708,17 @@ class ExpandedBenchmarkCase:
 def matches_case_exclusion(
     exclusion_table: dict[str, object],
     *,
-    variant_id: str,
     target_id: str,
     config_id: str,
     tool_id: str,
     location: str,
 ) -> bool:
     """Return whether one exclusion entry suppresses a candidate case."""
-    exclusion_variant = optional_string(exclusion_table, "variant", location)
     exclusion_target = optional_string(exclusion_table, "target", location)
     exclusion_config = optional_string(exclusion_table, "config", location)
     exclusion_tool = optional_string(exclusion_table, "tool", location)
-    if all(value is None for value in (exclusion_variant, exclusion_target, exclusion_config, exclusion_tool)):
-        raise ValueError(f"{location} must constrain at least one of variant/target/config/tool")
-    if exclusion_variant not in (None, variant_id):
-        return False
+    if all(value is None for value in (exclusion_target, exclusion_config, exclusion_tool)):
+        raise ValueError(f"{location} must constrain at least one of target/config/tool")
     if exclusion_target not in (None, target_id):
         return False
     if exclusion_config not in (None, config_id):
@@ -739,80 +731,54 @@ def matches_case_exclusion(
 def expand_benchmark_cases(benchmark_definition, tool_id: str) -> list[ExpandedBenchmarkCase]:
     """Expand the shared benchmark matrix into tool-filtered case candidates.
 
-    This centralizes the repeated ``targets x configs x tools x exclusions``
-    expansion logic so new runners only need to map an expanded case into their
-    own tool-specific inputs and outputs.
+    This centralizes the repeated ``configs x tools x exclusions`` expansion
+    logic so new runners only need to map an expanded case into their own
+    tool-specific inputs and outputs.
     """
     if "configs" not in benchmark_definition.extra_config:
         return []
 
     location = benchmark_definition.config_location
-    variant_id = benchmark_definition.variant_id
-    raw_target_entries = benchmark_definition.extra_config.get("targets")
+    target_id = benchmark_definition.target_id
+    target_location = f"{location}.targets.{target_id}"
+    target_table = benchmark_definition.extra_config
     configs = expect_array(benchmark_definition.extra_config.get("configs"), f"{location}.configs")
     exclusions = expect_array(benchmark_definition.extra_config.get("exclusions") or [], f"{location}.exclusions")
 
-    parsed_targets: list[tuple[str, str, set[str], str, dict[str, object]]] = []
-    if raw_target_entries is None:
-        parsed_targets.append(
-            (
-                "",
-                "",
-                set(benchmark_definition.tools),
-                f"{location}.targets[default]",
-                {},
-            )
-        )
-    else:
-        for target_index, raw_target in enumerate(expect_array(raw_target_entries, f"{location}.targets")):
-            target_location = f"{location}.targets[{target_index}]"
-            target_table = expect_table(raw_target, target_location)
-            target_id = expect_string(target_table, "target", target_location)
-            parsed_targets.append(
-                (
-                    target_id,
-                    set(optional_string_list(target_table, "tools", target_location) or benchmark_definition.tools),
-                    target_location,
-                    target_table,
-                )
-            )
-
     cases: list[ExpandedBenchmarkCase] = []
     benchmark_tools = set(benchmark_definition.tools)
-    for target_id, target_tools, target_location, target_table in parsed_targets:
-        for config_index, raw_config in enumerate(configs):
-            config_location = f"{location}.configs[{config_index}]"
-            config_table = expect_table(raw_config, config_location)
-            config_id = expect_string(config_table, "config", config_location)
-            config_tools = set(optional_string_list(config_table, "tools", config_location) or benchmark_definition.tools)
-            case_tools = target_tools & config_tools & benchmark_tools
-            if tool_id not in case_tools:
-                continue
-            if any(
-                matches_case_exclusion(
-                    expect_table(raw_exclusion, f"{location}.exclusions[{index}]"),
-                    variant_id=variant_id,
-                    target_id=target_id,
-                    config_id=config_id,
-                    tool_id=tool_id,
-                    location=f"{location}.exclusions[{index}]",
-                )
-                for index, raw_exclusion in enumerate(exclusions)
-            ):
-                continue
-            cases.append(
-                ExpandedBenchmarkCase(
-                    variant_id=variant_id,
-                    tool_id=tool_id,
-                    target_id=target_id,
-                    config_id=config_id,
-                    public_mode=expect_string(config_table, "public_mode", config_location),
-                    target_location=target_location,
-                    config_location=config_location,
-                    target_table=target_table,
-                    config_table=config_table,
-                )
+    for config_index, raw_config in enumerate(configs):
+        config_location = f"{location}.configs[{config_index}]"
+        config_table = expect_table(raw_config, config_location)
+        config_id = expect_string(config_table, "config", config_location)
+        config_tools = set(optional_string_list(config_table, "tools", config_location) or benchmark_definition.tools)
+        case_tools = config_tools & benchmark_tools
+        if tool_id not in case_tools:
+            continue
+        if any(
+            matches_case_exclusion(
+                expect_table(raw_exclusion, f"{location}.exclusions[{index}]"),
+                target_id=target_id,
+                config_id=config_id,
+                tool_id=tool_id,
+                location=f"{location}.exclusions[{index}]",
             )
+            for index, raw_exclusion in enumerate(exclusions)
+        ):
+            continue
+        cases.append(
+            ExpandedBenchmarkCase(
+                target_id=target_id,
+                tool_id=tool_id,
+                config_id=config_id,
+                config=config_id,
+                artifact_config=expect_string(config_table, "public_mode", config_location),
+                target_location=target_location,
+                config_location=config_location,
+                target_table=target_table,
+                config_table=config_table,
+            )
+        )
     return cases
 
 

@@ -3,6 +3,8 @@ library = "appliedcryp"
 code_path = "benchmarks/appliedCryp"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec", "abacus"]
 
+[benchmarks.runner_profiles]
+
 [benchmarks.runner_profiles.3way]
 config = "configs/runner/appliedcryp_3way_runner_config.toml"
 preset = "default"
@@ -20,34 +22,10 @@ preset = "default"
 common_flags = ["-g", "-O0", "-std=gnu89"]
 include_dirs = ["{repo_root}/include"]
 
+[benchmarks.build.tools]
+
 [benchmarks.build.tools.abacus]
 concrete_pubs = true
-
-[benchmarks.variants.default]
-
-[[benchmarks.targets]]
-target = "3way"
-runner_profile = "3way"
-build_sources = ["3way_wrapper.c"]
-secret_layout = "key:12,data:12"
-secret_inputs = ["key:12:key_buf", "data:12:data_buf"]
-klee_secret_inputs = ["key", "data"]
-
-[[benchmarks.targets]]
-target = "des"
-runner_profile = "des"
-build_sources = ["des_wrapper.c"]
-secret_layout = "key:24,data:8"
-secret_inputs = ["key:24:key_buf", "data:8:data_buf"]
-klee_secret_inputs = ["key", "data"]
-
-[[benchmarks.targets]]
-target = "loki91"
-runner_profile = "loki91"
-build_sources = ["loki91_wrapper.c"]
-secret_layout = "key:24,data:8"
-secret_inputs = ["key:24:key_buf", "data:8:data_buf"]
-klee_secret_inputs = ["key", "data"]
 
 [[benchmarks.configs]]
 config = "fix_pub"
@@ -57,3 +35,24 @@ public_mode = "fix_pub"
 config = "var_pub"
 public_mode = "var_pub"
 tools = ["klee_cf", "klee_eager", "klee_self_comp", "binsec"]
+
+[benchmarks.targets.3way]
+runner_profile = "3way"
+build_sources = ["3way_wrapper.c"]
+secret_layout = "key:12,data:12"
+secret_inputs = ["key:12:key_buf", "data:12:data_buf"]
+klee_secret_inputs = ["key", "data"]
+
+[benchmarks.targets.des]
+runner_profile = "des"
+build_sources = ["des_wrapper.c"]
+secret_layout = "key:24,data:8"
+secret_inputs = ["key:24:key_buf", "data:8:data_buf"]
+klee_secret_inputs = ["key", "data"]
+
+[benchmarks.targets.loki91]
+runner_profile = "loki91"
+build_sources = ["loki91_wrapper.c"]
+secret_layout = "key:24,data:8"
+secret_inputs = ["key:24:key_buf", "data:8:data_buf"]
+klee_secret_inputs = ["key", "data"]
