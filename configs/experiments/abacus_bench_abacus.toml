@@ -1,0 +1,23 @@
+[campaign]
+# Used for direct runs without --docker. Docker mode builds from the
+# CLI-provided ABACUS repo path and uses --container-abacus-root inside the
+# container.
+abacus_root = "/datapool/theta-lin/Abacus"
+num_copies = 1
+tmp_dir = "/datapool/theta-lin-experiments/tmp"
+output = "/datapool/theta-lin-experiments/20260616_abacus_bench_abacus"
+# These benchmark descriptors own their ABACUS build and runner presets, so
+# leave campaign.sym_sizes unset and use one benchmark-config-driven bucket.
+
+[benchmarks]
+abacus = [
+  "openssl:aes_encrypt",
+  "openssl:des_encrypt",
+  "openssl:ecdsa_sign",
+  "openssl:rsa_private_decrypt_oaep",
+  "mbedtls:aes_encrypt",
+  "mbedtls:des_encrypt",
+  "mbedtls:ecdsa_sign",
+  "mbedtls:rsa_rsaes_pkcs1_v15_decrypt",
+  "libgcrypt:gcry_pk_decrypt_raw",
+]

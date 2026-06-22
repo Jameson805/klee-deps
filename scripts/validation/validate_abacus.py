@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 from scripts.experiments.common import REPO_ROOT, expand_benchmark_cases
 from tools.postprocess.reproduce_positives import reproduce_abacus_json_positives
@@ -25,6 +26,10 @@ from tools.shared.experiment_registry import (
     definition,
     selected_benchmarks,
 )
+from tools.shared.runtime_limits import configure_int_max_str_digits
+
+
+configure_int_max_str_digits()
 
 
 def _resolve_preset_name(preset_template: str, sym_size: int | None, *, owner: str) -> str:
@@ -128,7 +133,7 @@ def _ensure_replay_executable(case: AbacusValidationCase, sym_size: int | None) 
         return replay_path
 
     build_command = [
-        "python",
+        sys.executable,
         "-m",
         "tools.build_benchmark",
         "--tool",
@@ -158,6 +163,7 @@ def validate_results_dir(
     sym_size_override: int | None,
     timeout: int,
     pin_root: str | None,
+    debug: bool = False,
 ) -> int:
     """Validate one merged ABACUS results directory in place or into another output dir."""
 
@@ -201,6 +207,7 @@ def validate_results_dir(
             output=str(output_json),
             library=case.library,
             pin_root=pin_root,
+            debug=debug,
         )
         if reproduce_return_code != 0:
             return reproduce_return_code
@@ -228,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sym-size", type=int, help="Override sym size instead of inferring it from results-dir")
     parser.add_argument("--timeout", type=int, default=300, help="Replay timeout in seconds (default: 300)")
     parser.add_argument("--pin-root", default=None, help="Path to external Intel Pin kit (defaults to PIN_ROOT)")
+    parser.add_argument("--debug", action="store_true", help="Print per-row validation decisions and replay locations")
     args = parser.parse_args(argv)
 
     results_dir = Path(args.results_dir).expanduser().resolve()
@@ -238,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
         sym_size_override=args.sym_size,
         timeout=args.timeout,
         pin_root=args.pin_root,
+        debug=args.debug,
     )
 
 

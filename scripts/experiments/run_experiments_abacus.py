@@ -113,7 +113,14 @@ def docker_bootstrap_command(*, container_abacus_root: Path) -> list[str]:
             f"cmake -S {container_abacus_root} -B {container_build_root} -DCMAKE_BUILD_TYPE=Release",
             f"cmake --build {container_build_root} --parallel",
             f"mkdir -p {container_abacus_root / 'build' / 'App' / 'QIF'}",
-            f"cp {container_build_root / 'App' / 'QIF' / 'QIF'} {container_abacus_root / 'build' / 'App' / 'QIF' / 'QIF'}",
+            (
+                f"install -m 755 {container_build_root / 'App' / 'QIF' / 'QIF'} "
+                f"{container_abacus_root / 'build' / 'App' / 'QIF' / 'QIF'}.new.$$"
+            ),
+            (
+                f"mv -f {container_abacus_root / 'build' / 'App' / 'QIF' / 'QIF'}.new.$$ "
+                f"{container_abacus_root / 'build' / 'App' / 'QIF' / 'QIF'}"
+            ),
             (
                 "make "
                 f"-C {container_abacus_root / 'Pintools'} "
@@ -252,6 +259,14 @@ def run_docker_campaign(
         if container_output_dir == output_dir.resolve() and not str(output_dir).startswith(str(REPO_ROOT)):
             append_mount(command, output_dir, container_output_dir, seen_mounts)
 
+    container_tmp_dir = Path(args.container_tmp_dir).expanduser()
+    if container_tmp_dir.is_absolute():
+        host_tmp_dir = resolve_host_path(container_tmp_dir)
+        host_tmp_dir.mkdir(parents=True, exist_ok=True)
+        tmp_mount_path = container_path_for_host_path(host_tmp_dir, container_workdir)
+        if tmp_mount_path == host_tmp_dir.resolve() and not str(host_tmp_dir).startswith(str(REPO_ROOT)):
+            append_mount(command, host_tmp_dir, tmp_mount_path, seen_mounts)
+
     try:
         config_path.relative_to(REPO_ROOT)
     except ValueError:
@@ -261,7 +276,8 @@ def run_docker_campaign(
         [
             DOCKER_IMAGE_TAG,
             "python3",
-            "scripts/experiments/run_experiments_abacus.py",
+            "-m",
+            "scripts.experiments.run_experiments_abacus",
             str(container_config_path),
             "--inside-container",
             "--container-abacus-root",

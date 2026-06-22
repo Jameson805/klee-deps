@@ -32,7 +32,7 @@ def _discover_buckets(output_base: Path) -> list[str]:
     return buckets
 
 
-def _run_one(output_base: Path, bucket: str) -> int:
+def _run_one(output_base: Path, bucket: str, debug: bool) -> int:
     """Validate one merged `abacus_<bucket>` directory under the output root."""
 
     results_dir = output_base / f"abacus_{bucket}"
@@ -43,6 +43,7 @@ def _run_one(output_base: Path, bucket: str) -> int:
         sym_size_override=_parse_bucket_sym_size(bucket),
         timeout=300,
         pin_root=None,
+        debug=debug,
     )
     if rc == 0:
         print(f"[VALIDATE {bucket}] done")
@@ -73,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--parallel", action="store_true", help="Validate selected sym sizes in parallel")
     parser.add_argument("--sequential", action="store_true", help="Validate selected sym sizes sequentially")
+    parser.add_argument("--debug", action="store_true", help="Print per-row validation decisions and replay locations")
     args = parser.parse_args(argv)
 
     output_base = Path(args.output_base).expanduser().resolve()
@@ -87,14 +89,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.parallel:
         with ThreadPoolExecutor(max_workers=len(bucket_labels)) as executor:
-            futures = [executor.submit(_run_one, output_base, bucket) for bucket in bucket_labels]
+            futures = [executor.submit(_run_one, output_base, bucket, args.debug) for bucket in bucket_labels]
             for future in futures:
                 rc = future.result()
                 if rc != 0:
                     return rc
     else:
         for bucket in bucket_labels:
-            rc = _run_one(output_base, bucket)
+            rc = _run_one(output_base, bucket, args.debug)
             if rc != 0:
                 return rc
 
