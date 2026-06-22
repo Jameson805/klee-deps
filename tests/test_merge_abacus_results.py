@@ -27,7 +27,6 @@ class MergeAbacusResultsTest(unittest.TestCase):
         return {
             "data": [
                 {
-                    "library": "toy",
                     "filename": "toy.c",
                     "line": 10,
                     "column": 2,
@@ -37,10 +36,10 @@ class MergeAbacusResultsTest(unittest.TestCase):
                 }
             ],
             "metadata": {
-                "source_column_suffix": "fix_pub",
-                "public_mode": "fix_pub",
+                "config": "fix_pub",
                 "sliced": False,
-                "library_key": "toy",
+                "library": "toy",
+                "target": "default",
             },
         }
 

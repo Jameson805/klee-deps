@@ -31,19 +31,18 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
 
     def _case_metadata(
         self,
-        suffix: str,
-        library_key: str,
+        config: str,
+        library: str,
         *,
-        target_key: str | None = None,
+        target: str | None = None,
     ) -> dict[str, object]:
         metadata: dict[str, object] = {
-            "source_column_suffix": suffix,
-            "public_mode": suffix,
+            "config": config,
             "sliced": False,
-            "library_key": library_key,
+            "library": library,
         }
-        if target_key is not None:
-            metadata["target_key"] = target_key
+        if target is not None:
+            metadata["target"] = target
         return metadata
 
     def _write_json(
@@ -93,7 +92,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("fix_pub", "mbedtls", target_key="aes"),
+                metadata=self._case_metadata("fix_pub", "mbedtls", target="aes"),
             )
             self._write_json(
                 root / "klee_cf" / "bearssl_fix_pub.json",
@@ -107,7 +106,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "timeout",
                     },
                 ],
-                metadata=self._case_metadata("fix_pub", "bearssl", target_key="rsa"),
+                metadata=self._case_metadata("fix_pub", "bearssl", target="rsa"),
             )
             self._write_json(
                 root / "binsec" / "mbedtls_var_pub.json",
@@ -129,7 +128,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "not_reproduced",
                     },
                 ],
-                metadata=self._case_metadata("var_pub", "mbedtls", target_key="aes"),
+                metadata=self._case_metadata("var_pub", "mbedtls", target="aes"),
             )
             self._write_json(
                 root / "binsec" / "bearssl_var_pub.json",
@@ -151,7 +150,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("var_pub", "bearssl", target_key="rsa"),
+                metadata=self._case_metadata("var_pub", "bearssl", target="rsa"),
             )
             self._write_json(
                 root / "klee_eager" / "mbedtls_fix_pub.json",
@@ -165,7 +164,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("fix_pub", "mbedtls", target_key="aes"),
+                metadata=self._case_metadata("fix_pub", "mbedtls", target="aes"),
             )
             self._write_json(
                 root / "klee_eager" / "bearssl_fix_pub.json",
@@ -179,7 +178,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("fix_pub", "bearssl", target_key="rsa"),
+                metadata=self._case_metadata("fix_pub", "bearssl", target="rsa"),
             )
 
             filter_csv = tmp_path / "filter.csv"
@@ -235,13 +234,13 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                 [
                     {
                         "configuration": "binsec_var_pub",
-                        "configuration_label": "searcher=default, public_mode=var_pub, cv_model=default",
+                        "configuration_label": "searcher=default, config=var_pub, cv_model=default",
                         "comparison_tool": "binsec",
                         "tool_family": "binsec",
                         "sliced": "False",
                         "searcher": "default",
                         "sym_size": "all",
-                        "public_mode": "var_pub",
+                        "config": "var_pub",
                         "cv_model": "default",
                         "success": "3",
                         "timeout": "0",
@@ -254,13 +253,13 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                     },
                     {
                         "configuration": "klee_cf_fix_pub",
-                        "configuration_label": "searcher=default, public_mode=fix_pub, cv_model=default",
+                        "configuration_label": "searcher=default, config=fix_pub, cv_model=default",
                         "comparison_tool": "klee_cf",
                         "tool_family": "klee_cf",
                         "sliced": "False",
                         "searcher": "default",
                         "sym_size": "all",
-                        "public_mode": "fix_pub",
+                        "config": "fix_pub",
                         "cv_model": "default",
                         "success": "2",
                         "timeout": "1",
@@ -273,13 +272,13 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                     },
                     {
                         "configuration": "klee_eager_fix_pub",
-                        "configuration_label": "searcher=default, public_mode=fix_pub, cv_model=default",
+                        "configuration_label": "searcher=default, config=fix_pub, cv_model=default",
                         "comparison_tool": "klee_eager",
                         "tool_family": "klee_eager",
                         "sliced": "False",
                         "searcher": "default",
                         "sym_size": "all",
-                        "public_mode": "fix_pub",
+                        "config": "fix_pub",
                         "cv_model": "default",
                         "success": "2",
                         "timeout": "0",
@@ -387,7 +386,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("fix_pub", "openssl", target_key="aes"),
+                metadata=self._case_metadata("fix_pub", "openssl", target="aes"),
             )
             self._write_json(
                 root / "klee_cf" / "openssl_default_sha_fix_pub.json",
@@ -401,7 +400,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("fix_pub", "openssl", target_key="sha"),
+                metadata=self._case_metadata("fix_pub", "openssl", target="sha"),
             )
 
             filter_csv = tmp_path / "filter.csv"
@@ -467,7 +466,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                 ],
             )
 
-    def test_target_specific_filter_and_sliced_map_use_legacy_library_target_key(self) -> None:
+    def test_target_specific_filter_and_sliced_map_use_metadata_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             root = tmp_path / "input"
@@ -487,7 +486,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                     },
                 ],
                 metadata={
-                    **self._case_metadata("fix_pub", "openssl", target_key="mont"),
+                    **self._case_metadata("fix_pub", "openssl", target="mont"),
                     "sliced": True,
                 },
             )
@@ -556,6 +555,95 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                 ],
             )
 
+    def test_target_specific_filter_and_sliced_map_accept_sliced_target_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            root = tmp_path / "input"
+            (root / "klee_cf").mkdir(parents=True, exist_ok=True)
+            self._write_run_metadata(root, ("klee_cf",))
+
+            self._write_json(
+                root / "klee_cf" / "openssl_mont_sliced_fix_pub.json",
+                [
+                    {
+                        "library": "openssl",
+                        "filename": "bn_exp.c",
+                        "line": 240,
+                        "column": 9,
+                        "kind": "branch",
+                        "reproduced_status": "success",
+                    },
+                ],
+                metadata={
+                    **self._case_metadata("fix_pub", "openssl", target="mont_sliced"),
+                    "sliced": True,
+                },
+            )
+
+            filter_csv = tmp_path / "filter.csv"
+            filter_csv.write_text(
+                "library,file,line_start,line_end\n"
+                "openssl_mont,bn_exp.c,364,364\n",
+                encoding="utf-8",
+            )
+            sliced_map_csv = tmp_path / "sliced_map.csv"
+            sliced_map_csv.write_text(
+                "library,file,line,column,file_sliced,line_sliced,column_sliced\n"
+                "openssl_mont,bn_exp.c,364,9,bn_exp.c,240,9\n",
+                encoding="utf-8",
+            )
+            selection_csv = tmp_path / "selection.csv"
+            selection_csv.write_text(
+                "comparison_tool,source_column,display_label\n"
+                "klee_cf_sliced,klee_cf_sliced_fix_pub,klee_cf\n",
+                encoding="utf-8",
+            )
+
+            summary_csv = tmp_path / "summary.csv"
+            by_library_prefix = tmp_path / "by_library"
+            command = [
+                sys.executable,
+                "-m",
+                SCRIPT_MODULE,
+                str(root),
+                "-f",
+                str(filter_csv),
+                "--sliced-map",
+                str(sliced_map_csv),
+                "-o",
+                str(summary_csv),
+                "--selection-csv",
+                str(selection_csv),
+                "--by-library-selection-tables",
+                "--by-library-output-prefix",
+                str(by_library_prefix),
+            ]
+            result = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                result.returncode,
+                0,
+                msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}",
+            )
+
+            self.assertEqual(self._read_csv(summary_csv)[0]["total_filtered_positives"], "1")
+            self.assertEqual(
+                self._read_csv(tmp_path / "by_library.csv"),
+                [
+                    {
+                        "library": "openssl",
+                        "target": "mont_sliced",
+                        "klee_cf_control_flow": "1",
+                        "klee_cf_memory": "0",
+                    },
+                ],
+            )
+
     def test_by_library_selection_tables_include_empty_target_runs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -566,7 +654,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
             self._write_json(
                 root / "klee_cf" / "appliedcryp_default_3way_var_pub.json",
                 [],
-                metadata=self._case_metadata("var_pub", "appliedcryp", target_key="3way"),
+                metadata=self._case_metadata("var_pub", "appliedcryp", target="3way"),
             )
             self._write_json(
                 root / "klee_cf" / "appliedcryp_default_des_var_pub.json",
@@ -580,7 +668,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("var_pub", "appliedcryp", target_key="des"),
+                metadata=self._case_metadata("var_pub", "appliedcryp", target="des"),
             )
 
             filter_csv = tmp_path / "filter.csv"
@@ -731,7 +819,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                 [
                     {
                         "library": "appliedcryp_3way",
-                        "target": "",
+                        "target": "3way",
                         "klee_cf_control_flow": "1",
                         "klee_cf_memory": "1",
                     },
@@ -758,7 +846,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("fix_pub", "mbedtls", target_key="aes"),
+                metadata=self._case_metadata("fix_pub", "mbedtls", target="aes"),
             )
             self._write_json(
                 root / "klee_cf" / "mbedtls_var_pub.json",
@@ -772,7 +860,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("var_pub", "mbedtls", target_key="aes"),
+                metadata=self._case_metadata("var_pub", "mbedtls", target="aes"),
             )
             self._write_json(
                 root / "binsec" / "mbedtls_var_pub.json",
@@ -786,7 +874,7 @@ class SummarizeReproductionStatusByLibraryTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                 ],
-                metadata=self._case_metadata("var_pub", "mbedtls", target_key="aes"),
+                metadata=self._case_metadata("var_pub", "mbedtls", target="aes"),
             )
 
             filter_csv = tmp_path / "filter.csv"

@@ -43,14 +43,23 @@ def write_verification_timing(
     timing_dir.mkdir(parents=True, exist_ok=True)
     output_path = timing_dir / f"{case_id}.json"
     effective_seconds = float(timeout_seconds) if status == "timeout" else float(elapsed_seconds)
+    library = metadata.get("library")
+    target = metadata.get("target")
+    config = metadata.get("config")
+    if not isinstance(library, str) or not library:
+        raise ValueError("timing metadata must define non-empty library")
+    if not isinstance(target, str) or not target:
+        raise ValueError("timing metadata must define non-empty target")
+    if not isinstance(config, str) or not config:
+        raise ValueError("timing metadata must define non-empty config")
     payload = {
         "data": [
             {
                 "case_id": case_id,
                 "title": title,
-                "library": metadata.get("library_key", ""),
-                "variant": metadata.get("variant_key", ""),
-                "target": metadata.get("target_key", ""),
+                "library": library,
+                "target": target,
+                "config": config,
                 "timeout_seconds": int(timeout_seconds),
                 "elapsed_seconds": float(elapsed_seconds),
                 "verification_time_seconds": effective_seconds,

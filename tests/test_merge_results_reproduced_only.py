@@ -22,12 +22,12 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
             "cv_model": "default",
         }
 
-    def _case_metadata(self, suffix: str, library_key: str) -> dict[str, object]:
+    def _case_metadata(self, config: str, library: str) -> dict[str, object]:
         return {
-            "source_column_suffix": suffix,
-            "public_mode": suffix,
+            "config": config,
             "sliced": False,
-            "library_key": library_key,
+            "library": library,
+            "target": "default",
         }
 
     def _write_run_metadata(self, root: Path, run_names: tuple[str, ...]) -> None:
@@ -59,7 +59,6 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                 root / "0" / "toy_fix_pub.json",
                 [
                     {
-                        "library": "toy",
                         "filename": "toy.c",
                         "line": 10,
                         "column": 2,
@@ -72,7 +71,6 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                 root / "1" / "toy_fix_pub.json",
                 [
                     {
-                        "library": "toy",
                         "filename": "toy.c",
                         "line": 10,
                         "column": 2,
@@ -96,7 +94,6 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                 root / "0" / "toy_fix_pub.json",
                 [
                     {
-                        "library": "toy",
                         "filename": "toy.c",
                         "line": 10,
                         "column": 2,
@@ -105,7 +102,6 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                         "reproduced_status": "success",
                     },
                     {
-                        "library": "toy",
                         "filename": "toy.c",
                         "line": 10,
                         "column": 2,
@@ -123,7 +119,6 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                 merged_rows,
                 [
                     {
-                        "library": "toy",
                         "filename": "toy.c",
                         "line": 10,
                         "non_ct_time": 4.0,
@@ -134,7 +129,6 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                         "kind": "branch",
                     },
                     {
-                        "library": "toy",
                         "filename": "toy.c",
                         "line": 10,
                         "non_ct_time": 6.0,

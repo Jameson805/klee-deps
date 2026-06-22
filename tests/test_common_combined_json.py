@@ -36,9 +36,9 @@ class CommonCombinedJsonTest(unittest.TestCase):
                             "reproduced_status": "object",
                         },
                         "metadata": {
-                            "library_key": "toy",
-                            "public_mode": "fix_pub",
-                            "source_column_suffix": "fix_pub",
+                            "library": "toy",
+                            "target": "default",
+                            "config": "fix_pub",
                             "sliced": False,
                         },
                     }
@@ -53,9 +53,9 @@ class CommonCombinedJsonTest(unittest.TestCase):
             self.assertEqual(
                 payload["metadata"],
                 {
-                    "library_key": "toy",
-                    "public_mode": "fix_pub",
-                    "source_column_suffix": "fix_pub",
+                    "library": "toy",
+                    "target": "default",
+                    "config": "fix_pub",
                     "sliced": False,
                 },
             )

@@ -12,7 +12,6 @@ from typing import Any
 
 
 FINAL_COLUMN_ORDER = [
-    "library",
     "filename",
     "line",
     "column",
@@ -121,11 +120,11 @@ def _merge_single_experiment(
             merged_metadata = metadata
         elif metadata != merged_metadata:
             raise SystemExit(f"{path}: metadata does not match other repetitions for this experiment")
+        library = metadata.get("library") or "unknown"
         for row in rows:
             filename = row.get("filename")
             line = _to_int(row.get("line"))
             column = _to_int(row.get("column"))
-            library = row.get("library")
             kind = row.get("kind")
             visit_count = _to_float(row.get("visit_count"))
             non_ct_count = _to_float(row.get("non_ct_count"))
@@ -139,8 +138,6 @@ def _merge_single_experiment(
                 continue
             if line is None:
                 continue
-            if not isinstance(library, str) or not library.strip():
-                library = "unknown"
             if non_ct_time is None:
                 continue
 
@@ -196,7 +193,6 @@ def _merge_single_experiment(
             continue
 
         row = {
-            "library": library,
             "filename": filename,
             "line": line,
             "non_ct_time": non_ct_time,

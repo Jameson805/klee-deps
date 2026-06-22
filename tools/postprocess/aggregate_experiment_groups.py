@@ -52,32 +52,32 @@ PLOT_DIMENSIONS: OrderedDict[str, str] = OrderedDict(
     [
         ("searcher", "searcher"),
         ("sym_size", "symbolic input size"),
-        ("public_mode", "public input mode"),
+        ("config", "benchmark config"),
         ("cv_model", "CV model"),
     ]
 )
 STYLE_CHANNELS_BY_FOCAL_FIELD: dict[str, dict[str, str]] = {
     "searcher": {
         "color": "searcher",
-        "linestyle": "public_mode",
+        "linestyle": "config",
         "brightness": "sym_size",
         "linewidth": "cv_model",
     },
     "sym_size": {
         "color": "sym_size",
         "linestyle": "searcher",
-        "brightness": "public_mode",
+        "brightness": "config",
         "linewidth": "cv_model",
     },
-    "public_mode": {
-        "color": "public_mode",
+    "config": {
+        "color": "config",
         "linestyle": "searcher",
         "brightness": "sym_size",
         "linewidth": "cv_model",
     },
     "cv_model": {
         "color": "cv_model",
-        "linestyle": "public_mode",
+        "linestyle": "config",
         "brightness": "sym_size",
         "linewidth": "searcher",
     },
@@ -92,7 +92,7 @@ class ColumnConfiguration:
     sliced: bool
     searcher: str
     sym_size: str
-    public_mode: str
+    config: str
     cv_model: str
     raw_suffix: str
     normalized_suffix: str
@@ -164,6 +164,8 @@ def normalize_suffix(raw_suffix: str) -> str:
 
 
 def column_configuration_from_metadata(column_name: str, metadata: Mapping[str, Any]) -> ColumnConfiguration:
+    raw_suffix = str(metadata.get("raw_suffix", metadata["config"]))
+    normalized_suffix = str(metadata.get("normalized_suffix", normalize_suffix(raw_suffix)))
     return ColumnConfiguration(
         source_column=column_name,
         tool_family=str(metadata["tool_family"]),
@@ -171,10 +173,10 @@ def column_configuration_from_metadata(column_name: str, metadata: Mapping[str, 
         sliced=bool(metadata["sliced"]),
         searcher=str(metadata["searcher"]),
         sym_size=str(metadata["sym_size"]),
-        public_mode=str(metadata["public_mode"]),
+        config=str(metadata["config"]),
         cv_model=str(metadata["cv_model"]),
-        raw_suffix=str(metadata["raw_suffix"]),
-        normalized_suffix=str(metadata["normalized_suffix"]),
+        raw_suffix=raw_suffix,
+        normalized_suffix=normalized_suffix,
         configuration_label=str(metadata["configuration_label"]),
     )
 
@@ -242,7 +244,7 @@ def summarize_configurations(
         "sliced",
         "searcher",
         "sym_size",
-        "public_mode",
+        "config",
         "cv_model",
         "raw_suffix",
         "normalized_suffix",
@@ -265,7 +267,7 @@ def configuration_metadata(summary: pd.DataFrame) -> pd.DataFrame:
         "sliced",
         "searcher",
         "sym_size",
-        "public_mode",
+        "config",
         "cv_model",
         "raw_suffix",
         "normalized_suffix",

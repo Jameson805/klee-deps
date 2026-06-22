@@ -79,15 +79,14 @@ def _case_identity_by_result_stem() -> dict[str, tuple[str, str, str]]:
             for expanded_case in expand_benchmark_cases(benchmark_definition, tool_id):
                 result_stem = canonical_case_id(
                     benchmark_definition.library_id,
-                    benchmark_definition.variant_id,
-                    expanded_case.target_id,
+                    benchmark_definition.target_id,
                     expanded_case.config_id,
                 )
                 mapping.setdefault(
                     result_stem,
                     (
                         benchmark_definition.library_id,
-                        benchmark_definition.variant_id,
+                        benchmark_definition.target_id,
                         expanded_case.target_id,
                     ),
                 )
@@ -98,6 +97,18 @@ def _benchmark_label(library: str, variant: str) -> str:
     if not variant:
         return library
     return f"{library}:{variant}"
+
+
+def _is_klee_family(row: Mapping[str, Any]) -> bool:
+    comparison_tool = str(row.get("comparison_tool", ""))
+    tool_family = str(row.get("tool_family", ""))
+    return comparison_tool.startswith("klee") or tool_family.startswith("klee")
+
+
+def _eligible_for_best_selection(row: Mapping[str, Any]) -> bool:
+    if not _is_klee_family(row):
+        return True
+    return str(row.get("public_mode", "")) == "var_pub"
 
 
 def _format_duration(seconds: int) -> str:
@@ -214,15 +225,16 @@ def _merge_case_timings(
         return None
 
     column_metadata = build_column_metadata(run_metadata, case_metadata)
+    public_mode_value = case_metadata.get("config")
+    public_mode = public_mode_value.strip() if isinstance(public_mode_value, str) else ""
     if not library:
-        library_value = case_metadata.get("library_key")
+        library_value = case_metadata.get("library")
         library = library_value.strip() if isinstance(library_value, str) else ""
-    if not variant:
-        variant_value = case_metadata.get("variant_key")
-        variant = variant_value.strip() if isinstance(variant_value, str) else ""
     if not target:
-        target_value = case_metadata.get("target_key")
+        target_value = case_metadata.get("target")
         target = target_value.strip() if isinstance(target_value, str) else ""
+    if not variant and target:
+        variant = target
     if (not variant or not target) and case_id:
         fallback_identity = _case_identity_by_result_stem().get(case_id)
         if fallback_identity is not None:
@@ -244,6 +256,7 @@ def _merge_case_timings(
         "variant": variant,
         "target": target,
         "benchmark": _benchmark_label(library, variant),
+        "public_mode": public_mode,
         "verification_time_seconds": merged_time,
         "total_repetitions": total,
         "completed_repetitions": status_counts.get("completed", 0),
@@ -298,6 +311,8 @@ def select_best_configurations(rows: Sequence[Mapping[str, Any]]) -> list[dict[s
     benchmarks_by_tool: dict[str, set[str]] = {}
     by_source: dict[str, dict[str, Any]] = {}
     for row in rows:
+        if not _eligible_for_best_selection(row):
+            continue
         source_column = str(row["source_column"])
         comparison_tool = str(row["comparison_tool"])
         benchmark = str(row["benchmark"])

@@ -62,7 +62,7 @@ OUTPUT_COLUMNS = [
     "sliced",
     "searcher",
     "sym_size",
-    "public_mode",
+    "config",
     "cv_model",
     *STATUS_COLUMNS,
     "total_filtered_positives",
@@ -112,16 +112,15 @@ def _target_key_by_result_stem() -> dict[str, str]:
             for expanded_case in expand_benchmark_cases(benchmark_definition, tool_id):
                 result_stem = canonical_case_id(
                     benchmark_definition.library_id,
-                    benchmark_definition.variant_id,
-                    expanded_case.target_id,
+                    benchmark_definition.target_id,
                     expanded_case.config_id,
                 )
-                mapping.setdefault(result_stem, expanded_case.target_id)
+                mapping.setdefault(result_stem, benchmark_definition.target_id)
     return mapping
 
 
 def _resolve_target_key(json_path: Path, case_metadata: Mapping[str, Any]) -> str:
-    explicit_target = case_metadata.get("target_key")
+    explicit_target = case_metadata.get("target")
     if isinstance(explicit_target, str) and explicit_target.strip():
         return explicit_target.strip()
     return _target_key_by_result_stem().get(json_path.stem, "")
@@ -133,15 +132,26 @@ def _target_library_key(library: str, target: str) -> str | None:
     return f"{library}_{target}"
 
 
+def _base_target_key(target: str) -> str:
+    if target.endswith("_sliced"):
+        return target[: -len("_sliced")]
+    return target
+
+
 def _library_lookup_candidates(
     library: str,
     target: str,
     configured_libraries: set[str],
 ) -> list[str]:
-    target_library = _target_library_key(library, target)
-    if target_library and target_library in configured_libraries:
-        return [target_library, library]
-    return [library]
+    candidates: list[str] = []
+
+    for candidate_target in (target, _base_target_key(target)):
+        target_library = _target_library_key(library, candidate_target)
+        if target_library and target_library in configured_libraries and target_library not in candidates:
+            candidates.append(target_library)
+
+    candidates.append(library)
+    return candidates
 
 
 def _filter_lookup_candidates(
@@ -149,9 +159,10 @@ def _filter_lookup_candidates(
     target: str,
     configured_libraries: set[str],
 ) -> list[str]:
-    target_library = _target_library_key(library, target)
-    if target_library and target_library in configured_libraries:
-        return [target_library]
+    for candidate_target in (target, _base_target_key(target)):
+        target_library = _target_library_key(library, candidate_target)
+        if target_library and target_library in configured_libraries:
+            return [target_library]
     return [library]
 
 
@@ -381,9 +392,9 @@ def collect_reproduction_status_counts(
                 raise SystemExit(f"{entry}: missing required payload metadata")
             metadata = build_column_metadata(run_metadata, case_metadata)
             configuration = str(metadata["source_column"])
-            library_hint = case_metadata.get("library_key")
+            library_hint = case_metadata.get("library")
             if not isinstance(library_hint, str) or not library_hint:
-                raise SystemExit(f"{entry}: payload metadata is missing non-empty library_key")
+                raise SystemExit(f"{entry}: payload metadata is missing non-empty library")
             if configuration not in counts_by_configuration:
                 ordered_configurations.append(configuration)
                 counts_by_configuration[configuration] = _empty_status_counts()
@@ -469,7 +480,7 @@ def _build_summary_rows(
                 "sliced": metadata["sliced"],
                 "searcher": metadata["searcher"],
                 "sym_size": metadata["sym_size"],
-                "public_mode": metadata["public_mode"],
+                "config": metadata["config"],
                 "cv_model": metadata["cv_model"],
                 **{status_name: counts[status_name] for status_name in STATUS_COLUMNS},
                 "total_filtered_positives": sum(counts.values()),

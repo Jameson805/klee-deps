@@ -38,7 +38,6 @@ MANDATORY_FIELDS = (
     "non_ct_time",
     "counterexamples",
     "reproduced_status",
-    "library",
 )
 
 MANDATORY_DTYPES: dict[str, str] = {
@@ -47,11 +46,9 @@ MANDATORY_DTYPES: dict[str, str] = {
     "non_ct_time": "float64",
     "counterexamples": "object",
     "reproduced_status": "object",
-    "library": "object",
 }
 
 PREFERRED_COLUMN_ORDER = [
-    "library",
     "filename",
     "line",
     "column",
@@ -142,7 +139,7 @@ def make_result_row(
     non_ct_time: Any,
     counterexamples: Any,
     reproduced_status: Any,
-    library: Any,
+    library: Any | None = None,
     optional_fields: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate and build one normalized result row."""
@@ -163,11 +160,6 @@ def make_result_row(
         raise ValueError(
             f"reproduced_status must be one of {sorted(REPRODUCED_STATUSES)}"
         )
-    if not isinstance(library, str):
-        raise TypeError("library must be a str")
-    normalized_library = library.strip()
-    if not normalized_library:
-        raise ValueError("library must be a non-empty str")
 
     row: dict[str, Any] = {}
     row["filename"] = filename
@@ -175,7 +167,12 @@ def make_result_row(
     row["non_ct_time"] = non_ct_time
     row["counterexamples"] = dict(counterexamples)
     row["reproduced_status"] = normalized_status
-    row["library"] = normalized_library
+    if library is not None:
+        if not isinstance(library, str):
+            raise TypeError("library must be a str when present")
+        normalized_library = library.strip()
+        if normalized_library:
+            row["library"] = normalized_library
 
     if optional_fields:
         for key, value in optional_fields.items():

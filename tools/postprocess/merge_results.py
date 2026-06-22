@@ -86,10 +86,10 @@ def _load_violations_from_json(
             f"{path}: payload metadata is missing; this output tree predates the metadata-aware experiment runners. "
             "Regenerate the run outputs with the current campaign runners before running postprocess."
         )
-    library_key = metadata.get("library_key")
+    library_key = metadata.get("library")
     if not isinstance(library_key, str) or not library_key:
         raise SystemExit(
-            f"{path}: payload metadata is missing non-empty library_key; this output tree is stale or incomplete. "
+            f"{path}: payload metadata is missing non-empty library; this output tree is stale or incomplete. "
             "Regenerate the run outputs with the current campaign runners before running postprocess."
         )
 

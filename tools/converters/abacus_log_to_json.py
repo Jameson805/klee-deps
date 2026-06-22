@@ -379,7 +379,6 @@ def convert_abacus_log(
                 non_ct_time=row.get("non_ct_time"),
                 counterexamples=counterexamples if isinstance(counterexamples, dict) else {},
                 reproduced_status=row.get("reproduced_status") or STATUS_NOT_REPRODUCED,
-                library=row.get("library") if isinstance(row.get("library"), str) and row.get("library").strip() else library,
                 optional_fields=optional,
             )
         )

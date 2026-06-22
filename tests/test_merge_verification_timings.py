@@ -27,17 +27,14 @@ class MergeVerificationTimingsTest(unittest.TestCase):
         self,
         *,
         library: str,
-        variant: str,
         target: str,
         suffix: str = "fix_pub",
     ) -> dict[str, object]:
         return {
-            "source_column_suffix": suffix,
-            "public_mode": suffix,
             "sliced": False,
-            "library_key": library,
-            "variant_key": variant,
-            "target_key": target,
+            "library": library,
+            "target": target,
+            "config": suffix,
         }
 
     def test_repetitions_use_geometric_mean_and_best_table_uses_benchmark_rows(self) -> None:
@@ -57,7 +54,7 @@ class MergeVerificationTimingsTest(unittest.TestCase):
                     root / "klee_fast" / str(repetition),
                     case_id="toy_v1_a_fix_pub",
                     title="toy:v1 a (fix_pub)",
-                    metadata=self._case_metadata(library="toy", variant="v1", target="a"),
+                    metadata=self._case_metadata(library="toy", target="a"),
                     timeout_seconds=7200,
                     elapsed_seconds=elapsed,
                     exit_code=0,
@@ -67,9 +64,33 @@ class MergeVerificationTimingsTest(unittest.TestCase):
                 root / "klee_fast" / "0",
                 case_id="toy_v1_b_fix_pub",
                 title="toy:v1 b (fix_pub)",
-                metadata=self._case_metadata(library="toy", variant="v1", target="b"),
+                metadata=self._case_metadata(library="toy", target="b"),
                 timeout_seconds=7200,
                 elapsed_seconds=25.0,
+                exit_code=0,
+                status="completed",
+            )
+            write_verification_timing(
+                root / "klee_fast" / "0",
+                case_id="toy_v1_a_var_pub",
+                title="toy:v1 a (var_pub)",
+                metadata=self._case_metadata(library="toy", target="a", suffix="var_pub"),
+                timeout_seconds=7200,
+                elapsed_seconds=11.0,
+                exit_code=0,
+                status="completed",
+            )
+            write_verification_timing(
+                root / "klee_fast" / "0",
+                case_id="toy_v1_b_var_pub",
+                title="toy:v1 b (var_pub)",
+                metadata=self._case_metadata(
+                    library="toy",
+                    target="b",
+                    suffix="var_pub",
+                ),
+                timeout_seconds=7200,
+                elapsed_seconds=20.0,
                 exit_code=0,
                 status="completed",
             )
@@ -77,7 +98,7 @@ class MergeVerificationTimingsTest(unittest.TestCase):
                 root / "klee_slow" / "0",
                 case_id="toy_v1_a_fix_pub",
                 title="toy:v1 a (fix_pub)",
-                metadata=self._case_metadata(library="toy", variant="v1", target="a"),
+                metadata=self._case_metadata(library="toy", target="a"),
                 timeout_seconds=7200,
                 elapsed_seconds=10.0,
                 exit_code=0,
@@ -85,9 +106,29 @@ class MergeVerificationTimingsTest(unittest.TestCase):
             )
             write_verification_timing(
                 root / "klee_slow" / "0",
+                case_id="toy_v1_a_var_pub",
+                title="toy:v1 a (var_pub)",
+                metadata=self._case_metadata(library="toy", target="a", suffix="var_pub"),
+                timeout_seconds=7200,
+                elapsed_seconds=40.0,
+                exit_code=0,
+                status="completed",
+            )
+            write_verification_timing(
+                root / "klee_slow" / "0",
+                case_id="toy_v1_b_var_pub",
+                title="toy:v1 b (var_pub)",
+                metadata=self._case_metadata(library="toy", target="b", suffix="var_pub"),
+                timeout_seconds=7200,
+                elapsed_seconds=50.0,
+                exit_code=0,
+                status="completed",
+            )
+            write_verification_timing(
+                root / "klee_slow" / "0",
                 case_id="toy_v1_b_fix_pub",
                 title="toy:v1 b (fix_pub)",
-                metadata=self._case_metadata(library="toy", variant="v1", target="b"),
+                metadata=self._case_metadata(library="toy", target="b"),
                 timeout_seconds=7200,
                 elapsed_seconds=30.0,
                 exit_code=0,
@@ -97,7 +138,7 @@ class MergeVerificationTimingsTest(unittest.TestCase):
                 root / "binsec_run" / "0",
                 case_id="toy_v1_a_fix_pub",
                 title="toy:v1 a (fix_pub)",
-                metadata=self._case_metadata(library="toy", variant="v1", target="a"),
+                metadata=self._case_metadata(library="toy", target="a"),
                 timeout_seconds=7200,
                 elapsed_seconds=7201.0,
                 exit_code=0,
@@ -120,7 +161,7 @@ class MergeVerificationTimingsTest(unittest.TestCase):
             selected = merge_verification_timings.select_best_configurations(rows)
             self.assertEqual(
                 {row["comparison_tool"]: row["source_column"] for row in selected},
-                {"klee_cf": "klee_fast_fix_pub", "binsec": "binsec_run_fix_pub"},
+                {"klee_cf": "klee_fast_var_pub", "binsec": "binsec_run_fix_pub"},
             )
 
             fieldnames, table_rows = merge_verification_timings.build_best_table_rows(rows, selected)
@@ -128,7 +169,8 @@ class MergeVerificationTimingsTest(unittest.TestCase):
             self.assertEqual(
                 table_rows,
                 [
-                    {"benchmark": "toy:v1", "CT-Witness": "25.00s", "Binsec/Rel 2": "TO(2h)"},
+                    {"benchmark": "toy:a", "CT-Witness": "11.00s", "Binsec/Rel 2": "TO(2h)"},
+                    {"benchmark": "toy:b", "CT-Witness": "20.00s", "Binsec/Rel 2": "-"},
                 ],
             )
 
@@ -141,7 +183,7 @@ class MergeVerificationTimingsTest(unittest.TestCase):
                 root / "binsec_run" / "0",
                 case_id="toy_v1_a_fix_pub",
                 title="toy:v1 a (fix_pub)",
-                metadata=self._case_metadata(library="toy", variant="v1", target="a"),
+                metadata=self._case_metadata(library="toy", target="a"),
                 timeout_seconds=7200,
                 elapsed_seconds=1.5,
                 exit_code=0,
@@ -159,20 +201,31 @@ class MergeVerificationTimingsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_run_metadata(root, {"binsec_run": self._run_metadata("binsec_run", "binsec")})
-            write_verification_timing(
-                root / "binsec_run" / "0",
-                case_id="libsodium_chacha20_chacha20_fix_pub",
-                title="libsodium:chacha20 chacha20 (fix_pub)",
-                metadata={
-                    "source_column_suffix": "fix_pub",
-                    "public_mode": "fix_pub",
-                    "sliced": False,
-                    "library_key": "libsodium",
-                },
-                timeout_seconds=7200,
-                elapsed_seconds=1.5,
-                exit_code=0,
-                status="completed",
+            timing_dir = root / "binsec_run" / "0" / "_timings"
+            timing_dir.mkdir(parents=True)
+            (timing_dir / "libsodium_chacha20_fix_pub.json").write_text(
+                json.dumps(
+                    {
+                        "data": [
+                            {
+                                "case_id": "libsodium_chacha20_fix_pub",
+                                "title": "libsodium:chacha20 chacha20 (fix_pub)",
+                                "library": "libsodium",
+                                "timeout_seconds": 7200,
+                                "elapsed_seconds": 1.5,
+                                "verification_time_seconds": 1.5,
+                                "status": "completed",
+                                "exit_code": 0,
+                            }
+                        ],
+                        "metadata": {
+                            "config": "fix_pub",
+                            "sliced": False,
+                            "library": "libsodium",
+                        },
+                    }
+                ),
+                encoding="utf-8",
             )
 
             rows = merge_verification_timings.collect_timing_rows(root)
@@ -180,6 +233,32 @@ class MergeVerificationTimingsTest(unittest.TestCase):
             self.assertEqual(rows[0]["variant"], "chacha20")
             self.assertEqual(rows[0]["target"], "chacha20")
             self.assertEqual(rows[0]["benchmark"], "libsodium:chacha20")
+
+    def test_writer_uses_flattened_identity_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output_path = write_verification_timing(
+                root / "binsec_run" / "0",
+                case_id="toy_a_fix_pub",
+                title="toy:a (fix_pub)",
+                metadata={
+                    "library": "toy",
+                    "target": "a",
+                    "config": "fix_pub",
+                    "sliced": False,
+                },
+                timeout_seconds=60,
+                elapsed_seconds=1.5,
+                exit_code=0,
+                status="completed",
+            )
+
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            row = payload["data"][0]
+            self.assertEqual(row["library"], "toy")
+            self.assertEqual(row["target"], "a")
+            self.assertEqual(row["config"], "fix_pub")
+            self.assertNotIn("variant", row)
 
 
 if __name__ == "__main__":
