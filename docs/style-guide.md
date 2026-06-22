@@ -8,7 +8,7 @@ The repository-specific Copilot instructions in `.github/copilot-instructions.md
 
 - Keep code and documentation pragmatic and direct.
 - Prefer the smallest owning code path over broad edits.
-- Keep benchmark identity explicit as `library_id` plus `variant_id`.
+- Keep benchmark identity explicit as `library_id` plus `target_id`.
 - Use explicit metadata files and structured fields instead of deriving semantics from filenames.
 - Keep generated or edited source-like files newline-terminated.
 

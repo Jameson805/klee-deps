@@ -11,11 +11,13 @@ filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-all = ["bearssl:aes_des", "libsodium:salsa20", "libsodium:chacha20", "libsodium:sha256", "libsodium:sha512", "hacl:chacha20", "hacl:curve25519", "hacl:sha256", "hacl:sha512", "monocypher:chacha20", "monocypher:poly1305", "monocypher:argon2i", "monocypher:ed25519"]
+all = ["bearssl:aes_ct", "bearssl:des_ct", "libsodium:salsa20", "libsodium:chacha20", "libsodium:sha256", "libsodium:sha512", "hacl:chacha20", "hacl:curve25519", "hacl:sha256", "hacl:sha512", "monocypher:chacha20", "monocypher:poly1305", "monocypher:argon2i", "monocypher:ed25519"]
 # The orchestrator validates benchmark selections for every registered campaign
-# tool. HACL bounded benchmarks do not support the ABACUS tool yet, and this
-# campaign intentionally does not define ABACUS runs.
-abacus = ["bearssl:aes_des", "libsodium:salsa20", "libsodium:chacha20", "libsodium:sha256", "libsodium:sha512", "monocypher:chacha20", "monocypher:poly1305", "monocypher:argon2i", "monocypher:ed25519"]
+# tool. HACL bounded benchmarks do not support the ABACUS tool yet, so the
+# ABACUS-compatible subset keeps the direct ABACUS-side Monocypher rows and the
+# BINSEC/Rel2-derived BearSSL and Libsodium rows. This campaign still does not
+# define ABACUS runs.
+abacus = ["bearssl:aes_ct", "bearssl:des_ct", "libsodium:salsa20", "libsodium:chacha20", "libsodium:sha256", "libsodium:sha512", "monocypher:chacha20", "monocypher:poly1305", "monocypher:argon2i", "monocypher:ed25519"]
 
 [runs]
 klee_cf_default_4 = true

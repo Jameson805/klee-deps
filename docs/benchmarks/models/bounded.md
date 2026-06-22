@@ -10,8 +10,8 @@ sizes rather than unbounded bug-finding over whole programs.
 
 | Source benchmark | Repository status | Selector or path |
 | --- | --- | --- |
-| BearSSL `aes_ct` | Implemented. | `bearssl:aes_des` / target `aes_ct`. |
-| BearSSL `des_ct` | Implemented. | `bearssl:aes_des` / target `des_ct`. |
+| BearSSL AES-CT | Implemented. | `bearssl:aes_ct`. |
+| BearSSL DES-CT | Implemented. | `bearssl:des_ct`. |
 | Libsodium Salsa20 | Implemented descriptor. | `libsodium:salsa20`. |
 | Libsodium Chacha20 | Implemented. | `libsodium:chacha20`. |
 | Libsodium SHA256 | Implemented. | `libsodium:sha256`. |
@@ -61,12 +61,12 @@ columns below describe repository behavior.
 
 | Selector target | Input variable | Kind | Size | Concrete value | Symbolic when | Rationale |
 | --- | --- | --- | --- | --- | --- | --- |
-| `bearssl:aes_des` / `aes_ct` | `skey` | Secret | 240 bytes | Valid AES expanded schedule generated from the shared AES-128 key. | `fix_pub` and `var_pub`. | Repository wrapper receives the full schedule-sized buffer. |
-| `bearssl:aes_des` / `aes_ct` | `data` | Public | 32 bytes | Shared deterministic plaintext beginning `4b 21 30 a3`. | `var_pub`. | Repository wrapper models CBC data as public while keeping the fixed Rel2 length. |
-| `bearssl:aes_des` / `aes_ct` | `iv` | Public | 16 bytes | All zero. | `var_pub`. | Repository wrapper receives IV as public input. |
-| `bearssl:aes_des` / `des_ct` | `skey` | Secret | 384 bytes | Valid 3DES expanded schedule generated from the shared generated 3DES key. | `fix_pub` and `var_pub`. | Repository wrapper receives the full schedule-sized buffer. |
-| `bearssl:aes_des` / `des_ct` | `data` | Public | 16 bytes | Shared deterministic plaintext beginning `4b 21 30 a3`. | `var_pub`. | Repository wrapper models CBC data as public while keeping the fixed Rel2 length. |
-| `bearssl:aes_des` / `des_ct` | `iv` | Public | 8 bytes | All zero. | `var_pub`. | Repository wrapper receives IV as public input. |
+| `bearssl:aes_ct` | `skey` | Secret | 240 bytes | Valid AES expanded schedule generated from the shared AES-128 key. | `fix_pub` and `var_pub`. | Repository wrapper receives the full schedule-sized buffer. |
+| `bearssl:aes_ct` | `data` | Public | 32 bytes | Shared deterministic plaintext beginning `4b 21 30 a3`. | `var_pub`. | Repository wrapper models CBC data as public while keeping the fixed Rel2 length. |
+| `bearssl:aes_ct` | `iv` | Public | 16 bytes | All zero. | `var_pub`. | Repository wrapper receives IV as public input. |
+| `bearssl:des_ct` | `skey` | Secret | 384 bytes | Valid 3DES expanded schedule generated from the shared generated 3DES key. | `fix_pub` and `var_pub`. | Repository wrapper receives the full schedule-sized buffer. |
+| `bearssl:des_ct` | `data` | Public | 16 bytes | Shared deterministic plaintext beginning `4b 21 30 a3`. | `var_pub`. | Repository wrapper models CBC data as public while keeping the fixed Rel2 length. |
+| `bearssl:des_ct` | `iv` | Public | 8 bytes | All zero. | `var_pub`. | Repository wrapper receives IV as public input. |
 | `libsodium:salsa20` / `salsa20` | `key` | Secret | 32 bytes | Shared deterministic stream-cipher key. | `fix_pub` and `var_pub`. | Repository wrapper receives a symbolic key after concrete trace seeding. |
 | `libsodium:salsa20` / `salsa20` | `message` | Public | 256 bytes | Shared deterministic stream message. | `var_pub`. | Repository convention treats plaintext/message as public input and uses fixed-public mode for the concrete trace. |
 | `libsodium:salsa20` / `salsa20` | `nonce` | Public | 8 bytes | All zero. | `var_pub`. | Repository wrapper makes the normally public nonce explicit. |

@@ -351,8 +351,8 @@ def main(argv: list[str] | None = None) -> int:
         None
         if benchmark_csv is None
         else ",".join(
-            format_benchmark_selector(library_id, variant_id)
-            for library_id, variant_id in normalized_benchmarks
+            format_benchmark_selector(library_id, target_id)
+            for library_id, target_id in normalized_benchmarks
         )
     )
 

@@ -10,12 +10,12 @@ rows that Constantine reused. Those reused rows are grouped here rather than in
 
 | Selector | Targets | Model |
 | --- | --- | --- |
-| `appliedcryp:default` | `3way`, `des`, `loki91` | Historical cipher wrappers with key and data secret. |
-| `ghostrider:default` | `findmax`, `matmul` | Data-dependent microbenchmarks with the whole data array secret. |
-| `libg:default` | `des` | Historical image-table Libgcrypt DES row, distinct from real Libgcrypt 1.10.1. |
-| `pycrypto:default` | `arc4` | Historical ARC4 key-dependent benchmark. |
-| `bearssl:aes_des` | `aes_big`, `des_tab` | BINSEC/Rel2 rows reused by Constantine; reduced-round CBC wrappers. |
-| `openssl_almeida:default` | `tls_rempad_luk13` | BINSEC/Rel2 TLS padding row reused by Constantine. |
+| `appliedcryp:3way`, `appliedcryp:des`, `appliedcryp:loki91` | Historical cipher wrappers with key and data secret. |
+| `ghostrider:findmax`, `ghostrider:matmul` | Data-dependent microbenchmarks with the whole data array secret. |
+| `libg:des` | Historical image-table Libgcrypt DES row, distinct from real Libgcrypt 1.10.1. |
+| `pycrypto:arc4` | Historical ARC4 key-dependent benchmark. |
+| `bearssl:aes_big`, `bearssl:des_tab` | BINSEC/Rel2 rows reused by Constantine; reduced-round CBC wrappers. |
+| `openssl_almeida:tls_rempad_luk13` | BINSEC/Rel2 TLS padding row reused by Constantine. |
 
 ## Detailed Input Variables
 
@@ -28,30 +28,30 @@ bytes instead of the listed concrete value.
 
 | Selector target | Input variable | Kind | Size | Concrete value | Symbolic when | Rationale |
 | --- | --- | --- | --- | --- | --- | --- |
-| `appliedcryp:default` / `3way` | `key` | Secret | 12 bytes | First 12 bytes of the shared AES key. | `fix_pub` and `var_pub`. | Historical all-secret cipher wrapper. |
-| `appliedcryp:default` / `3way` | `data` | Secret | 12 bytes | First 12 bytes of the shared deterministic plaintext. | `fix_pub` and `var_pub`. | Prior wrapper treats data as high, so the repository keeps it high. |
-| `appliedcryp:default` / `des` | `key` | Secret | 24 bytes | Shared generated 3DES key. | `fix_pub` and `var_pub`. | Historical all-secret DES wrapper. |
-| `appliedcryp:default` / `des` | `data` | Secret | 8 bytes | First 8 bytes of the shared deterministic plaintext. | `fix_pub` and `var_pub`. | Prior wrapper treats data as high. |
-| `appliedcryp:default` / `loki91` | `key` | Secret | 24 bytes | Shared generated 3DES key. | `fix_pub` and `var_pub`. | Historical all-secret LOKI91 wrapper. |
-| `appliedcryp:default` / `loki91` | `data` | Secret | 8 bytes | First 8 bytes of the shared deterministic plaintext. | `fix_pub` and `var_pub`. | Prior wrapper treats data as high. |
-| `ghostrider:default` / `findmax` | `data` | Secret | 2000 bytes | Repeated `0x5a` concrete trace seed. | `fix_pub` and `var_pub`. | Data-dependent microbenchmark; the whole array is the high input. |
-| `ghostrider:default` / `matmul` | `data` | Secret | 32768 bytes | Repeated `0x5a` concrete trace seed. | `fix_pub` and `var_pub`. | Data-dependent microbenchmark; the whole matrix buffer is high. |
-| `libg:default` / `des` | `key` | Secret | 24 bytes | Shared generated 3DES key. | `fix_pub` and `var_pub`. | Historical image-table Libgcrypt DES row, not real Libgcrypt 1.10.1. |
-| `libg:default` / `des` | `data` | Secret | 64 bytes | Shared deterministic plaintext prefix, repeated to 64 bytes. | `fix_pub` and `var_pub`. | Historical image-table row treats the data buffer as high. |
-| `pycrypto:default` / `arc4` | `key` | Secret | 32 bytes | Shared deterministic stream-cipher key. | `fix_pub` and `var_pub`. | ARC4 key-dependent benchmark; there is no public input. |
-| `bearssl:aes_des` / `aes_big` | `skey` | Secret | 240 bytes | Valid AES expanded schedule generated from the shared AES-128 key. | `fix_pub` and `var_pub`. | Matches the full Constantine/BINSEC schedule size while starting ABACUS from schedule-shaped bytes. |
-| `bearssl:aes_des` / `aes_big` | `data` | Public | 32 bytes | Shared deterministic plaintext beginning `4b 21 30 a3`. | `var_pub`. | Repository wrapper receives public CBC data; fixed mode avoids an all-zero block. |
-| `bearssl:aes_des` / `aes_big` | `iv` | Public | 16 bytes | All zero. | `var_pub`. | Repository wrapper receives IV as public input. |
-| `bearssl:aes_des` / `des_tab` | `skey` | Secret | 384 bytes | Valid 3DES expanded schedule generated from the shared generated 3DES key. | `fix_pub` and `var_pub`. | Matches the full Constantine/BINSEC schedule size while starting ABACUS from schedule-shaped bytes. |
-| `bearssl:aes_des` / `des_tab` | `data` | Public | 16 bytes | Shared deterministic plaintext beginning `4b 21 30 a3`. | `var_pub`. | Repository wrapper receives public CBC data; fixed mode avoids an all-zero block. |
-| `bearssl:aes_des` / `des_tab` | `iv` | Public | 8 bytes | All zero. | `var_pub`. | Repository wrapper receives IV as public input. |
-| `openssl_almeida:default` / `tls_rempad_luk13` | `data` | Secret | 63 bytes | `0x0f` pattern seed. | `fix_pub` and `var_pub`. | Matches the high TLS record-data input shape. |
-| `openssl_almeida:default` / `tls_rempad_luk13` | `options` | Public | 4 bytes | `0`. | `var_pub`. | Canonical fixed-public TLS options baseline. |
-| `openssl_almeida:default` / `tls_rempad_luk13` | `s3_flags` | Public | 4 bytes | `0`. | `var_pub`. | Canonical fixed-public SSL state flag baseline. |
-| `openssl_almeida:default` / `tls_rempad_luk13` | `flags` | Public | 4 bytes | `0`. | `var_pub`. | Wrapper control is public; fixed mode keeps it stable. |
-| `openssl_almeida:default` / `tls_rempad_luk13` | `slicing_cheat` | Public | 4 bytes | `0`. | `var_pub`. | Public sliced-wrapper control; fixed mode disables it. |
-| `openssl_almeida:default` / `tls_rempad_luk13` | `mac_size` | Public | 4 bytes | `20`. | `var_pub`. | SHA-1 MAC length for the Lucky13 TLS padding scenario. |
-| `openssl_almeida:default` / `tls_rempad_luk13` | `block_size` | Public constant | 4 bytes | `16`. | Never. | TLS block size is an internal constant, not a runner public input. |
+| `appliedcryp:3way` | `key` | Secret | 12 bytes | First 12 bytes of the shared AES key. | `fix_pub` and `var_pub`. | Historical all-secret cipher wrapper. |
+| `appliedcryp:3way` | `data` | Secret | 12 bytes | First 12 bytes of the shared deterministic plaintext. | `fix_pub` and `var_pub`. | Prior wrapper treats data as high, so the repository keeps it high. |
+| `appliedcryp:des` | `key` | Secret | 24 bytes | Shared generated 3DES key. | `fix_pub` and `var_pub`. | Historical all-secret DES wrapper. |
+| `appliedcryp:des` | `data` | Secret | 8 bytes | First 8 bytes of the shared deterministic plaintext. | `fix_pub` and `var_pub`. | Prior wrapper treats data as high. |
+| `appliedcryp:loki91` | `key` | Secret | 24 bytes | Shared generated 3DES key. | `fix_pub` and `var_pub`. | Historical all-secret LOKI91 wrapper. |
+| `appliedcryp:loki91` | `data` | Secret | 8 bytes | First 8 bytes of the shared deterministic plaintext. | `fix_pub` and `var_pub`. | Prior wrapper treats data as high. |
+| `ghostrider:findmax` | `data` | Secret | 2000 bytes | Repeated `0x5a` concrete trace seed. | `fix_pub` and `var_pub`. | Data-dependent microbenchmark; the whole array is the high input. |
+| `ghostrider:matmul` | `data` | Secret | 32768 bytes | Repeated `0x5a` concrete trace seed. | `fix_pub` and `var_pub`. | Data-dependent microbenchmark; the whole matrix buffer is high. |
+| `libg:des` | `key` | Secret | 24 bytes | Shared generated 3DES key. | `fix_pub` and `var_pub`. | Historical image-table Libgcrypt DES row, not real Libgcrypt 1.10.1. |
+| `libg:des` | `data` | Secret | 64 bytes | Shared deterministic plaintext prefix, repeated to 64 bytes. | `fix_pub` and `var_pub`. | Historical image-table row treats the data buffer as high. |
+| `pycrypto:arc4` | `key` | Secret | 32 bytes | Shared deterministic stream-cipher key. | `fix_pub` and `var_pub`. | ARC4 key-dependent benchmark; there is no public input. |
+| `bearssl:aes_big` | `skey` | Secret | 240 bytes | Valid AES expanded schedule generated from the shared AES-128 key. | `fix_pub` and `var_pub`. | Matches the full Constantine/BINSEC schedule size while starting ABACUS from schedule-shaped bytes. |
+| `bearssl:aes_big` | `data` | Public | 32 bytes | Shared deterministic plaintext beginning `4b 21 30 a3`. | `var_pub`. | Repository wrapper receives public CBC data; fixed mode avoids an all-zero block. |
+| `bearssl:aes_big` | `iv` | Public | 16 bytes | All zero. | `var_pub`. | Repository wrapper receives IV as public input. |
+| `bearssl:des_tab` | `skey` | Secret | 384 bytes | Valid 3DES expanded schedule generated from the shared generated 3DES key. | `fix_pub` and `var_pub`. | Matches the full Constantine/BINSEC schedule size while starting ABACUS from schedule-shaped bytes. |
+| `bearssl:des_tab` | `data` | Public | 16 bytes | Shared deterministic plaintext beginning `4b 21 30 a3`. | `var_pub`. | Repository wrapper receives public CBC data; fixed mode avoids an all-zero block. |
+| `bearssl:des_tab` | `iv` | Public | 8 bytes | All zero. | `var_pub`. | Repository wrapper receives IV as public input. |
+| `openssl_almeida:tls_rempad_luk13` | `data` | Secret | 63 bytes | `0x0f` pattern seed. | `fix_pub` and `var_pub`. | Matches the high TLS record-data input shape. |
+| `openssl_almeida:tls_rempad_luk13` | `options` | Public | 4 bytes | `0`. | `var_pub`. | Canonical fixed-public TLS options baseline. |
+| `openssl_almeida:tls_rempad_luk13` | `s3_flags` | Public | 4 bytes | `0`. | `var_pub`. | Canonical fixed-public SSL state flag baseline. |
+| `openssl_almeida:tls_rempad_luk13` | `flags` | Public | 4 bytes | `0`. | `var_pub`. | Wrapper control is public; fixed mode keeps it stable. |
+| `openssl_almeida:tls_rempad_luk13` | `slicing_cheat` | Public | 4 bytes | `0`. | `var_pub`. | Public sliced-wrapper control; fixed mode disables it. |
+| `openssl_almeida:tls_rempad_luk13` | `mac_size` | Public | 4 bytes | `20`. | `var_pub`. | SHA-1 MAC length for the Lucky13 TLS padding scenario. |
+| `openssl_almeida:tls_rempad_luk13` | `block_size` | Public constant | 4 bytes | `16`. | Never. | TLS block size is an internal constant, not a runner public input. |
 
 ## Historical Cipher And Microbenchmark Inputs
 
@@ -60,8 +60,8 @@ bytes instead of the listed concrete value.
 | Applied Crypto `3way` | 12-byte key, 12-byte data. | Key and data. | None. | All-zero ABACUS seed values; symbolic domain is the full listed buffers. |
 | Applied Crypto `des` | 24-byte key, 8-byte data. | Key and data. | None. | Historical all-secret model. |
 | Applied Crypto `loki91` | 24-byte key, 8-byte data. | Key and data. | None. | Historical all-secret model. |
-| `libg:default` / `des` | 24-byte key, 64-byte data. | Key and data. | None. | Represents the old image-table Libgcrypt row, not the real Libgcrypt tree. |
-| `pycrypto:default` / `arc4` | 32-byte key. | Key. | None. | Preserves the historical ARC4 key-dependent benchmark shape. |
+| `libg:des` | 24-byte key, 64-byte data. | Key and data. | None. | Represents the old image-table Libgcrypt row, not the real Libgcrypt tree. |
+| `pycrypto:arc4` | 32-byte key. | Key. | None. | Preserves the historical ARC4 key-dependent benchmark shape. |
 | GhostRider `findmax` | 2000-byte data array. | Whole data array. | None. | Non-cryptographic data-dependent kernel; ABACUS concrete trace seed is repeated `0x5a`. |
 | GhostRider `matmul` | 32768-byte data array. | Whole data array. | None. | Non-cryptographic data-dependent kernel; ABACUS concrete trace seed is repeated `0x5a`. |
 
@@ -153,6 +153,7 @@ scalars, not the shared modular-exponentiation buffer shape. It has one
   `var_pub`. `var_pub` matches the original BINSEC high/low-input split;
   `fix_pub` intentionally fixes the low inputs to the concrete values listed in
   the table.
-- Do not merge `libg:default` with `libgcrypt:aes_des` or
-  `libgcrypt:rsa_stages`. The former is a historical source snapshot; the
+- Do not merge `libg:des` with `libgcrypt:aes_encrypt`,
+  `libgcrypt:des_encrypt`, or Libgcrypt RSA targets. The former is a
+  historical source snapshot; the
   latter use the real Libgcrypt 1.10.1 tree.

@@ -11,8 +11,8 @@ filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-all = ["bearssl:modexp", "libgcrypt:default", "mbedtls:default", "openssl:default"]
-klee_cf = ["bearssl:modexp", "libgcrypt:default", "libgcrypt:sliced", "mbedtls:default", "mbedtls:sliced", "openssl:default", "openssl:sliced"]
+all = ["bearssl:modexp", "libgcrypt:modexp", "mbedtls:modexp", "openssl:recp", "openssl:mont", "openssl:mont_consttime", "openssl:mont_word"]
+klee_cf = ["bearssl:modexp", "libgcrypt:modexp", "libgcrypt:modexp_sliced", "mbedtls:modexp", "mbedtls:modexp_sliced", "openssl:recp", "openssl:mont", "openssl:mont_consttime", "openssl:mont_word", "openssl:recp_sliced", "openssl:mont_sliced", "openssl:mont_word_sliced"]
 
 [runs]
 klee_cf_default_4 = true

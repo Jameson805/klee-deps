@@ -25,7 +25,7 @@ the workspace manifest in `build/tool-paths.json` is used to expose the BINSEC e
 The entrypoint is:
 
 ```bash
-python -m scripts.experiments.run_binsec 1m --sym-size 4 --benchmarks bearssl:default
+python -m scripts.experiments.run_binsec 1m --sym-size 4 --benchmarks bearssl:modexp
 ```
 
 `scripts/experiments/run_binsec.py` owns the flow.

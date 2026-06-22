@@ -26,7 +26,7 @@ This keeps benchmark descriptors generic while letting runners stay explicit abo
 
 ## Benchmark Descriptors
 
-Benchmark descriptors are keyed by `library` plus explicit `variant` entries. The canonical CLI selector is always `library:variant`.
+Benchmark descriptors are keyed by `library` plus explicit `target` entries. The canonical CLI selector is always `library:target`.
 
 The descriptor layer owns:
 
@@ -36,6 +36,10 @@ The descriptor layer owns:
 - build preset selection
 - runner-profile mapping
 - tool-local extra config when a runner genuinely needs it
+
+Each target is one build/run unit. Descriptors should split algorithm,
+backend, sliced, and stage differences into separate targets instead of hiding
+multiple former subtargets inside one selector.
 
 The descriptor layer should not grow a second tool-specific schema language when runner-local parsing is clearer.
 

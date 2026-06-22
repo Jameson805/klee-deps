@@ -97,13 +97,13 @@ This is the main eager-specific CLI distinction exposed by the repository runner
 Canonical entrypoint:
 
 ```bash
-python -m scripts.experiments.run_klee_eager 1m --sym-size 4 --benchmarks bearssl:default
+python -m scripts.experiments.run_klee_eager 1m --sym-size 4 --benchmarks bearssl:modexp
 ```
 
 To enable the eager-specific fallback path:
 
 ```bash
-python -m scripts.experiments.run_klee_eager 1m --sym-size 4 --product-program-fallback --benchmarks bearssl:default
+python -m scripts.experiments.run_klee_eager 1m --sym-size 4 --product-program-fallback --benchmarks bearssl:modexp
 ```
 
 ## Runner Model

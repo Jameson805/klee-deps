@@ -105,7 +105,7 @@ The shared runner treats KLEE-Self-Comp as another KLEE-family mode with a disti
 Canonical entrypoint:
 
 ```bash
-python -m scripts.experiments.run_klee_self_comp 1m --sym-size 4 --benchmarks bearssl:default
+python -m scripts.experiments.run_klee_self_comp 1m --sym-size 4 --benchmarks bearssl:modexp
 ```
 
 ## Runner Model

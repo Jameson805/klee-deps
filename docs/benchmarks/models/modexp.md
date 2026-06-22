@@ -14,16 +14,16 @@ base and modulus are public operation parameters.
 
 | Selector target | Invoked backend shape | Repository implementation |
 | --- | --- | --- |
-| `bearssl:modexp` / `modexp` | BearSSL i32 modular exponentiation path. | Calls the BearSSL i32 backend with shared `exp`, `base`, and `mod` buffers. |
-| `libgcrypt:default` / `modexp` | Libgcrypt MPI exponentiation path. | Calls the Libgcrypt 1.10.1 MPI exponentiation implementation. |
-| `libgcrypt:sliced` / `modexp` | KLEE-CF sliced Libgcrypt exponentiation variant. | Uses the same inputs as `libgcrypt:default`; only the implementation body is sliced. |
-| `mbedtls:default` / `modexp` | `mbedtls_mpi_exp_mod` wrapper. | Calls the mbedTLS 3.2.1 modular exponentiation backend. |
-| `mbedtls:sliced` / `modexp` | KLEE-CF sliced mbedTLS exponentiation variant. | Uses the same inputs as `mbedtls:default`; only the implementation body is sliced. |
-| `openssl:default` / `recp` | OpenSSL reciprocal modular exponentiation backend. | Selects the reciprocal backend through the wrapper define. |
-| `openssl:default` / `mont` | OpenSSL Montgomery modular exponentiation backend. | Selects the Montgomery backend through the wrapper define. |
-| `openssl:default` / `mont_consttime` | OpenSSL constant-time Montgomery backend. | Selects the constant-time Montgomery backend through the wrapper define. |
-| `openssl:default` / `mont_word` | OpenSSL word-sized Montgomery backend. | Selects the word-sized Montgomery backend through the wrapper define. |
-| `openssl:sliced` / `recp`, `mont`, `mont_word` | KLEE-CF sliced OpenSSL variants. | Uses the same inputs as `openssl:default`; `mont_consttime` is excluded from the sliced selector. |
+| `bearssl:modexp` | BearSSL i32 modular exponentiation path. | Calls the BearSSL i32 backend with shared `exp`, `base`, and `mod` buffers. |
+| `libgcrypt:modexp` | Libgcrypt MPI exponentiation path. | Calls the Libgcrypt 1.10.1 MPI exponentiation implementation. |
+| `libgcrypt:modexp_sliced` | KLEE-CF sliced Libgcrypt exponentiation target. | Uses the same inputs as `libgcrypt:modexp`; only the implementation body is sliced. |
+| `mbedtls:modexp` | `mbedtls_mpi_exp_mod` wrapper. | Calls the mbedTLS 3.2.1 modular exponentiation backend. |
+| `mbedtls:modexp_sliced` | KLEE-CF sliced mbedTLS exponentiation target. | Uses the same inputs as `mbedtls:modexp`; only the implementation body is sliced. |
+| `openssl:recp` | OpenSSL reciprocal modular exponentiation backend. | Selects the reciprocal backend through the wrapper define. |
+| `openssl:mont` | OpenSSL Montgomery modular exponentiation backend. | Selects the Montgomery backend through the wrapper define. |
+| `openssl:mont_consttime` | OpenSSL constant-time Montgomery backend. | Selects the constant-time Montgomery backend through the wrapper define. |
+| `openssl:mont_word` | OpenSSL word-sized Montgomery backend. | Selects the word-sized Montgomery backend through the wrapper define. |
+| `openssl:recp_sliced`, `openssl:mont_sliced`, `openssl:mont_word_sliced` | KLEE-CF sliced OpenSSL targets. | Use the same inputs as their unsliced OpenSSL targets; `mont_consttime` has no sliced target. |
 
 All implemented targets intentionally use the same input model so differences
 come from library code and selected backend rather than from benchmark shape.
@@ -39,7 +39,7 @@ not intended to be realistic production RSA key sizes. They are small symbolic
 models that let the tools reach exponentiation behavior while still exploring
 different operand widths.
 
-The repository-specific sliced selectors are part of this group. They use the
+The repository-specific sliced targets are part of this group. They use the
 same secret exponent and public base/modulus inputs as the unsliced modular
 exponentiation targets; only the implementation body is sliced for focused
 KLEE-CF experiments.
@@ -109,15 +109,15 @@ them.
 
 ## Sliced Variants
 
-Slicing is currently a modular-exponentiation feature. The sliced selectors are
+Slicing is currently a modular-exponentiation feature. The sliced targets are
 therefore reported with the modular-exponentiation group rather than as a
 separate repository-specific benchmark family.
 
 | Selector | Coverage | Difference from the unsliced selector |
 | --- | --- | --- |
-| `libgcrypt:sliced` | Libgcrypt `modexp`. | Same input model; reduced implementation body. |
-| `mbedtls:sliced` | mbedTLS `modexp`. | Same input model; reduced implementation body. |
-| `openssl:sliced` | OpenSSL `recp`, `mont`, and `mont_word`. | Same input model; excludes `mont_consttime`. |
+| `libgcrypt:modexp_sliced` | Libgcrypt modular exponentiation. | Same input model as `libgcrypt:modexp`; reduced implementation body. |
+| `mbedtls:modexp_sliced` | mbedTLS modular exponentiation. | Same input model as `mbedtls:modexp`; reduced implementation body. |
+| `openssl:recp_sliced`, `openssl:mont_sliced`, `openssl:mont_word_sliced` | OpenSSL reciprocal, Montgomery, and word-sized Montgomery backends. | Same input model as the matching unsliced targets; excludes `openssl:mont_consttime`. |
 
 Report sliced and unsliced results together when the question is about modular
 exponentiation behavior. Report them separately only when the question is about

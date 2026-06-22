@@ -27,9 +27,9 @@ Detailed inputs:
 
 | Selector target | Input variable | Kind | Size | Concrete value | Symbolic when | Rationale |
 | --- | --- | --- | --- | --- | --- | --- |
-| `bearssl:rsa_stages` / private and full-decrypt targets | `dp`, `dq` | Secret | `SYM_SIZE` bytes each | Large prime-like suffix seeds. | `fix_pub` and `var_pub`. | Keeps the concrete base key valid while varying selected CRT exponent suffixes. |
-| `bearssl:rsa_stages` / private and full-decrypt targets | `ciphertext` | Public | 128 bytes | Generated ciphertext for the shared concrete 1024-bit RSA key. | `var_pub`. | Keeps fixed-public decrypt runs in the valid RSA domain. |
-| `bearssl:rsa_stages` / `rsa_oaep_unpad` | `encoded` | Secret | 128 bytes | N/A. | `fix_pub` and `var_pub`. | Focuses directly on OAEP unpadding behavior. |
+| `bearssl:rsa_i31_private`, `bearssl:rsa_i31_oaep_decrypt`, `bearssl:rsa_ssl_decrypt` | `dp`, `dq` | Secret | `SYM_SIZE` bytes each | Large prime-like suffix seeds. | `fix_pub` and `var_pub`. | Keeps the concrete base key valid while varying selected CRT exponent suffixes. |
+| `bearssl:rsa_i31_private`, `bearssl:rsa_i31_oaep_decrypt`, `bearssl:rsa_ssl_decrypt` | `ciphertext` | Public | 128 bytes | Generated ciphertext for the shared concrete 1024-bit RSA key. | `var_pub`. | Keeps fixed-public decrypt runs in the valid RSA domain. |
+| `bearssl:rsa_oaep_unpad` | `encoded` | Secret | 128 bytes | N/A. | `fix_pub` and `var_pub`. | Focuses directly on OAEP unpadding behavior. |
 
 Best reconciliation: keep BearSSL RSA here unless a future comparison source
 explicitly uses it. If it becomes part of an ABACUS or BINSEC comparison, add a
@@ -67,21 +67,21 @@ modexp campaign configs.
 
 | Target | Layer | Secret inputs | Public inputs | Notes |
 | --- | --- | --- | --- | --- |
-| `modexp32` | 32-bit HACL bignum exponentiation. | `exp`, width `SYM_SIZE`. | `base` and `mod`, each width `SYM_SIZE`. | Selector `hacl_modexp:default`; repository-only HACL bignum coverage. |
-| `modexp64` | 64-bit HACL bignum exponentiation. | `exp`, width `SYM_SIZE`. | `base` and `mod`, each width `SYM_SIZE`. | Selector `hacl_modexp:default`; repository-only HACL bignum coverage. |
+| `hacl_modexp:modexp32` | 32-bit HACL bignum exponentiation. | `exp`, width `SYM_SIZE`. | `base` and `mod`, each width `SYM_SIZE`. | Repository-only HACL bignum coverage. |
+| `hacl_modexp:modexp64` | 64-bit HACL bignum exponentiation. | `exp`, width `SYM_SIZE`. | `base` and `mod`, each width `SYM_SIZE`. | Repository-only HACL bignum coverage. |
 
 Detailed inputs:
 
 | Selector target | Input variable | Kind | Size | Concrete value | Symbolic when | Rationale |
 | --- | --- | --- | --- | --- | --- | --- |
-| `hacl_modexp:default` / `modexp32`, `modexp64` | `exp` | Secret | `SYM_SIZE` bytes | Second largest prime representable in the selected width. | `fix_pub` and `var_pub`. | Keeps the exponent as private key material while starting concrete replay from a nondegenerate value. |
-| `hacl_modexp:default` / `modexp32`, `modexp64` | `base` | Public | `SYM_SIZE` bytes | Small prime: `0x03` for 1 byte, `0xfb` for wider presets. | `var_pub`. | Stable public representative that avoids a zero base. |
-| `hacl_modexp:default` / `modexp32`, `modexp64` | `mod` | Public | `SYM_SIZE` bytes | Largest prime representable in the selected width. | `var_pub`. | Avoids invalid zero, collapsed modulus-one behavior, and small composite moduli. |
+| `hacl_modexp:modexp32`, `hacl_modexp:modexp64` | `exp` | Secret | `SYM_SIZE` bytes | Second largest prime representable in the selected width. | `fix_pub` and `var_pub`. | Keeps the exponent as private key material while starting concrete replay from a nondegenerate value. |
+| `hacl_modexp:modexp32`, `hacl_modexp:modexp64` | `base` | Public | `SYM_SIZE` bytes | Small prime: `0x03` for 1 byte, `0xfb` for wider presets. | `var_pub`. | Stable public representative that avoids a zero base. |
+| `hacl_modexp:modexp32`, `hacl_modexp:modexp64` | `mod` | Public | `SYM_SIZE` bytes | Largest prime representable in the selected width. | `var_pub`. | Avoids invalid zero, collapsed modulus-one behavior, and small composite moduli. |
 
 Best reconciliation: keep HACL bignum modular exponentiation here unless a
 future campaign explicitly includes it in the primary modexp comparison set.
 When reporting the current modexp campaign configs, do not include
-`hacl_modexp:default` in the modexp group.
+`hacl_modexp:modexp32` and `hacl_modexp:modexp64` in the modexp group.
 
 ## Reclassification Rule
 

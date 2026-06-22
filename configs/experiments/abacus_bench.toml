@@ -11,7 +11,7 @@ filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-all = ["openssl:aes_des", "mbedtls:aes_des", "openssl:rsa_stages", "mbedtls:rsa_stages", "mbedtls:rsa_decrypt_only", "libgcrypt:rsa_stages", "openssl:ecdsa", "mbedtls:ecdsa"]
+all = ["openssl:aes_encrypt", "openssl:des_encrypt", "openssl:ecdsa_sign", "openssl:rsa_private_decrypt_oaep", "mbedtls:aes_encrypt", "mbedtls:des_encrypt", "mbedtls:ecdsa_sign", "mbedtls:rsa_rsaes_pkcs1_v15_decrypt", "libgcrypt:gcry_pk_decrypt_raw"]
 
 [runs]
 klee_cf_default_4 = true

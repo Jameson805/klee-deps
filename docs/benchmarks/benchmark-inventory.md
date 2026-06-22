@@ -6,7 +6,7 @@ based so planning can distinguish benchmarks inherited from prior comparison
 suites from benchmarks added for repository-specific experiments.
 
 Implemented means there is a benchmark descriptor under `configs/benchmarks/`
-and the benchmark can be selected in `library:variant` form. Planned means the
+and the benchmark can be selected in `library:target` form. Planned means the
 benchmark is part of the intended evaluation set, appears in bundled source
 trees, or appears in prior artifact data, but does not yet have a complete
 selector in the repository benchmark pipeline.
@@ -17,28 +17,26 @@ Detailed model and comparison notes live under `models/`:
 - `models/constantine.md` for Constantine-style known-violation benchmarks.
 - `models/bounded.md` for bounded verification benchmarks from BINSEC/Rel2 and
   ABACUS constant-time-claim rows.
-- `models/abacus.md` for ABACUS-overlap benchmarks.
+- `models/abacus.md` for direct ABACUS benchmark targets and their repository
+  modeling differences.
 - `models/other.md` for repository benchmarks that do not currently belong to
   the four provenance groups above.
 
 ## Grouping Rules And Ambiguities
 
-The primary grouping is by intended comparison role, not by selector name. A
-single selector may contain targets from more than one group.
+The primary grouping is by intended comparison role, not by selector name. Each
+selector is one target, so mixed former selectors are represented by multiple
+precise `library:target` rows.
 
 Known ambiguities:
 
-- `bearssl:aes_des` spans groups. `aes_big` and `des_tab` are counted with the
-  Constantine-style known-violation rows because Constantine uses these BINSEC
-  rows. `aes_ct` is counted with the bounded verification group because it was
-  a bounded constant-time-claim benchmark in BINSEC.
-- `bearssl:default` is a legacy combined selector and spans modular
-  exponentiation, Constantine, and bounded verification roles. Prefer focused
-  selectors for new campaigns.
-- RSA, ECDSA, AES, and DES library targets overlap ABACUS by algorithm and
-  library family, but the active repository wrappers are not exact ABACUS
-  reproductions. They are grouped as ABACUS-overlap benchmarks and the
-  differences are documented in `models/abacus.md`.
+- BearSSL AES/DES rows are split by role. `bearssl:aes_big` and
+  `bearssl:des_tab` are counted with Constantine-style known violations;
+  `bearssl:aes_ct` and `bearssl:des_ct` are counted with bounded verification.
+- RSA, ECDSA, AES, and DES library targets can overlap ABACUS by algorithm and
+  library family, but only direct ABACUS benchmark targets are grouped in the
+  ABACUS campaign. The active repository wrappers are not exact ABACUS
+  reproductions, and the differences are documented in `models/abacus.md`.
 - Direction matters for symmetric and RSA rows. The active OpenSSL, mbedTLS,
   Libgcrypt, and BearSSL AES/DES wrappers listed here are encryption wrappers
   unless the target name explicitly says decrypt or unpad. RSA stage rows are
@@ -58,62 +56,92 @@ Known ambiguities:
 
 ## Current Descriptor Set
 
-| Selector | Targets | Primary group |
-| --- | --- | --- |
-| `appliedcryp:default` | `3way`, `des`, `loki91` | Constantine-style known violations. |
-| `bearssl:default` | `aes_big`, `aes_ct`, `des_ct`, `modexp`, `des_tab` | Legacy mixed selector; use focused selectors. |
-| `bearssl:aes_des` | `aes_big`, `aes_ct`, `des_ct`, `des_tab` | Mixed: Constantine for `aes_big`/`des_tab`; bounded verification for `aes_ct`/`des_ct`. |
-| `bearssl:modexp` | `modexp` | Modular exponentiation. |
-| `bearssl:rsa_stages` | `rsa_i31_private`, `rsa_i31_oaep_decrypt`, `rsa_ssl_decrypt`, `rsa_oaep_unpad` | Other RSA stage benchmarks; related to ABACUS RSA by algorithm but not an ABACUS suite row. |
-| `ghostrider:default` | `findmax`, `matmul` | Constantine-style known violations. |
-| `hacl_modexp:default` | `modexp32`, `modexp64` | Other HACL bignum benchmark. |
-| `hacl:chacha20` | `chacha20` | Bounded verification. |
-| `hacl:curve25519` | `curve25519` | Bounded verification. |
-| `hacl:sha256` | `sha256` | Bounded verification. |
-| `hacl:sha512` | `sha512` | Bounded verification. |
-| `libg:default` | `des` | Constantine-style known violations. |
-| `libgcrypt:default` | `modexp` | Modular exponentiation. |
-| `libgcrypt:aes_des` | `aes_encrypt`, `des_encrypt` | Repository-only Libgcrypt symmetric routines; ABACUS source-set caveat below. |
-| `libgcrypt:ecdsa` | `ecdsa_sign` | Repository-only Libgcrypt ECDSA; ABACUS source-set caveat below. |
-| `libgcrypt:rsa_stages` | `gcry_pk_decrypt_pkcs1`, `gcry_pk_decrypt_oaep`, `gcry_pk_decrypt_raw`, `rsa_pkcs1_decode_for_enc`, `rsa_oaep_decode` | ABACUS-overlap RSA. |
-| `libgcrypt:sliced` | `modexp` | Modular exponentiation. |
-| `libsodium:chacha20` | `chacha20` | Bounded verification. |
-| `libsodium:curve25519` | `curve25519_scalarmult` | Other repository benchmark. |
-| `libsodium:salsa20` | `salsa20` | Bounded verification. |
-| `libsodium:sha256` | `sha256` | Bounded verification. |
-| `libsodium:sha512` | `sha512` | Bounded verification. |
-| `mbedtls:default` | `modexp`, `rsa_private`, `rsa_rsaes_pkcs1_v15_decrypt`, `rsa_rsaes_oaep_decrypt`, `pkcs1_v15_unpadding` | Mixed: modular exponentiation plus ABACUS-overlap RSA. |
-| `mbedtls:rsa_stages` | `rsa_private`, `rsa_rsaes_pkcs1_v15_decrypt`, `rsa_rsaes_oaep_decrypt`, `pkcs1_v15_unpadding` | ABACUS-overlap RSA. |
-| `mbedtls:rsa_decrypt_only` | `rsa_private`, `rsa_rsaes_pkcs1_v15_decrypt`, `rsa_rsaes_oaep_decrypt`, `pkcs1_v15_unpadding` | ABACUS-overlap RSA. |
-| `mbedtls:aes_des` | `aes_encrypt`, `des_encrypt` | ABACUS-overlap library symmetric routines. |
-| `mbedtls:ecdsa` | `ecdsa_sign` | ABACUS-overlap ECDSA. |
-| `mbedtls:sliced` | `modexp` | Modular exponentiation. |
-| `monocypher:argon2i` | `argon2i` | Bounded verification. |
-| `monocypher:chacha20` | `chacha20` | Bounded verification. |
-| `monocypher:ed25519` | `ed25519` | Bounded verification. |
-| `monocypher:poly1305` | `poly1305` | Bounded verification. |
-| `openssl:default` | `recp`, `mont`, `mont_consttime`, `mont_word` | Modular exponentiation. |
-| `openssl:aes_des` | `aes_encrypt`, `des_encrypt` | ABACUS-overlap library symmetric routines. |
-| `openssl:ecdsa` | `ecdsa_sign` | ABACUS-overlap ECDSA. |
-| `openssl:rsa_stages` | `rsa_private_core`, `padding_check_pkcs1_type_2`, `padding_check_oaep_mgf1`, `padding_check_sslv23`, `rsa_private_decrypt_pkcs1`, `rsa_private_decrypt_oaep`, `rsa_private_decrypt_sslv23`, `rsa_private_decrypt_no_padding` | ABACUS-overlap RSA. |
-| `openssl:sliced` | `recp`, `mont`, `mont_word` | Modular exponentiation. |
-| `openssl_almeida:default` | `tls_rempad_luk13` | Constantine-style known violations through the BINSEC/Rel2 row. |
-| `pycrypto:default` | `arc4` | Constantine-style known violations. |
+| Selector | Primary group |
+| --- | --- |
+| `appliedcryp:3way` | Constantine-style known violations. |
+| `appliedcryp:des` | Constantine-style known violations. |
+| `appliedcryp:loki91` | Constantine-style known violations. |
+| `bearssl:aes_big` | Constantine-style known violations through the BINSEC/Rel2 row. |
+| `bearssl:aes_ct` | Bounded verification. |
+| `bearssl:des_ct` | Bounded verification. |
+| `bearssl:des_tab` | Constantine-style known violations through the BINSEC/Rel2 row. |
+| `bearssl:modexp` | Modular exponentiation. |
+| `bearssl:rsa_i31_private` | Other RSA stage benchmark. |
+| `bearssl:rsa_i31_oaep_decrypt` | Other RSA stage benchmark. |
+| `bearssl:rsa_ssl_decrypt` | Other RSA stage benchmark. |
+| `bearssl:rsa_oaep_unpad` | Other RSA stage benchmark. |
+| `ghostrider:findmax` | Constantine-style known violations. |
+| `ghostrider:matmul` | Constantine-style known violations. |
+| `hacl_modexp:modexp32` | Other HACL bignum benchmark. |
+| `hacl_modexp:modexp64` | Other HACL bignum benchmark. |
+| `hacl:chacha20` | Bounded verification. |
+| `hacl:curve25519` | Bounded verification. |
+| `hacl:sha256` | Bounded verification. |
+| `hacl:sha512` | Bounded verification. |
+| `libg:des` | Constantine-style known violations. |
+| `libgcrypt:modexp` | Modular exponentiation. |
+| `libgcrypt:modexp_sliced` | Modular exponentiation. |
+| `libgcrypt:gcry_pk_decrypt_pkcs1` | Repository-only Libgcrypt RSA alternate mode. |
+| `libgcrypt:gcry_pk_decrypt_oaep` | Repository-only Libgcrypt RSA alternate mode. |
+| `libgcrypt:gcry_pk_decrypt_raw` | Direct ABACUS RSA target. |
+| `libgcrypt:rsa_pkcs1_decode_for_enc` | Repository-only Libgcrypt RSA padding helper. |
+| `libgcrypt:rsa_oaep_decode` | Repository-only Libgcrypt RSA padding helper. |
+| `libgcrypt:aes_encrypt` | Repository-only Libgcrypt symmetric routine. |
+| `libgcrypt:des_encrypt` | Repository-only Libgcrypt symmetric routine. |
+| `libgcrypt:ecdsa_sign` | Repository-only Libgcrypt ECDSA. |
+| `libsodium:curve25519_scalarmult` | Other repository benchmark. |
+| `libsodium:salsa20` | Bounded verification. |
+| `libsodium:chacha20` | Bounded verification. |
+| `libsodium:sha256` | Bounded verification. |
+| `libsodium:sha512` | Bounded verification. |
+| `mbedtls:modexp` | Modular exponentiation. |
+| `mbedtls:modexp_sliced` | Modular exponentiation. |
+| `mbedtls:rsa_private` | Repository-only mbedTLS RSA core target. |
+| `mbedtls:rsa_rsaes_pkcs1_v15_decrypt` | Direct ABACUS RSA target. |
+| `mbedtls:rsa_rsaes_oaep_decrypt` | Repository-only mbedTLS RSA alternate mode. |
+| `mbedtls:pkcs1_v15_unpadding` | Repository-only mbedTLS RSA padding helper. |
+| `mbedtls:aes_encrypt` | Direct ABACUS symmetric target. |
+| `mbedtls:des_encrypt` | Direct ABACUS symmetric target. |
+| `mbedtls:ecdsa_sign` | Direct ABACUS ECDSA target. |
+| `monocypher:chacha20` | Bounded verification. |
+| `monocypher:poly1305` | Bounded verification. |
+| `monocypher:argon2i` | Bounded verification. |
+| `monocypher:ed25519` | Bounded verification. |
+| `openssl:recp` | Modular exponentiation. |
+| `openssl:mont` | Modular exponentiation. |
+| `openssl:mont_consttime` | Modular exponentiation. |
+| `openssl:mont_word` | Modular exponentiation. |
+| `openssl:recp_sliced` | Modular exponentiation. |
+| `openssl:mont_sliced` | Modular exponentiation. |
+| `openssl:mont_word_sliced` | Modular exponentiation. |
+| `openssl:rsa_private_core` | Repository-only OpenSSL RSA core target. |
+| `openssl:padding_check_pkcs1_type_2` | Repository-only OpenSSL RSA padding helper. |
+| `openssl:padding_check_oaep_mgf1` | Repository-only OpenSSL RSA padding helper. |
+| `openssl:padding_check_sslv23` | Repository-only OpenSSL RSA padding helper. |
+| `openssl:rsa_private_decrypt_pkcs1` | Repository-only OpenSSL RSA alternate mode. |
+| `openssl:rsa_private_decrypt_oaep` | Direct ABACUS RSA target. |
+| `openssl:rsa_private_decrypt_sslv23` | Repository-only OpenSSL RSA alternate mode. |
+| `openssl:rsa_private_decrypt_no_padding` | Repository-only OpenSSL RSA alternate mode. |
+| `openssl:aes_encrypt` | Direct ABACUS symmetric target. |
+| `openssl:des_encrypt` | Direct ABACUS symmetric target. |
+| `openssl:ecdsa_sign` | Direct ABACUS ECDSA target. |
+| `openssl_almeida:tls_rempad_luk13` | Constantine-style known violations through the BINSEC/Rel2 row. |
+| `pycrypto:arc4` | Constantine-style known violations. |
 
 ## Benchmark Groups
 
 ### Modular Exponentiation
 
 This group contains direct modular-exponentiation backends. It is implemented
-for the libraries below. The sliced variants also belong here because the
+for the libraries below. The sliced targets also belong here because the
 repository currently slices only modular-exponentiation implementations.
 
 | Library | Status | Descriptor coverage |
 | --- | --- | --- |
-| BearSSL 0.6 | Implemented | `bearssl:modexp` and the legacy `bearssl:default` selector. |
-| Mbed TLS 3.2.1 | Implemented | `mbedtls:default`; sliced variant in `mbedtls:sliced`. |
-| Libgcrypt 1.10.1 | Implemented | `libgcrypt:default`; sliced variant in `libgcrypt:sliced`. |
-| OpenSSL 1.1.1q | Implemented | `openssl:default`; sliced variant in `openssl:sliced`. |
+| BearSSL 0.6 | Implemented | `bearssl:modexp`. |
+| Mbed TLS 3.2.1 | Implemented | `mbedtls:modexp`; sliced target `mbedtls:modexp_sliced`. |
+| Libgcrypt 1.10.1 | Implemented | `libgcrypt:modexp`; sliced target `libgcrypt:modexp_sliced`. |
+| OpenSSL 1.1.1q | Implemented | `openssl:recp`, `openssl:mont`, `openssl:mont_consttime`, `openssl:mont_word`; sliced targets `openssl:recp_sliced`, `openssl:mont_sliced`, `openssl:mont_word_sliced`. |
 
 The shared model is a secret exponent with public base and modulus. See
 `models/modexp.md`.
@@ -123,13 +151,13 @@ The shared model is a secret exponent with public base and modulus. See
 This group is the historical known-violation set currently represented in the
 repository. It includes the BINSEC rows that Constantine also used.
 
-| Source group | Implemented targets | Selector |
-| --- | --- | --- |
-| Applied Crypto | `3way`, `des`, `loki91` | `appliedcryp:default` |
-| GhostRider | `findmax`, `matmul` | `ghostrider:default` |
-| Image-table Libgcrypt subset | `des` | `libg:default` |
-| PyCrypto | `arc4` | `pycrypto:default` |
-| BINSEC/Rel2 rows also used by Constantine | `tls_rempad_luk13`, `aes_big`, `des_tab` | `openssl_almeida:default`, `bearssl:aes_des` |
+| Source group | Selectors |
+| --- | --- |
+| Applied Crypto | `appliedcryp:3way`, `appliedcryp:des`, `appliedcryp:loki91` |
+| GhostRider | `ghostrider:findmax`, `ghostrider:matmul` |
+| Image-table Libgcrypt subset | `libg:des` |
+| PyCrypto | `pycrypto:arc4` |
+| BINSEC/Rel2 rows also used by Constantine | `openssl_almeida:tls_rempad_luk13`, `bearssl:aes_big`, `bearssl:des_tab` |
 
 The attached image/table data includes more historical suites than the subset
 currently represented by descriptors. These include Chronos, S-CP `cast-ssl`,
@@ -144,8 +172,8 @@ from the BINSEC/Rel2 and ABACUS benchmark spaces.
 
 | Source group | Status | Descriptor coverage |
 | --- | --- | --- |
-| BearSSL 0.6 AES-CT | Implemented | `bearssl:aes_des` includes `aes_ct`. |
-| BearSSL 0.6 DES-CT | Implemented | `bearssl:aes_des` includes `des_ct`. |
+| BearSSL 0.6 AES-CT | Implemented | `bearssl:aes_ct`. |
+| BearSSL 0.6 DES-CT | Implemented | `bearssl:des_ct`. |
 | Libsodium | Implemented | `libsodium:salsa20`, `libsodium:chacha20`, `libsodium:sha256`, and `libsodium:sha512`. |
 | HACL Packages C v0.6 | Implemented | `hacl:chacha20`, `hacl:curve25519`, `hacl:sha256`, and `hacl:sha512`. |
 | Monocypher 3.0.0 | Implemented | `monocypher:chacha20`, `monocypher:poly1305`, `monocypher:argon2i`, and `monocypher:ed25519`. |
@@ -163,13 +191,12 @@ not exact ABACUS driver reproductions.
 
 | Source group | Status | Descriptor coverage |
 | --- | --- | --- |
-| OpenSSL AES/DES | Implemented | `openssl:aes_des` covers AES-128 block encryption and single-DES encryption. |
-| OpenSSL ECDSA | Implemented | `openssl:ecdsa` covers 192-bit ECDSA signing, matching the ABACUS curve size. |
-| OpenSSL RSA | Implemented | `openssl:rsa_stages`. |
-| Mbed TLS RSA | Implemented | `mbedtls:rsa_stages` and `mbedtls:rsa_decrypt_only`. |
-| Mbed TLS AES/DES/ECDSA | Implemented | `mbedtls:aes_des` and `mbedtls:ecdsa`; implemented against mbedTLS 3.2.1 rather than the ABACUS 2.5/2.15 source trees. |
-| Libgcrypt RSA | Implemented | `libgcrypt:rsa_stages`. |
-| Libgcrypt AES/DES/ECDSA | Repository-only overlap | `libgcrypt:aes_des` and `libgcrypt:ecdsa` exist, but the checked ABACUS artifact data only contains Libgcrypt RSA rows. Keep this provenance caveat visible when reporting them. |
+| OpenSSL AES/DES | Implemented | `openssl:aes_encrypt` and `openssl:des_encrypt`. |
+| OpenSSL ECDSA | Implemented | `openssl:ecdsa_sign`, matching the ABACUS curve size. |
+| OpenSSL RSA | Implemented | `openssl:rsa_private_decrypt_oaep`; this matches the ABACUS OpenSSL RSA driver, which decrypts an OAEP ciphertext through `RSA_private_decrypt`. |
+| Mbed TLS RSA | Implemented | `mbedtls:rsa_rsaes_pkcs1_v15_decrypt`; this is the direct repository target for the ABACUS mbedTLS RSA row. |
+| Mbed TLS AES/DES/ECDSA | Implemented | `mbedtls:aes_encrypt`, `mbedtls:des_encrypt`, `mbedtls:ecdsa_sign`; implemented against mbedTLS 3.2.1 rather than the ABACUS 2.5/2.15 source trees. |
+| Libgcrypt RSA | Implemented | `libgcrypt:gcry_pk_decrypt_raw`; this matches the ABACUS Libgcrypt driver, which encrypts raw data and calls `gcry_pk_decrypt`. |
 See `models/abacus.md` for exact function-boundary, version, input, and
 reconciliation notes.
 
@@ -180,21 +207,22 @@ are not cleanly classified as one of the prior comparison groups above.
 
 | Source group | Status | Descriptor coverage |
 | --- | --- | --- |
-| BearSSL RSA stages | Implemented | `bearssl:rsa_stages` covers BearSSL RSA primitive, full decrypt, and OAEP unpadding stages. |
-| HACL Packages C bignum modexp | Implemented | `hacl_modexp:default` covers 32-bit and 64-bit bignum modular exponentiation targets. |
-| Libsodium Curve25519 | Implemented | `libsodium:curve25519` covers `curve25519_scalarmult` as a repository-only comparable routine. |
+| BearSSL RSA stages | Implemented | `bearssl:rsa_i31_private`, `bearssl:rsa_i31_oaep_decrypt`, `bearssl:rsa_ssl_decrypt`, `bearssl:rsa_oaep_unpad`. |
+| HACL Packages C bignum modexp | Implemented | `hacl_modexp:modexp32`, `hacl_modexp:modexp64`. |
+| Libgcrypt AES/DES/ECDSA | Implemented | `libgcrypt:aes_encrypt`, `libgcrypt:des_encrypt`, and `libgcrypt:ecdsa_sign`; repository-only comparable targets because the checked ABACUS artifact data only contains Libgcrypt RSA rows. |
+| Libsodium Curve25519 | Implemented | `libsodium:curve25519_scalarmult` as a repository-only comparable routine. |
 
 See `models/other.md` for the rationale and how these should be reported
 relative to the comparison suites.
 
 ## Current Classification Gaps
 
-- Add separate bounded-size selectors for `bearssl:aes_ct` and `bearssl:des_ct`
+- Add separate bounded-size targets for `bearssl:aes_ct` and `bearssl:des_ct`
   before claiming parity with BINSEC's input-size scalability matrix. The
-  default selector implements the fixed 32-byte AES and 16-byte DES wrappers.
+  current targets implement the fixed 32-byte AES and 16-byte DES wrappers.
 - Keep Libsodium, HACL, and Monocypher bounded descriptors aligned with their
   documented repository stream models. Add separate exact-parity selectors if a
   run needs to copy an external wrapper's high plaintext or output-entry
   schedule.
-- Add `abacus_compat` selectors if exact ABACUS parity is required for
+- Add `abacus_compat` targets if exact ABACUS parity is required for
   key-schedule-only AES/DES, full-CRT RSA, and ECDSA nonce handling.
