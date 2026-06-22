@@ -38,7 +38,7 @@ Here `pi` is the current path condition, `PRIME(pi)` is the same path condition 
 
 KLEE-CF extends symbolic input creation in `Executor::executeMakeSymbolic`. Public symbolic objects behave like ordinary KLEE arrays. Secret symbolic objects are created with `Array::isSecret` set, and KLEE-CF immediately creates a second array whose name appends `__prime`.
 
-The executor keeps a `prime` map from the original secret array name to the primed array. When the concrete-model path is enabled, it also initializes a binding for the prime array, because CT checks and renamed constraints can mention both sides of the relational execution.
+The executor keeps a `prime` map from the original secret array name to the primed array. When the concrete-model path is enabled, the persistent state model remains original-side only. CT checks build a temporary mirrored assignment that maps each primed secret to the current original secret bytes before trying divergent primed values.
 
 The user-facing input API is `klee_make_symbolic_sc`. It behaves like `klee_make_symbolic`, but the final `is_secret` argument controls whether the array participates in relational renaming.
 
@@ -75,7 +75,9 @@ When a witness is found, KLEE-CF writes assignments for public arrays, original 
 
 The current KLEE-CF implementation also includes a concrete-model path controlled by `--use-cv-model`. This is documented in more detail in `../notes/klee-cf-candidate-models.md`.
 
-Each live `ExecutionState` carries a `concreteModel` assignment that must satisfy the state's current constraints. After constraints change, KLEE-CF repairs the model with deterministic candidate assignments or falls back to solver-generated initial values. If the model cannot be repaired, KLEE-CF terminates that state with an execution error rather than continuing with stale model data.
+Each live `ExecutionState` carries an original-side `concreteModel` assignment that must satisfy the state's current original path constraints. After an original path constraint is added, KLEE-CF repairs the model with deterministic candidate assignments or falls back to solver-generated initial values if the current model no longer satisfies the new condition. CT checks build a temporary mirrored assignment that gives each primed secret the current original secret bytes, then search for divergent primed values. If the original-side model cannot be repaired, KLEE-CF terminates that state with an execution error rather than continuing with stale model data.
+
+The current implementation deliberately checks model repair against only the newly added original-side condition and the state's original path constraints. It does not keep prime-secret bindings in the persistent model and does not repeatedly validate accumulated renamed relational constraints during ordinary path repair. This keeps the common path auditable and avoids spending SHA-scale execution time rechecking relational constraints that are only needed by CT witness queries.
 
 For non-CT checks, the concrete-model path uses an escalation ladder:
 
@@ -111,10 +113,10 @@ Important outputs include:
 Canonical entrypoint:
 
 ```bash
-python -m scripts.experiments.run_klee_cf 1m --sym-size 4 --benchmarks bearssl:default
+python -m scripts.experiments.run_klee_cf 1m --sym-size 4 --benchmarks bearssl:modexp
 ```
 
-The runner uses `python -m ...` entrypoints from the repository root and accepts benchmark selectors in `library:variant` form.
+The runner uses `python -m ...` entrypoints from the repository root and accepts benchmark selectors in `library:target` form.
 
 ## Runner Model
 
@@ -129,6 +131,12 @@ That shared implementation handles:
 - replay of positives after conversion
 
 KLEE-CF's mode-specific runner flag is `--use-cv-model`.
+
+## Freestanding Runtime Support
+
+KLEE-CF relies on KLEE runtime bitcode for memory routines that should execute symbolically rather than as host external calls. LLVM memory intrinsics are lowered into ordinary calls, and the executor preserves freestanding routines such as `memset`, `memcpy`, `memcmp`, `memmove`, and `explicit_bzero` during module preparation.
+
+`explicit_bzero` is implemented as a freestanding byte-zeroing loop in `klee-cf/runtime/Freestanding/explicit_bzero.c`. This keeps secure-wipe code symbolic and avoids the expensive external-call path that would otherwise concretize symbolic buffers. For `--libc=uclibc` runs, KLEE-CF links a small `RuntimeExplicitBzero` archive in addition to `klee-uclibc.bca`, because linking the full freestanding archive would duplicate uclibc symbols such as `memcpy`.
 
 ## Important Option Surface
 
@@ -152,6 +160,7 @@ The main implementation anchors are:
 - `klee-cf/lib/Core/Executor.cpp`: symbolic input creation, `renameSecret`, relational witness checks, concrete-model repair, and fork handling;
 - `klee-cf/lib/Core/Executor.h`: the prime map and rename caches;
 - `klee-cf/lib/Core/Memory.cpp`: the concrete `ObjectState::read` fast path controlled by `--optimize-concrete-object-state-reads`;
+- `klee-cf/runtime/Freestanding/explicit_bzero.c`: symbolic freestanding secure-wipe support used to avoid external-call concretization;
 - `../notes/klee-cf-candidate-models.md`: concrete-model and chosen-value details.
 
 These implementation files define the exact recursion, cache behavior, and witness-search order documented above.

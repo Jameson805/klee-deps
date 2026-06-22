@@ -19,9 +19,9 @@ Two simpler experiments were useful negative controls. A direct symbolic divisio
 
 ## Implementation
 
-Each `ExecutionState` now carries an `Assignment concreteModel`. New symbolic arrays are initialized to zero bytes in the model, and secret arrays also initialize zero-valued prime-secret bindings because KLEE-CF stores renamed CT path constraints in the same state constraint set. The model is copied with the state. After path constraints are added, KLEE-CF tries to repair the model with deterministic candidate assignments and then with `getInitialValues`.
+Each `ExecutionState` carries an `Assignment concreteModel` for the original execution side. New symbolic arrays are initialized to zero bytes in the model. Prime-secret arrays are not stored as part of the persistent state model; CT checks build a temporary mirrored assignment that maps each prime secret to the current original secret bytes before searching for divergent renamed-side values. The model is copied with the state. After original path constraints are added, KLEE-CF checks the newly added condition and repairs the model with deterministic candidate assignments or `getInitialValues` only if the current model no longer satisfies that original-side condition.
 
-When `--use-cv-model=true`, the implementation treats this as an invariant: every live state must have a concrete model that satisfies its current path constraints, including renamed prime-secret path constraints. If KLEE-CF adds a constraint and cannot repair the model, it terminates that state with an execution error instead of continuing with a stale model. Fork-time model checks can therefore use the model directly rather than revalidating it before every use.
+When `--use-cv-model=true`, the implementation treats this as an invariant: every live state must have a concrete model that satisfies its current original path constraints. Renamed path and relational constraints are satisfiable by the mirrored assignment where prime secrets equal the original secrets; CT witness search may then intentionally change prime-secret values to demonstrate divergence. If KLEE-CF adds an original path constraint and cannot repair the model, it terminates that state with an execution error instead of continuing with stale model data. Fork-time model checks can therefore use the original-side model directly rather than revalidating it before every use.
 
 The candidate set is explicit in the implementation. For code paths that enable candidate search, KLEE-CF tries candidates in this order:
 
@@ -32,7 +32,7 @@ The candidate set is explicit in the implementation. For code paths that enable 
 
 The current tuned default keeps the fixed set intentionally small. Broader fixed patterns such as all-zero or alternating `0x55` and `0xaa` whole-state fills were removed because they did not justify their per-query cost on the RSA CT workload.
 
-For CT checking, `--use-cv-model` starts with the fixed current public/current secret1 fallback level. At that level it first tries chosen alternate secret2 values for the renamed side, then asks the solver for secret2 if the candidates fail. If both expressions become constants and differ, KLEE-CF reports the non-CT issue immediately.
+For CT checking, `--use-cv-model` first mirrors the current original-side model onto prime secrets. It then starts with the fixed current public/current secret1 fallback level. At that level it first tries chosen alternate secret2 values for the renamed side, then asks the solver for secret2 if the candidates fail. If both expressions become constants and differ, KLEE-CF reports the non-CT issue immediately.
 
 For branch handling, `--use-cv-model` runs before the normal fork query. KLEE-CF evaluates the branch condition under the current model. That model gives one side. KLEE-CF then tries the fixed and deterministic random candidates for the opposite side before asking the solver for an opposite-side model. If an opposite side is found, KLEE-CF forks. If no opposite side is found, KLEE-CF continues the current-model side and counts the opposite side with `DeferredForks` and `InhibitedForks`.
 
@@ -64,7 +64,9 @@ This single option controls the whole concrete-model optimization and defaults t
 
 This option controls how many deterministic pseudo-random assignments are tried after the fixed candidate values. It defaults to `1`. Setting it to `0` keeps only the current-model probe plus the fixed `1` and `-1` candidates.
 
-After a new constraint is added, KLEE-CF checks whether the existing `concreteModel` still satisfies the state's path constraints. If not, it tries to repair that model first with the explicit candidate list above and then, only if those candidates fail, with `solver->getInitialValues(...)`.
+After a new original path constraint is added, KLEE-CF checks whether the existing `concreteModel` satisfies that new condition. If not, it tries to repair the original-side model first with the explicit candidate list above and then, only if those candidates fail, with `solver->getInitialValues(...)` over the original path constraints.
+
+The current implementation intentionally keeps this repair check original-side only. It does not persist prime-secret bindings in `state.concreteModel`; instead, CT checks create a temporary mirrored model where each prime secret has the current original secret bytes. This avoids revalidating renamed relational constraints on every ordinary path update while preserving the invariant that each live state's model satisfies its original path constraints.
 
 For CT checks, the option adds chosen-value probes before each solver fallback level. The first probe keeps current public values and current original secrets fixed while substituting alternate values only for prime secret arrays. Later probes relax that fixed context: first allowing chosen original-secret values with public values still fixed, then allowing chosen public and original-secret values in the symbolic-public stage.
 
@@ -111,6 +113,15 @@ This counts branch alternatives that were not explored because model-directed fo
 This is an existing upstream KLEE stat. It counts any case where KLEE chose not to split a fork, including upstream fork-inhibition paths such as fork limits. `DeferredForks` is narrower: it counts only the new model-directed case where KLEE-CF skipped the opposite side after candidate probing. Every `DeferredForks` increment also increments `InhibitedForks`, but not every `InhibitedForks` increment is a `DeferredForks` increment.
 
 ## Validation result
+
+The latest focused validation was run on 2026-06-22 after the concrete-model repair optimization and freestanding `explicit_bzero` runtime changes. The nested `klee-cf/` commits were:
+
+- `c9191f23 Optimize KLEE-CF concrete model repair`
+- `faf6085e Model explicit_bzero in freestanding runtime`
+
+Validation covered three checks. First, `cmake --build build/klee-cf --target klee -j4` passed. Second, a small symbolic-buffer toy calling `explicit_bzero` under `--libc=uclibc` completed with no `explicit_bzero` undefined-reference warning, no `calling external: explicit_bzero` warning, no `explicit_bzero` concretization warning, and no generated `.err` file. Third, libsodium SHA artifacts were rerun with KLEE-CF, `--use-cv-model=true`, STP, uclibc, POSIX runtime, random-path plus DFS search, batching enabled, and concrete object-state read optimization enabled. SHA512 completed in `real 2.72` with `174127` total instructions, and SHA256 completed in `real 2.81` with `200353` total instructions. Neither SHA run externalized or concretized `explicit_bzero`.
+
+These runs confirm the intended split: the concrete model remains an original-side execution model used for cheap repair and CT witness seeding, while secure wipes are handled by runtime bitcode rather than by a KLEE special-function handler or host external call.
 
 The latest focused validation was run on 2026-06-14. Raw commands and logs are under `results/cv-model-validation-20260614/`. KLEE-CF used `--solver-backend=stp`, `--max-solver-time=1s`, DFS search, and a 20 second outer timeout. BINSEC used `-fml-solver z3`, `-smt-solver z3`, one second formula/SMT timeouts, `-sse-timeout 20`, `-sse-heuristics nurs`, and `-checkct-no-cv` for the CV-off runs. The BINSEC configs replace `klee_make_symbolic_sc` and mark the passed memory range as secret, so both global and stack-local toy inputs are handled consistently.
 
