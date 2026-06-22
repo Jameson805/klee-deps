@@ -102,6 +102,15 @@ class LocationMatchResult:
     same_line_different_column: bool = False
 
 
+@dataclass(frozen=True)
+class InputValidationResult:
+    return_code: int
+    status: str | None
+    replay: ReplayResult | None = None
+    match_result: LocationMatchResult | None = None
+    error: str | None = None
+
+
 def _statement_bounds(lines: Sequence[str], line_number: int) -> tuple[int, int] | None:
     if line_number <= 0 or line_number > len(lines):
         return None
@@ -784,6 +793,101 @@ def _load_json_notes(path: str) -> dict[str, Any]:
     return {}
 
 
+def _format_replay_location_for_log(replay: ReplayResult | None) -> str:
+    if replay is None:
+        return "<identical traces>"
+    if replay.location is None:
+        if replay.culprit_ip is None:
+            return f"{replay.divergence_kind}:<unresolved>"
+        return f"{replay.divergence_kind}:0x{replay.culprit_ip:x}:<no debug info>"
+    file_name, line_no, col_no = replay.location
+    address = replay.resolved_ip if replay.resolved_ip is not None else replay.culprit_ip
+    address_text = "<no-ip>" if address is None else f"0x{address:x}"
+    return f"{replay.divergence_kind}:{address_text}:{file_name}:{line_no}:{col_no}"
+
+
+def validate_input_values(
+    *,
+    executable: str,
+    secret_spec: str,
+    public_spec: str,
+    timeout: int,
+    debug: bool,
+    pin_root: str | None = None,
+    expected_filename: str | None = None,
+    expected_line: int | None = None,
+    expected_column: int | None = None,
+    expected_kind: str | None = None,
+) -> InputValidationResult:
+    try:
+        secrets = parse_secret_input_spec(secret_spec)
+        publics = parse_public_input_spec(public_spec)
+        secret_orig, secret_prime, public_values = build_value_input_bytes(secrets, publics)
+    except ValueError as err:
+        return InputValidationResult(return_code=2, status=None, error=f"Error parsing inputs: {err}")
+
+    resolved_pin_root = os.path.abspath(pin_root) if pin_root is not None else resolve_pin_root()
+    executable_path = os.path.abspath(executable)
+
+    try:
+        replay = analyze_input_bytes(
+            executable=executable_path,
+            secret_names=list(secrets.keys()),
+            public_names=list(publics.keys()),
+            secret_orig=secret_orig,
+            secret_prime=secret_prime,
+            public_values=public_values,
+            timeout=timeout,
+            pin_root=resolved_pin_root,
+            debug=debug,
+        )
+    except subprocess.TimeoutExpired:
+        return InputValidationResult(return_code=124, status=STATUS_TIMEOUT, error="Timeout while running Pin traces")
+    except (RuntimeError, subprocess.CalledProcessError) as err:
+        return InputValidationResult(return_code=2, status=None, error=f"Error: {err}")
+
+    if replay is None:
+        return InputValidationResult(return_code=1, status=STATUS_IDENTICAL_TRACE)
+
+    if not divergence_kind_matches(expected_kind, replay.divergence_kind):
+        return InputValidationResult(return_code=42, status=STATUS_KIND_MISMATCH, replay=replay)
+
+    if replay.location is None:
+        if expected_filename is not None or expected_line is not None or expected_column is not None:
+            return InputValidationResult(return_code=3, status=STATUS_LOCATION_MISMATCH, replay=replay)
+        return InputValidationResult(return_code=0, status=STATUS_SUCCESS, replay=replay)
+
+    actual_file, actual_line, actual_column = replay.location
+    previous_column = None
+    next_column = None
+    if replay.column_bounds is not None:
+        previous_column, next_column = replay.column_bounds
+    match_result = location_matches(
+        expected_filename,
+        expected_line,
+        expected_column,
+        actual_file,
+        actual_line,
+        actual_column,
+        actual_previous_column=previous_column,
+        actual_next_column=next_column,
+    )
+    if match_result.matches:
+        return InputValidationResult(
+            return_code=0,
+            status=STATUS_SUCCESS,
+            replay=replay,
+            match_result=match_result,
+        )
+
+    return InputValidationResult(
+        return_code=3,
+        status=STATUS_LOCATION_MISMATCH,
+        replay=replay,
+        match_result=match_result,
+    )
+
+
 def _build_abacus_specs(
     counterexamples: dict[str, int],
     notes: dict[str, Any],
@@ -1050,65 +1154,44 @@ def mode_input_values(
 ) -> int:
     warn_addrinfo_unavailable()
 
-    try:
-        secrets = parse_secret_input_spec(secret_spec)
-        publics = parse_public_input_spec(public_spec)
-        secret_orig, secret_prime, public_values = build_value_input_bytes(secrets, publics)
-    except ValueError as err:
-        print(f"Error parsing inputs: {err}", file=sys.stderr)
-        return 2
+    validation = validate_input_values(
+        executable=executable,
+        secret_spec=secret_spec,
+        public_spec=public_spec,
+        timeout=timeout,
+        debug=debug,
+        pin_root=pin_root,
+        expected_filename=expected_filename,
+        expected_line=expected_line,
+        expected_column=expected_column,
+        expected_kind=expected_kind,
+    )
+    if validation.error is not None:
+        print(validation.error, file=sys.stderr)
+        return validation.return_code
 
-    resolved_pin_root = pin_root if pin_root is not None else resolve_pin_root()
-    executable_path = os.path.abspath(executable)
-
-    try:
-        replay = analyze_input_bytes(
-            executable=executable_path,
-            secret_names=list(secrets.keys()),
-            public_names=list(publics.keys()),
-            secret_orig=secret_orig,
-            secret_prime=secret_prime,
-            public_values=public_values,
-            timeout=timeout,
-            pin_root=resolved_pin_root,
-            debug=debug,
-        )
-    except subprocess.TimeoutExpired:
-        print("Timeout while running Pin traces", file=sys.stderr)
-        return 124
-    except (RuntimeError, subprocess.CalledProcessError) as err:
-        print(f"Error: {err}", file=sys.stderr)
-        return 2
+    replay = validation.replay
+    if validation.status == STATUS_IDENTICAL_TRACE:
+        print("Identical traces")
+        return validation.return_code
 
     if replay is None:
-        print("Identical traces")
-        return 1
+        return validation.return_code
 
     print_replay_location(replay)
-    if not divergence_kind_matches(expected_kind, replay.divergence_kind):
+    if validation.status == STATUS_KIND_MISMATCH:
         print(f"Kind mismatch: expected {expected_kind}, got {replay.divergence_kind}")
-        return 42  # unique code for kind mismatch
+        return validation.return_code
 
     if replay.location is None:
-        if expected_filename is not None or expected_line is not None or expected_column is not None:
-            return 3
-        return 0
+        return validation.return_code
 
     actual_file, actual_line, actual_column = replay.location
     previous_column = None
     next_column = None
     if replay.column_bounds is not None:
         previous_column, next_column = replay.column_bounds
-    match_result = location_matches(
-        expected_filename,
-        expected_line,
-        expected_column,
-        actual_file,
-        actual_line,
-        actual_column,
-        actual_previous_column=previous_column,
-        actual_next_column=next_column,
-    )
+    match_result = validation.match_result
     if match_result.matches:
         if match_result.snapped and expected_column is not None:
             print(format_snapped_success(actual_column, expected_column, previous_column, next_column))
@@ -1125,13 +1208,13 @@ def mode_input_values(
             )
         elif match_result.same_line_different_column and expected_column is not None:
             print(format_same_line_column_success(actual_column, expected_column))
-        return 0
+        return validation.return_code
 
     print(
         f"Location mismatch: expected {expected_filename}:{expected_line}:{expected_column}, "
         f"got {actual_file}:{actual_line}:{actual_column}"
     )
-    return 3
+    return validation.return_code
 
 
 def mode_abacus_json(
@@ -1142,10 +1225,12 @@ def mode_abacus_json(
     output: str | None,
     library: str,
     debug: bool,
+    pin_root: str | None = None,
 ) -> int:
     from tools.shared.common import load_combined_json, save_combined_json  # type: ignore
 
-    resolved_pin_root = resolve_pin_root()
+    warn_addrinfo_unavailable()
+    resolved_pin_root = os.path.abspath(pin_root) if pin_root is not None else resolve_pin_root()
     notes = _load_json_notes(input_json)
     df = load_combined_json(input_json)
     if "counterexamples" not in df.columns:
@@ -1165,12 +1250,16 @@ def mode_abacus_json(
         df["library"] = library
     else:
         df["library"] = df["library"].apply(lambda value: value if isinstance(value, str) and value.strip() else library)
+    if "column" not in df.columns:
+        df["column"] = None
 
     df["reproduced_status"] = STATUS_NOT_REPRODUCED
     for idx, row in df.iterrows():
         counterexamples = row.get("counterexamples")
         if not isinstance(counterexamples, dict):
-            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+            if debug:
+                print(f"[validate] row={idx} skipped: counterexamples is not an object", file=sys.stderr)
+            df.at[idx, "reproduced_status"] = STATUS_NOT_REPRODUCED
             continue
 
         try:
@@ -1179,12 +1268,17 @@ def mode_abacus_json(
             print(f"Error: {err}", file=sys.stderr)
             return 2
         if specs is None:
-            df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
+            if debug:
+                print(
+                    f"[validate] row={idx} skipped: could not build replay input specs from counterexamples/notes",
+                    file=sys.stderr,
+                )
+            df.at[idx, "reproduced_status"] = STATUS_NOT_REPRODUCED
             continue
 
         filename = row.get("filename")
         line_no = coerce_int(row.get("line"))
-        column_no = coerce_int(row.get("column"))
+        source_column = coerce_int(row.get("column"))
         expected_kind = None
         raw_kind = row.get("kind")
         if raw_kind is not None:
@@ -1195,9 +1289,16 @@ def mode_abacus_json(
                 df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
                 continue
         print(f"Reproducing {filename}:{line_no} ... ", end="", flush=True)
+        if debug:
+            ignored_column = "none" if source_column is None else str(source_column)
+            print(
+                f"[validate] row={idx} expected={filename}:{line_no} "
+                f"kind={expected_kind or '<any>'} source_column={ignored_column} column_policy=ignore",
+                file=sys.stderr,
+            )
 
         secret_spec, public_spec = specs
-        rc = mode_input_values(
+        validation = validate_input_values(
             executable=executable,
             secret_spec=secret_spec,
             public_spec=public_spec,
@@ -1206,27 +1307,39 @@ def mode_abacus_json(
             debug=debug,
             expected_filename=filename if isinstance(filename, str) else None,
             expected_line=line_no,
-            expected_column=column_no,
+            expected_column=None,
             expected_kind=expected_kind,
         )
-        if rc == 0:
+        if debug:
+            print(
+                f"[validate] row={idx} replay={_format_replay_location_for_log(validation.replay)} "
+                f"status={validation.status or '<operational_error>'} rc={validation.return_code}",
+                file=sys.stderr,
+            )
+            if validation.error is not None:
+                print(f"[validate] row={idx} error={validation.error}", file=sys.stderr)
+
+        if validation.return_code == 0:
+            if validation.replay is not None and validation.replay.location is not None:
+                _, _, actual_col = validation.replay.location
+                df.at[idx, "column"] = actual_col
             print("Success")
             df.at[idx, "reproduced_status"] = STATUS_SUCCESS
-        elif rc == 124:
+        elif validation.return_code == 124:
             print("Failed (timeout)")
             df.at[idx, "reproduced_status"] = STATUS_TIMEOUT
-        elif rc == 1:
+        elif validation.return_code == 1:
             print("Failed (identical traces)")
             df.at[idx, "reproduced_status"] = STATUS_IDENTICAL_TRACE
-        elif rc == 42:
+        elif validation.return_code == 42:
             print("Failed (kind mismatch)")
             df.at[idx, "reproduced_status"] = STATUS_KIND_MISMATCH
-        elif rc == 3:
+        elif validation.return_code == 3:
             print("Failed (location mismatch)")
             df.at[idx, "reproduced_status"] = STATUS_LOCATION_MISMATCH
         else:
-            print(f"Failed (unexpected rc={rc})", file=sys.stderr)
-            return rc
+            print(f"Failed (unexpected rc={validation.return_code})", file=sys.stderr)
+            return validation.return_code
 
     for column_name in ["visit_count", "non_ct_count", "visit_time"]:
         if column_name in df.columns:
@@ -1235,6 +1348,11 @@ def mode_abacus_json(
                     df = df.drop(columns=[column_name])
             except Exception:
                 pass
+
+    try:
+        df["column"] = df["column"].astype("Int64")
+    except Exception:
+        pass
 
     save_combined_json(df, output if output else input_json)
     return 0
@@ -1291,6 +1409,7 @@ def reproduce_input_values(
     public_spec: str,
     timeout: int = 300,
     debug: bool = False,
+    pin_root: str | None = None,
     expected_filename: str | None = None,
     expected_line: int | None = None,
     expected_column: int | None = None,
@@ -1302,6 +1421,7 @@ def reproduce_input_values(
         public_spec=public_spec,
         timeout=timeout,
         debug=debug,
+        pin_root=pin_root,
         expected_filename=expected_filename,
         expected_line=expected_line,
         expected_column=expected_column,
@@ -1318,6 +1438,7 @@ def reproduce_abacus_json_positives(
     output: str | None = None,
     library: str = "unknown",
     debug: bool = False,
+    pin_root: str | None = None,
 ) -> int:
     return mode_abacus_json(
         input_json=input_json,
@@ -1327,6 +1448,7 @@ def reproduce_abacus_json_positives(
         output=output,
         library=library,
         debug=debug,
+        pin_root=pin_root,
     )
 
 
@@ -1371,6 +1493,7 @@ def build_parsers_and_dispatch(argv: list[str]) -> int:
     parser.add_argument("--timeout", type=int, default=300, help="Timeout in seconds (default: 300).")
     parser.add_argument("--output", help="Output JSON path for --json and --abacus-json modes.")
     parser.add_argument("--debug", action="store_true", help="Print the exact Pin command when a replay fails or times out.")
+    parser.add_argument("--pin-root", default=None, help="Path to external Intel Pin kit (defaults to PIN_ROOT).")
     parser.add_argument("--sym-size", type=int, default=4, help="Symbol byte size for --abacus-json mode (default: 4).")
     parser.add_argument(
         "--library",
@@ -1404,6 +1527,7 @@ def build_parsers_and_dispatch(argv: list[str]) -> int:
             output=args.output,
             library=args.library,
             debug=args.debug,
+            pin_root=args.pin_root,
         )
 
     if args.file:
@@ -1437,6 +1561,7 @@ def build_parsers_and_dispatch(argv: list[str]) -> int:
         public_spec=args.public,
         timeout=args.timeout,
         debug=args.debug,
+        pin_root=args.pin_root,
         expected_filename=args.expected_filename,
         expected_line=args.expected_line,
         expected_column=args.expected_column,

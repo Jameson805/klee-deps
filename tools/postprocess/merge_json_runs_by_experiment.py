@@ -67,9 +67,17 @@ def _geometric_mean(values: list[float]) -> float | None:
     return math.exp(sum(math.log(value) for value in cleaned) / len(cleaned))
 
 
-def _read_payload(path: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _safe_json_int(text: str) -> int | str:
+    limit_getter = getattr(sys, "get_int_max_str_digits", None)
+    max_digits = limit_getter() if callable(limit_getter) else 4300
+    if isinstance(max_digits, int) and max_digits > 0 and len(text.lstrip("-")) > max_digits:
+        return text
+    return int(text)
+
+
+def _read_payload(path: str) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     with open(path, "r", encoding="utf-8") as f:
-        payload = json.load(f)
+        payload = json.load(f, parse_int=_safe_json_int)
 
     if isinstance(payload, dict):
         data = payload.get("data")
@@ -77,13 +85,16 @@ def _read_payload(path: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             metadata = payload.get("metadata")
             if metadata is not None and not isinstance(metadata, dict):
                 raise SystemExit(f"{path}: payload metadata must be a JSON object")
-            return [row for row in data if isinstance(row, dict)], dict(metadata or {})
-        return [], {}
+            notes = payload.get("notes")
+            if notes is not None and not isinstance(notes, dict):
+                raise SystemExit(f"{path}: payload notes must be a JSON object")
+            return [row for row in data if isinstance(row, dict)], dict(metadata or {}), dict(notes or {})
+        return [], {}, {}
 
     if isinstance(payload, list):
-        return [row for row in payload if isinstance(row, dict)], {}
+        return [row for row in payload if isinstance(row, dict)], {}, {}
 
-    return [], {}
+    return [], {}, {}
 
 
 def _group_input_files(dst_dir: str) -> dict[str, list[str]]:
@@ -110,16 +121,21 @@ def _remove_previous_merged_outputs(dst_dir: str) -> None:
 
 def _merge_single_experiment(
     paths: Sequence[str],
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     by_location: dict[tuple[str, int, int | None, str, str | None], dict[str, Any]] = {}
     merged_metadata: dict[str, Any] | None = None
+    merged_notes: dict[str, Any] | None = None
 
     for path in paths:
-        rows, metadata = _read_payload(path)
+        rows, metadata, notes = _read_payload(path)
         if merged_metadata is None:
             merged_metadata = metadata
         elif metadata != merged_metadata:
             raise SystemExit(f"{path}: metadata does not match other repetitions for this experiment")
+        if merged_notes is None:
+            merged_notes = notes
+        elif notes != merged_notes:
+            raise SystemExit(f"{path}: notes do not match other repetitions for this experiment")
         library = metadata.get("library") or "unknown"
         for row in rows:
             filename = row.get("filename")
@@ -212,7 +228,7 @@ def _merge_single_experiment(
             row["visit_time"] = visit_time
         merged_rows.append(row)
 
-    return merged_rows, dict(merged_metadata or {})
+    return merged_rows, dict(merged_metadata or {}), dict(merged_notes or {})
 
 
 def merge_all(dst_dir: str) -> int:
@@ -222,7 +238,7 @@ def merge_all(dst_dir: str) -> int:
     _remove_previous_merged_outputs(dst_dir)
 
     for base, paths in sorted(grouped.items(), key=lambda kv: _natural_key(kv[0])):
-        merged_rows, metadata = _merge_single_experiment(paths)
+        merged_rows, metadata, notes = _merge_single_experiment(paths)
         out_path = os.path.join(dst_dir, base)
 
         if merged_rows:
@@ -239,6 +255,8 @@ def merge_all(dst_dir: str) -> int:
         }
         if metadata:
             payload["metadata"] = metadata
+        if notes:
+            payload["notes"] = notes
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
             f.write("\n")

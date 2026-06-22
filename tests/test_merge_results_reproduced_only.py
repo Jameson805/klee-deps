@@ -42,11 +42,14 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
         rows: list[dict[str, object]],
         *,
         metadata: dict[str, object] | None = None,
+        notes: dict[str, object] | None = None,
     ) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         payload: dict[str, object] = {"data": rows}
         if metadata is not None:
             payload["metadata"] = metadata
+        if notes is not None:
+            payload["notes"] = notes
         path.write_text(json.dumps(payload), encoding="utf-8")
 
     def _read_json_rows(self, path: Path) -> list[dict[str, object]]:
@@ -140,6 +143,32 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                     },
                 ],
             )
+
+    def test_merge_json_runs_preserves_notes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            notes = {
+                "secret_layout": [{"name": "skey", "size": 4}],
+                "public_layout": [],
+            }
+            self._write_json(
+                root / "0" / "toy_fix_pub.json",
+                [
+                    {
+                        "library": "toy",
+                        "filename": "toy.c",
+                        "line": 10,
+                        "non_ct_time": 4.0,
+                        "reproduced_status": "not_reproduced",
+                    }
+                ],
+                notes=notes,
+            )
+
+            merge_json_runs_by_experiment.main([str(root)])
+            merged = json.loads((root / "toy_fix_pub.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(merged.get("notes"), notes)
 
     def test_merge_results_requires_reproduced_success_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

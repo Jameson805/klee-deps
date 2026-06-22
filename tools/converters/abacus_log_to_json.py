@@ -34,6 +34,10 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 _INSTRUCTION_KIND_CACHE: dict[tuple[str, int], str] = {}
 
 
+def _empty_divergent_assignment() -> dict[str, Any]:
+    return {"values": [], "offset_values": []}
+
+
 def _classify_instruction_text(text: str) -> str | None:
     # ABACUS logs report only the divergent instruction address, not whether the
     # underlying side channel was control-flow- or memory-driven. We therefore
@@ -220,7 +224,7 @@ def _load_abacus_secret_layout(runner_config_path: str, preset_name: str) -> lis
     return layout
 
 
-def _build_counterexamples(secret_layout: list[dict[str, Any]], divergent_bytes: list[int]) -> dict[str, int]:
+def _counterexamples_from_bytes(secret_layout: list[dict[str, Any]], divergent_bytes: list[int]) -> dict[str, int]:
     total_size = sum(int(entry["size"]) for entry in secret_layout)
     if len(divergent_bytes) != total_size:
         raise ValueError(
@@ -237,6 +241,64 @@ def _build_counterexamples(secret_layout: list[dict[str, Any]], divergent_bytes:
         offset += size
 
     return counterexamples
+
+
+def _counterexamples_from_offsets(
+    secret_layout: list[dict[str, Any]],
+    offset_values: list[tuple[int, int]],
+) -> dict[str, int]:
+    total_size = sum(int(entry["size"]) for entry in secret_layout)
+    if not offset_values:
+        raise ValueError("offset-aware divergent input is empty")
+
+    prime_bytes_by_name: dict[str, list[int]] = {
+        str(entry["name"]): list(entry["seed_bytes"])
+        for entry in secret_layout
+    }
+    counterexamples: dict[str, int] = {
+        str(entry["name"]): int(entry["seed_value"])
+        for entry in secret_layout
+    }
+
+    for absolute_offset, value in offset_values:
+        if absolute_offset < 0 or absolute_offset >= total_size:
+            raise ValueError(
+                f"divergent input offset {absolute_offset} is outside configured secret length {total_size}"
+            )
+        if value < 0 or value > 0xFF:
+            raise ValueError(f"divergent byte value {value} is outside [0, 255]")
+
+        local_base = 0
+        for entry in secret_layout:
+            size = int(entry["size"])
+            if absolute_offset < local_base + size:
+                name = str(entry["name"])
+                prime_bytes_by_name[name][absolute_offset - local_base] = value
+                break
+            local_base += size
+
+    for entry in secret_layout:
+        name = str(entry["name"])
+        counterexamples[f"{name}__prime"] = _bytes_to_int(prime_bytes_by_name[name])
+
+    return counterexamples
+
+
+def _build_counterexamples(secret_layout: list[dict[str, Any]], divergent_assignment: dict[str, Any]) -> dict[str, int]:
+    offset_values = divergent_assignment.get("offset_values")
+    if isinstance(offset_values, list) and offset_values:
+        values = divergent_assignment.get("values")
+        if isinstance(values, list) and len(offset_values) != len(values):
+            raise ValueError(
+                f"only {len(offset_values)} of {len(values)} divergent values carry original input offsets"
+            )
+        return _counterexamples_from_offsets(secret_layout, offset_values)
+
+    values = divergent_assignment.get("values")
+    if isinstance(values, list):
+        return _counterexamples_from_bytes(secret_layout, values)
+
+    raise ValueError("unsupported ABACUS divergent input assignment")
 
 
 def convert_abacus_log(
@@ -265,7 +327,7 @@ def convert_abacus_log(
     with open(log_path, "r", encoding="utf-8", errors="replace") as handle:
         lines = handle.readlines()
 
-    divergent: dict[int, list[int]] = {}
+    divergent: dict[int, dict[str, Any]] = {}
     locations: dict[int, dict[str, Any]] = {}
     se_time: float | None = None
     qif_time: float | None = None
@@ -290,17 +352,31 @@ def convert_abacus_log(
         m_div = re.match(r"^\[Divergent Input\]\s+0x([0-9a-fA-F]+):\s*$", s)
         if m_div:
             addr = int(m_div.group(1), 16)
-            bvals: list[int] = []
+            assignment = _empty_divergent_assignment()
             i += 1
             while i < len(lines):
                 t = lines[i].rstrip("\n")
-                km = re.match(r"^\s*Key(\d+)\s*=\s*([0-9]+)\s*$", t)
+                if not t.strip():
+                    break
+                km = re.match(
+                    r"^\s*(?:Key(?P<key_index>[0-9]+)|InternalID\s+(?P<internal_id>[0-9]+))"
+                    r"(?:\s+offset=(?P<offset>[0-9]+))?"
+                    r"(?:\s+byte_offset=(?P<byte_offset>[0-9]+))?"
+                    r"(?:\s+addr=0x[0-9a-fA-F]+)?"
+                    r"\s*=\s*(?P<value>[0-9]+)\s*$",
+                    t,
+                )
                 if not km:
                     break
-                bvals.append(int(km.group(2)))
+                value = int(km.group("value"))
+                assignment["values"].append(value)
+                offset_text = km.group("offset") or km.group("key_index")
+                if offset_text is not None:
+                    assignment["offset_values"].append((int(offset_text), value))
                 i += 1
-            if bvals and all(0 <= value <= 255 for value in bvals):
-                divergent[addr] = bvals
+            values = assignment["values"]
+            if values and all(0 <= value <= 255 for value in values):
+                divergent[addr] = assignment
             continue
 
         m_addr = re.match(r"^Address:\s*([0-9a-fA-F]+)\b", s)

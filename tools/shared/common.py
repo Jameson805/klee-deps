@@ -69,6 +69,9 @@ def load_combined_json(input_json: str) -> pd.DataFrame:
         metadata = obj.get("metadata")
         if isinstance(metadata, dict):
             df.attrs["metadata"] = metadata
+        notes = obj.get("notes")
+        if isinstance(notes, dict):
+            df.attrs["notes"] = notes
         dtypes = obj.get("dtypes", {})
         for col, dtype in dtypes.items():
             if col in df.columns:
@@ -93,6 +96,9 @@ def save_combined_json(df: pd.DataFrame, output_json: str) -> None:
     metadata = df.attrs.get("metadata")
     if isinstance(metadata, dict):
         out_obj["metadata"] = _encode_json_value(metadata)
+    notes = df.attrs.get("notes")
+    if isinstance(notes, dict):
+        out_obj["notes"] = _encode_json_value(notes)
 
     with open(output_json, "w") as f:
         json.dump(out_obj, f, indent=2)
