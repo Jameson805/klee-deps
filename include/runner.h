@@ -47,7 +47,8 @@ int load_bytes(const char *filename, void *buf, size_t size) {
 void runner_copy_bytes(void *dst_void, const void *src_void, size_t size) {
     unsigned char *dst = (unsigned char *)dst_void;
     const unsigned char *src = (const unsigned char *)src_void;
-    for (size_t i = 0; i < size; ++i) {
+    size_t i;
+    for (i = 0; i < size; ++i) {
         dst[i] = src[i];
     }
 }

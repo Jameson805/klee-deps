@@ -25,6 +25,7 @@ include_dirs = ["{repo_root}/include"]
 [benchmarks.build.tools]
 
 [benchmarks.build.tools.abacus]
+common_flags = ["-std=gnu99", "-fgnu89-inline", "-D__attribute__(x)="]
 concrete_pubs = true
 
 [[benchmarks.configs]]

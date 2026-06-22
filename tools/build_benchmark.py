@@ -9,12 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-
-from capstone import CS_ARCH_X86, CS_MODE_32, CS_MODE_64, Cs
-from capstone.x86 import X86_OP_MEM, X86_REG_RIP
-from elftools.elf.elffile import ELFFile
-from elftools.elf.relocation import RelocationSection
-from elftools.elf.sections import SymbolTableSection
+import sys
 
 from scripts.experiments.common import (
     REPO_ROOT,
@@ -47,6 +42,9 @@ def _normalize_elf_symbol(name: str) -> str:
 
 def _elf_disassembler(binary_path: Path) -> tuple[ELFFile, Cs, object]:
     """Open one ELF and return the file handle alongside a matching x86 disassembler."""
+    from capstone import CS_ARCH_X86, CS_MODE_32, CS_MODE_64, Cs
+    from elftools.elf.elffile import ELFFile
+
     binary_file = binary_path.open("rb")
     elf = ELFFile(binary_file)
     if elf.get_machine_arch() != "x64" and elf.get_machine_arch() != "x86":
@@ -58,11 +56,16 @@ def _elf_disassembler(binary_path: Path) -> tuple[ELFFile, Cs, object]:
 
 
 def _iter_symbol_tables(elf: ELFFile) -> list[SymbolTableSection]:
+    from elftools.elf.sections import SymbolTableSection
+
     return [section for section in elf.iter_sections() if isinstance(section, SymbolTableSection)]
 
 
 def _relocation_symbol_map(elf: ELFFile) -> dict[int, str]:
     """Map relocation target addresses to their referenced symbol names."""
+    from elftools.elf.relocation import RelocationSection
+    from elftools.elf.sections import SymbolTableSection
+
     mapping: dict[int, str] = {}
     for section in elf.iter_sections():
         if not isinstance(section, RelocationSection):
@@ -109,6 +112,8 @@ def _relocated_elf_symbols(binary_path: Path) -> set[str]:
 
 def _plt_elf_symbol_sections(binary_path: Path) -> dict[str, str]:
     """Return PLT symbol names mapped to the section that contains their stub."""
+    from capstone.x86 import X86_OP_MEM, X86_REG_RIP
+
     symbols: dict[str, str] = {}
     elf, disassembler, binary_file = _elf_disassembler(binary_path)
     try:
@@ -475,7 +480,7 @@ def _generate_runner_artifacts(
     mode: str,
 ) -> None:
     command = [
-        "python",
+        sys.executable,
         "-m",
         "tools.generate_runner_artifacts",
         "--config",
@@ -527,6 +532,7 @@ def main(argv: list[str] | None = None) -> int:
     mode_build_table = _tool_build_config(build_table, mode, build_location)
     mode_location = f"{build_location}.tools.{mode}"
     common_flags = list(_string_list(build_table, "common_flags", build_location))
+    common_flags.extend(_string_list(mode_build_table, "common_flags", mode_location))
     include_dirs = _string_list(build_table, "include_dirs", build_location)
     link_libraries = _string_list(build_table, "link_libraries", build_location)
     prepare_commands = _string_list(build_table, "prepare_commands", build_location)
@@ -688,7 +694,7 @@ def main(argv: list[str] | None = None) -> int:
             abacus_defs = ["-DABACUS"]
             if abacus_concrete_pubs:
                 abacus_defs.append("-DCONCRETE_PUBS")
-            _run(["gcc", *final_flags, "-m32", *abacus_link_flags, *define_flags, *abacus_defs, *sources, *rendered_link_libraries, "-o", artifact_dir / "fix_pub"], cwd=code_path)
+            _run(["gcc", *final_flags, "-m32", *define_flags, *abacus_defs, *sources, *rendered_link_libraries, *abacus_link_flags, "-o", artifact_dir / "fix_pub"], cwd=code_path)
 
         built_targets += 1
 

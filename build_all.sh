@@ -100,7 +100,12 @@ require_command() {
 resolve_tool() {
     local candidate
     for candidate in "$@"; do
-        if command -v "$candidate" >/dev/null 2>&1; then
+        if [[ "$candidate" == */* && -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+
+        if [[ "$candidate" != */* ]] && command -v "$candidate" >/dev/null 2>&1; then
             command -v "$candidate"
             return 0
         fi
@@ -323,11 +328,14 @@ configure_toolchain() {
 
     local conda_include_dir="${CONDA_PREFIX:-}/include"
     local conda_lib_dir="${CONDA_PREFIX:-}/lib"
+    local conda_gcc_root="${CONDA_PREFIX:-}/lib/gcc/x86_64-conda-linux-gnu"
+    local conda_gcc_version_dir=""
+    local conda_cxx_include_dir=""
     local pkg_config_entries=()
 
-    LLVM_CONFIG_BIN="${LLVM_CONFIG_BIN:-$(resolve_tool llvm-config-16 llvm-config || true)}"
-    CLANG_BIN="${LLVMCC:-$(resolve_tool clang-16 clang || true)}"
-    CLANGXX_BIN="${LLVMCXX:-$(resolve_tool clang++-16 clang++ || true)}"
+    LLVM_CONFIG_BIN="${LLVM_CONFIG_BIN:-$(resolve_tool "${CONDA_PREFIX:-}/bin/llvm-config" llvm-config-16 llvm-config || true)}"
+    CLANG_BIN="${LLVMCC:-$(resolve_tool "${CONDA_PREFIX:-}/bin/clang-16" "${CONDA_PREFIX:-}/bin/clang" clang-16 clang || true)}"
+    CLANGXX_BIN="${LLVMCXX:-$(resolve_tool "${CONDA_PREFIX:-}/bin/clang++-16" "${CONDA_PREFIX:-}/bin/clang++" clang++-16 clang++ || true)}"
 
     [[ -n "$LLVM_CONFIG_BIN" ]] || die "Could not find llvm-config inside the active conda environment"
     [[ -n "$CLANG_BIN" ]] || die "Could not find clang inside the active conda environment"
@@ -346,6 +354,20 @@ configure_toolchain() {
         export CPPFLAGS="-I$conda_include_dir ${CPPFLAGS:-}"
         export CFLAGS="-I$conda_include_dir ${CFLAGS:-}"
         export CXXFLAGS="-I$conda_include_dir ${CXXFLAGS:-}"
+    fi
+
+    if [[ -n "${CONDA_PREFIX:-}" && -d "$conda_gcc_root" ]]; then
+        conda_gcc_version_dir="$(find "$conda_gcc_root" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+        conda_cxx_include_dir="$conda_gcc_version_dir/include/c++"
+
+        if [[ -d "$conda_cxx_include_dir" ]]; then
+            export CXXFLAGS="-Wno-invalid-constexpr -I$conda_cxx_include_dir -I$conda_cxx_include_dir/x86_64-conda-linux-gnu ${CXXFLAGS:-}"
+        fi
+
+        if [[ -d "$conda_gcc_version_dir" ]]; then
+            export LDFLAGS="-L$conda_gcc_version_dir ${LDFLAGS:-}"
+            export LIBRARY_PATH="$conda_gcc_version_dir${LIBRARY_PATH:+:$LIBRARY_PATH}"
+        fi
     fi
 
     if [[ -n "${CONDA_PREFIX:-}" && -d "$conda_lib_dir" ]]; then
@@ -370,6 +392,69 @@ configure_toolchain() {
     log "Using clang++=$CLANGXX_BIN"
 }
 
+ensure_klee_host_cxx_wrapper() {
+    local wrapper_dir="$BUILD_ROOT/tool-wrappers"
+    local wrapper_path="$wrapper_dir/klee-clangxx"
+
+    mkdir -p "$wrapper_dir"
+
+    # KLEE's host-side C++ build still appends -fno-exceptions, but newer
+    # conda-provided libstdc++ headers used by LLVM 16 instantiate throw-based
+    # helpers during ordinary host compilation. That breaks on some machines
+    # with errors like bits/nested_exception.h: cannot use 'throw' with
+    # exceptions disabled. Keep the workaround here in the integration layer so
+    # we can adapt to the active toolchain without patching the KLEE trees.
+    cat > "$wrapper_path" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+real_cxx=$(printf '%q' "$CLANGXX_BIN")
+args=()
+
+for arg in "\$@"; do
+    if [[ "\$arg" == "-fno-exceptions" ]]; then
+        continue
+    fi
+    args+=("\$arg")
+done
+
+# Re-enable exceptions for KLEE's host compilation only. LLVMCXX still points
+# at the real clang++ binary, so this wrapper does not change bitcode runtime
+# builds that intentionally rely on KLEE's upstream flags.
+for arg in "\$@"; do
+    :
+done
+
+args+=("-fexceptions")
+
+exec "\$real_cxx" "\${args[@]}"
+EOF
+
+    chmod +x "$wrapper_path"
+    KLEE_HOST_CXX_WRAPPER="$wrapper_path"
+    export KLEE_HOST_CXX_WRAPPER
+}
+
+reset_cmake_build_if_toolchain_changed() {
+    local build_dir="$1"
+    local cache_file="$build_dir/CMakeCache.txt"
+
+    [[ -f "$cache_file" ]] || return 0
+
+    if ! grep -qxF "CMAKE_C_COMPILER:FILEPATH=$CLANG_BIN" "$cache_file" || \
+       ! grep -qxF "CMAKE_CXX_COMPILER:FILEPATH=$CLANGXX_BIN" "$cache_file"; then
+        log "Removing stale CMake build directory $build_dir because the compiler changed"
+        rm -rf "$build_dir"
+        return 0
+    fi
+
+    if [[ " ${CXXFLAGS:-} " == *" -Wno-invalid-constexpr "* ]] && \
+       ! grep -q -- "-Wno-invalid-constexpr" "$cache_file"; then
+        log "Removing stale CMake build directory $build_dir because the C++ flags changed"
+        rm -rf "$build_dir"
+    fi
+}
+
 clone_or_update_repo() {
     local repo_url="$1"
     local target_dir="$2"
@@ -392,15 +477,18 @@ clone_or_update_repo() {
 
 build_binsec() {
     local switch_bin_dir
+    local binsec_cc="$CLANG_BIN ${CXXFLAGS:-}"
     local binsec_compiler_env=(
-        "CC=$CLANG_BIN"
+        "CC=$binsec_cc"
         "CXX=$CLANGXX_BIN"
     )
     local binsec_native_link_env=(
         "OCAMLPARAM=_,cclib=-lstdc++"
     )
+    local binsec_unisim_env=(
+        "CFLAGS=${CXXFLAGS:-} ${CFLAGS:-}"
+    )
     local current_switch_cc=""
-    local resolved_switch_cc=""
 
     ensure_opam_root
     clone_or_update_repo "$BINSEC_REPO_URL" "$BINSEC_ROOT"
@@ -410,17 +498,9 @@ build_binsec() {
             opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- \
             ocamlc -config | awk -F': ' '/^c_compiler:/ {print $2; exit}')"
 
-        if [[ -n "$current_switch_cc" ]]; then
-            if [[ "$current_switch_cc" == /* ]]; then
-                resolved_switch_cc="$current_switch_cc"
-            else
-                resolved_switch_cc="$(command -v "$current_switch_cc" 2>/dev/null || true)"
-            fi
-        fi
-
-        # The local switch bakes its C toolchain into ocamlc -config, so later
-        # CC/CXX overrides do not fix a switch that was created with conda's CC.
-        if [[ -n "$resolved_switch_cc" && "$resolved_switch_cc" != "$CLANG_BIN" ]]; then
+        # The local switch bakes its C toolchain into ocamlc -config, and dune
+        # uses that command for C++ foreign stubs in unisim_archisec.
+        if [[ -n "$current_switch_cc" && "$current_switch_cc" != "$binsec_cc" ]]; then
             log "Recreating BINSEC local opam switch because ocamlc uses $current_switch_cc"
             rm -rf "$BINSEC_ROOT/_opam"
         fi
@@ -440,17 +520,27 @@ build_binsec() {
     env -u OPAMSWITCH -u OPAMROOT -u OPAMNOENVNOTICE \
         "${binsec_compiler_env[@]}" \
         opam install --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" \
-        --yes dune dune-site menhir grain_dypgen ocamlgraph zarith toml z3 unisim_archisec
+        --yes dune dune-site menhir grain_dypgen ocamlgraph zarith toml z3
+
+    log "Installing unisim_archisec with conda C++ headers available to CC"
+    env -u OPAMSWITCH -u OPAMROOT -u OPAMNOENVNOTICE \
+        "${binsec_compiler_env[@]}" \
+        "${binsec_unisim_env[@]}" \
+        opam install --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" \
+        --yes unisim_archisec
 
     log "Building BINSEC"
     (
         cd "$BINSEC_ROOT"
+        # Build BINSEC directly with dune instead of the repo Makefile. The
+        # Makefile runs the @fmt alias before @install, which turns formatter
+        # version skew inside BINSEC's docs tree into a spurious build failure.
         # unisim_archisec installs C++ stubs but does not export the native
         # C++ runtime link flag, so keep BINSEC's final OCaml native link explicit.
         env -u OPAMSWITCH -u OPAMROOT -u OPAMNOENVNOTICE \
             "${binsec_compiler_env[@]}" \
             "${binsec_native_link_env[@]}" \
-            opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- make
+            opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- dune build @install
     )
     log "Installing BINSEC into the local opam switch"
     (
@@ -458,7 +548,7 @@ build_binsec() {
         env -u OPAMSWITCH -u OPAMROOT -u OPAMNOENVNOTICE \
             "${binsec_compiler_env[@]}" \
             "${binsec_native_link_env[@]}" \
-            opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- make install
+            opam exec --root "$OPAM_ROOT" --switch "$BINSEC_ROOT" -- dune install
     )
 
     switch_bin_dir="$BINSEC_ROOT/_opam/bin"
@@ -480,6 +570,8 @@ build_stp() {
 
     clone_or_update_repo "$STP_REPO_URL" "$stp_src" "tags/$STP_VERSION"
 
+    reset_cmake_build_if_toolchain_changed "$stp_build"
+
     log "Configuring STP"
     cmake -S "$stp_src" -B "$stp_build" \
         -G "$CMAKE_GENERATOR" \
@@ -490,6 +582,7 @@ build_stp() {
         -DCMAKE_CXX_COMPILER="$CLANGXX_BIN" \
         -DCMAKE_CXX_FLAGS="$stp_cxx_flags" \
         -DENABLE_PYTHON_INTERFACE=OFF \
+        -DNOCRYPTOMINISAT=ON \
         -DMINISAT_INCLUDE_DIRS="$MINISAT_INSTALL_DIR/include" \
         -DMINISAT_LIBDIR="$MINISAT_INSTALL_DIR/lib" \
         -DCMAKE_PREFIX_PATH="$MINISAT_INSTALL_DIR;$CMAKE_PREFIX_PATH_VALUE"
@@ -564,6 +657,8 @@ build_minisat() {
 
     clone_or_update_repo https://github.com/stp/minisat.git "$minisat_src"
 
+    reset_cmake_build_if_toolchain_changed "$minisat_build"
+
     log "Configuring Minisat"
     cmake -S "$minisat_src" -B "$minisat_build" \
         -G "$CMAKE_GENERATOR" \
@@ -572,6 +667,8 @@ build_minisat() {
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_C_COMPILER="$CLANG_BIN" \
         -DCMAKE_CXX_COMPILER="$CLANGXX_BIN" \
+        -DCMAKE_C_FLAGS="${CFLAGS:-}" \
+        -DCMAKE_CXX_FLAGS="${CXXFLAGS:-}" \
         -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH_VALUE" \
         -DZLIB_ROOT="$CONDA_PREFIX" \
         -DZLIB_INCLUDE_DIR="$zlib_include" \
@@ -681,10 +778,14 @@ configure_klee_project() {
 
     [[ -f "$project_src/CMakeLists.txt" ]] || die "Missing CMakeLists.txt in $project_src. Did submodule initialization fail?"
 
+    ensure_klee_host_cxx_wrapper
+
     if [[ -n "${KLEE_CMAKE_EXTRA_ARGS:-}" ]]; then
         # shellcheck disable=SC2206
         extra_args=( ${KLEE_CMAKE_EXTRA_ARGS} )
     fi
+
+    reset_cmake_build_if_toolchain_changed "$project_build"
 
     klee_cxx_flags="${CXXFLAGS:-} ${KLEE_CXX_FLAGS:--include stdint.h}"
 
@@ -693,7 +794,7 @@ configure_klee_project() {
         -G "$CMAKE_GENERATOR" \
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DCMAKE_C_COMPILER="$CLANG_BIN" \
-        -DCMAKE_CXX_COMPILER="$CLANGXX_BIN" \
+        -DCMAKE_CXX_COMPILER="$KLEE_HOST_CXX_WRAPPER" \
         -DCMAKE_CXX_FLAGS="$klee_cxx_flags" \
         -DLLVM_DIR="$LLVM_DIR" \
         -DLLVMCC="$CLANG_BIN" \
@@ -785,6 +886,8 @@ build_llvm_plugin_project() {
     local project_build="$BUILD_ROOT/$project_name"
 
     [[ -f "$project_src/CMakeLists.txt" ]] || die "Missing CMakeLists.txt in $project_src"
+
+    reset_cmake_build_if_toolchain_changed "$project_build"
 
     log "Configuring $project_name"
     cmake -S "$project_src" -B "$project_build" \
