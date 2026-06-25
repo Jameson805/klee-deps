@@ -68,6 +68,51 @@ class MergeCsvByLocationTest(unittest.TestCase):
             self.assertEqual(len(merged), 1)
             self.assertTrue(pd.isna(merged.loc[0, "kind"]) or merged.loc[0, "kind"] == "")
 
+    def test_merge_distinguishes_target_for_same_source_location(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            left = root / "left.csv"
+            right = root / "right.csv"
+            output = root / "merged.csv"
+
+            self._write_csv(
+                left,
+                "library,target,file,line,column,kind,left_metric\n"
+                "toy,aes,toy.c,10,2,branch,1.0\n"
+                "toy,des,toy.c,10,2,branch,2.0\n",
+            )
+            self._write_csv(
+                right,
+                "library,target,file,line,column,kind,right_metric\n"
+                "toy,aes,toy.c,10,2,branch,3.0\n"
+                "toy,des,toy.c,10,2,branch,4.0\n",
+            )
+
+            merge_on_location(str(left), str(right), str(output))
+            merged = pd.read_csv(output)
+
+            self.assertEqual(
+                merged[["library", "target", "file", "line", "column", "kind"]].to_dict("records"),
+                [
+                    {
+                        "library": "toy",
+                        "target": "aes",
+                        "file": "toy.c",
+                        "line": 10,
+                        "column": 2,
+                        "kind": "branch",
+                    },
+                    {
+                        "library": "toy",
+                        "target": "des",
+                        "file": "toy.c",
+                        "line": 10,
+                        "column": 2,
+                        "kind": "branch",
+                    },
+                ],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

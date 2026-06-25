@@ -13,7 +13,7 @@ except Exception as e:
 
 
 REQUIRED_KEYS = ["library", "file", "line", "column"]
-KEYS = [*REQUIRED_KEYS, "kind"]
+OPTIONAL_KEYS = ["target", "kind"]
 
 
 def merge_on_location(left_path: str, right_path: str, output_path: str) -> int:
@@ -31,18 +31,24 @@ def merge_on_location(left_path: str, right_path: str, output_path: str) -> int:
         if k not in left.columns or k not in right.columns:
             raise SystemExit(f"Missing required key column '{k}' in one or both CSVs")
 
-    if "kind" not in left.columns:
-        left["kind"] = ""
-    if "kind" not in right.columns:
-        right["kind"] = ""
+    keys = [*REQUIRED_KEYS]
+    for optional_key in OPTIONAL_KEYS:
+        if optional_key == "kind" or optional_key in left.columns or optional_key in right.columns:
+            if optional_key not in left.columns:
+                left[optional_key] = ""
+            if optional_key not in right.columns:
+                right[optional_key] = ""
+            keys.append(optional_key)
 
     # Normalize key types so merges behave as expected.
     left["library"] = left["library"].astype(str).str.strip()
     left["file"] = left["file"].astype(str).str.strip()
-    left["kind"] = left["kind"].fillna("").astype(str).str.strip()
     right["library"] = right["library"].astype(str).str.strip()
     right["file"] = right["file"].astype(str).str.strip()
-    right["kind"] = right["kind"].fillna("").astype(str).str.strip()
+    for optional_key in OPTIONAL_KEYS:
+        if optional_key in keys:
+            left[optional_key] = left[optional_key].fillna("").astype(str).str.strip()
+            right[optional_key] = right[optional_key].fillna("").astype(str).str.strip()
 
     left["line"] = pd.to_numeric(left["line"], errors="coerce").astype("Int64")
     left["column"] = pd.to_numeric(left["column"], errors="coerce").astype("Int64")
@@ -53,10 +59,10 @@ def merge_on_location(left_path: str, right_path: str, output_path: str) -> int:
     left = left.dropna(subset=REQUIRED_KEYS)
     right = right.dropna(subset=REQUIRED_KEYS)
 
-    merged = left.merge(right, on=KEYS, how="outer", suffixes=("", "_right"))
+    merged = left.merge(right, on=keys, how="outer", suffixes=("", "_right"))
 
     # Make the output stable/readable.
-    merged = merged.sort_values(KEYS, kind="stable")
+    merged = merged.sort_values(keys, kind="stable")
     merged.to_csv(output_path, index=False)
     merge_column_metadata(output_path, [left_path, right_path])
     return int(len(merged))
@@ -65,7 +71,7 @@ def merge_on_location(left_path: str, right_path: str, output_path: str) -> int:
 def main(argv: list[str] | None = None) -> int:
 
     p = argparse.ArgumentParser(
-        description="Merge two KLEE CSV files on (library,file,line,column,kind) into one CSV (outer merge)."
+        description="Merge two KLEE CSV files on location metadata into one CSV (outer merge)."
     )
     p.add_argument("left", help="Left CSV path (e.g., utils/klee.csv)")
     p.add_argument("right", help="Right CSV path (e.g., utils/klee_sliced_line_column_aligned.csv)")

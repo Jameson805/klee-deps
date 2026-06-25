@@ -10,6 +10,7 @@ from tools.postprocess.aggregate_experiment_groups import (
     automatic_selection_summary,
     best_selection_table,
     filter_tool_summary_for_plot,
+    metric_columns,
     select_best_configurations,
     summarize_configurations,
 )
@@ -154,6 +155,21 @@ class AggregateExperimentGroupsSelectionTest(unittest.TestCase):
                 },
             ],
         )
+
+    def test_target_column_is_metadata_not_metric(self) -> None:
+        df = pd.DataFrame(
+            {
+                "library": ["lib", "lib"],
+                "target": ["aes", "des"],
+                "file": ["f.c", "f.c"],
+                "line": [10, 10],
+                "column": [1, 1],
+                "kind": ["branch", "branch"],
+                "klee_cf_default_4_fix_pub": [1.0, 2.0],
+            }
+        )
+
+        self.assertEqual(metric_columns(df), ["klee_cf_default_4_fix_pub"])
 
     def test_automatic_selection_marks_grouped_comparison_plots(self) -> None:
         best_summary = pd.DataFrame(

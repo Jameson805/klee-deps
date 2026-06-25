@@ -37,7 +37,9 @@ from tools.postprocess.selection_helpers import (
 from tools.shared.configuration_metadata import load_column_metadata_bundle
 
 
-METADATA_COLS = ["library", "file", "line", "column", "kind"]
+REQUIRED_METADATA_COLS = ["library", "file", "line", "column"]
+OPTIONAL_METADATA_COLS = ["target", "kind"]
+METADATA_COLS = [*REQUIRED_METADATA_COLS, *OPTIONAL_METADATA_COLS]
 MULTI_TOKEN_TOOL_PREFIXES = ["klee_cf", "klee_eager", "klee_self_comp"]
 LINESTYLES = ("-", ":", "--")
 CURVE_ID_LABEL_PLOT_EXTENSION = 1.14
@@ -100,18 +102,21 @@ class ColumnConfiguration:
 
 
 def metric_columns(df: pd.DataFrame) -> list[str]:
-    return [column for column in df.columns if column not in METADATA_COLS]
+    metadata_columns = set(METADATA_COLS)
+    return [column for column in df.columns if column not in metadata_columns]
 
 
 def normalize_location_keys(df: pd.DataFrame) -> pd.DataFrame:
-    for key in METADATA_COLS[:4]:
+    for key in REQUIRED_METADATA_COLS:
         if key not in df.columns:
             raise ValueError(f"Missing required key column {key!r}")
 
     normalized = df.copy()
-    if "kind" not in normalized.columns:
-        normalized["kind"] = ""
+    for optional_key in OPTIONAL_METADATA_COLS:
+        if optional_key not in normalized.columns:
+            normalized[optional_key] = ""
     normalized["library"] = normalized["library"].astype(str).str.strip()
+    normalized["target"] = normalized["target"].fillna("").astype(str).str.strip()
     normalized["file"] = normalized["file"].astype(str).str.strip()
     normalized["line"] = pd.to_numeric(normalized["line"], errors="coerce").astype(
         "Int64"
@@ -120,7 +125,7 @@ def normalize_location_keys(df: pd.DataFrame) -> pd.DataFrame:
         normalized["column"], errors="coerce"
     ).astype("Int64")
     normalized["kind"] = normalized["kind"].fillna("").astype(str).str.strip()
-    normalized = normalized.dropna(subset=METADATA_COLS[:4])
+    normalized = normalized.dropna(subset=REQUIRED_METADATA_COLS)
     return normalized.sort_values(METADATA_COLS, kind="stable").reset_index(
         drop=True
     )

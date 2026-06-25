@@ -23,7 +23,7 @@ from tools.shared.configuration_metadata import (
 )
 
 
-Location = tuple[str, str, int, int | None, str | None]
+Location = tuple[str, str, str, int, int | None, str | None]
 
 
 def _to_float(value: Any) -> float | None:
@@ -92,6 +92,10 @@ def _load_violations_from_json(
             f"{path}: payload metadata is missing non-empty library; this output tree is stale or incomplete. "
             "Regenerate the run outputs with the current campaign runners before running postprocess."
         )
+    target_key = metadata.get("target")
+    if not isinstance(target_key, str):
+        target_key = ""
+    target_key = target_key.strip()
 
     out: dict[Location, float] = {}
     for row in rows:
@@ -118,7 +122,14 @@ def _load_violations_from_json(
             col_i = int(column)
         except (TypeError, ValueError):
             col_i = None
-        key: Location = (library_key, filename, line_i, col_i, _normalize_kind(row.get("kind")))
+        key: Location = (
+            library_key,
+            target_key,
+            filename,
+            line_i,
+            col_i,
+            _normalize_kind(row.get("kind")),
+        )
         previous = out.get(key)
         out[key] = non_ct_time if previous is None else max(previous, non_ct_time)
 
@@ -186,19 +197,22 @@ def write_csv(
 ) -> int:
     """Write the merged CSV and its metadata sidecar."""
     all_locations: set[Location] = set()
-    wildcard_locations: set[tuple[str, str, int, str | None]] = set()
+    wildcard_locations: set[tuple[str, str, str, int, str | None]] = set()
 
     for column in ordered_columns:
-        for library, filename, line, column_value, kind in by_col.get(column, {}).keys():
+        for library, target, filename, line, column_value, kind in by_col.get(column, {}).keys():
             if column_value is None:
-                wildcard_locations.add((library, filename, line, kind))
+                wildcard_locations.add((library, target, filename, line, kind))
             else:
-                all_locations.add((library, filename, line, column_value, kind))
+                all_locations.add((library, target, filename, line, column_value, kind))
 
-    concrete_lines = {(library, filename, line, kind) for library, filename, line, _, kind in all_locations}
-    for library, filename, line, kind in wildcard_locations:
-        if (library, filename, line, kind) not in concrete_lines:
-            all_locations.add((library, filename, line, 0, kind))
+    concrete_lines = {
+        (library, target, filename, line, kind)
+        for library, target, filename, line, _, kind in all_locations
+    }
+    for library, target, filename, line, kind in wildcard_locations:
+        if (library, target, filename, line, kind) not in concrete_lines:
+            all_locations.add((library, target, filename, line, 0, kind))
 
     rows = sorted(
         all_locations,
@@ -206,18 +220,20 @@ def write_csv(
             location[0],
             location[1],
             location[2],
-            location[3] if location[3] is not None else -1,
-            "" if location[4] is None else location[4],
+            location[3],
+            location[4] if location[4] is not None else -1,
+            "" if location[5] is None else location[5],
         ),
     )
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
     with open(output_path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["library", "file", "line", "column", "kind", *ordered_columns])
-        for library, filename, line, column_value, kind in rows:
+        writer.writerow(["library", "target", "file", "line", "column", "kind", *ordered_columns])
+        for library, target, filename, line, column_value, kind in rows:
             output_row: list[str] = [
                 library,
+                target,
                 filename,
                 str(line),
                 str(column_value if column_value is not None else ""),
@@ -225,9 +241,9 @@ def write_csv(
             ]
             for experiment_column in ordered_columns:
                 experiment_map = by_col.get(experiment_column, {})
-                value = experiment_map.get((library, filename, line, column_value, kind))
+                value = experiment_map.get((library, target, filename, line, column_value, kind))
                 if value is None:
-                    value = experiment_map.get((library, filename, line, None, kind))
+                    value = experiment_map.get((library, target, filename, line, None, kind))
                 output_row.append("" if value is None else f"{value:.2f}")
             writer.writerow(output_row)
 
@@ -239,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint for wide-CSV generation from campaign output trees."""
     parser = argparse.ArgumentParser(
         description=(
-            "Merge per-run top-level JSON results into a single CSV keyed by (library,file,line,column,kind). "
+            "Merge per-run top-level JSON results into a single CSV keyed by (library,target,file,line,column,kind). "
             "By default, a row is included iff at least one experiment reports non_ct_time != null "
             "and that positive reproduced successfully in at least one repetition."
         )

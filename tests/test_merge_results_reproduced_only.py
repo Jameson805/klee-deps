@@ -200,7 +200,7 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                 by_col,
                 {
                     "klee_cf_fix_pub": {
-                        ("toy", "toy.c", 10, 2, None): 4.0,
+                        ("toy", "default", "toy.c", 10, 2, None): 4.0,
                     }
                 },
             )
@@ -235,10 +235,49 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                 by_col,
                 {
                     "klee_cf_fix_pub": {
-                        ("toy", "toy.c", 10, 2, None): 4.0,
-                        ("toy", "toy.c", 20, 4, None): 7.0,
+                        ("toy", "default", "toy.c", 10, 2, None): 4.0,
+                        ("toy", "default", "toy.c", 20, 4, None): 7.0,
                     }
                 },
+            )
+
+    def test_merge_results_keeps_same_location_distinct_across_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output_path = root / "merged.csv"
+            self._write_run_metadata(root, ("klee_cf",))
+            for target, non_ct_time in (("aes", 4.0), ("des", 6.0)):
+                self._write_json(
+                    root / "klee_cf" / f"toy_{target}_fix_pub.json",
+                    [
+                        {
+                            "filename": "shared.c",
+                            "line": 10,
+                            "column": 2,
+                            "kind": "branch",
+                            "non_ct_time": non_ct_time,
+                            "reproduced_status": {"success": 1},
+                        },
+                    ],
+                    metadata={**self._case_metadata("fix_pub", "toy"), "target": target},
+                )
+
+            ordered_columns, by_col, column_metadata = merge_results.merge_runs(str(root))
+            row_count = merge_results.write_csv(
+                str(output_path),
+                ordered_columns,
+                by_col,
+                column_metadata,
+            )
+
+            self.assertEqual(row_count, 2)
+            self.assertEqual(
+                output_path.read_text(encoding="utf-8").splitlines(),
+                [
+                    "library,target,file,line,column,kind,klee_cf_fix_pub",
+                    "toy,aes,shared.c,10,2,branch,4.00",
+                    "toy,des,shared.c,10,2,branch,6.00",
+                ],
             )
 
     def test_merge_results_keeps_branch_and_memory_rows_distinct_in_csv(self) -> None:
@@ -281,9 +320,9 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
             self.assertEqual(
                 output_path.read_text(encoding="utf-8").splitlines(),
                 [
-                    "library,file,line,column,kind,klee_cf_fix_pub",
-                    "toy,toy.c,10,2,branch,4.00",
-                    "toy,toy.c,10,2,memory,6.00",
+                    "library,target,file,line,column,kind,klee_cf_fix_pub",
+                    "toy,default,toy.c,10,2,branch,4.00",
+                    "toy,default,toy.c,10,2,memory,6.00",
                 ],
             )
 
@@ -313,7 +352,7 @@ class MergeResultsReproducedOnlyTest(unittest.TestCase):
                 by_col,
                 {
                     "klee_cf_fix_pub": {
-                        ("toy", "toy.c", 10, 2, None): 4.0,
+                        ("toy", "default", "toy.c", 10, 2, None): 4.0,
                     }
                 },
             )
