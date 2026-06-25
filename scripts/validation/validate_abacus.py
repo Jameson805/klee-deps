@@ -18,7 +18,7 @@ import shutil
 import subprocess
 import sys
 
-from scripts.experiments.common import REPO_ROOT, expand_benchmark_cases
+from scripts.experiments.common import REPO_ROOT, expand_benchmark_cases, expect_string
 from tools.postprocess.reproduce_positives import reproduce_abacus_json_positives
 from tools.shared.experiment_registry import (
     build_for_tool,
@@ -41,6 +41,34 @@ def _resolve_preset_name(preset_template: str, sym_size: int | None, *, owner: s
     return preset_template
 
 
+def _infer_config_sym_size(benchmark_definition) -> int | None:
+    """Infer the config-owned sym size from fixed secret input layouts."""
+    raw_layout = benchmark_definition.extra_config.get("secret_layout")
+    if raw_layout is None:
+        return None
+    layout = expect_string(
+        benchmark_definition.extra_config,
+        "secret_layout",
+        benchmark_definition.config_location,
+    )
+    sym_sizes: set[int] = set()
+    for raw_entry in layout.split(","):
+        fields = raw_entry.strip().split(":")
+        if len(fields) < 2 or not fields[0] or not fields[1]:
+            raise SystemExit(f"{benchmark_definition.config_location}.secret_layout has invalid entry {raw_entry!r}")
+        size_text = fields[1]
+        if size_text == "{sym_size}":
+            return None
+        if not size_text.isdigit():
+            raise SystemExit(
+                f"{benchmark_definition.config_location}.secret_layout entry {raw_entry!r} has non-numeric size"
+            )
+        sym_sizes.add(int(size_text))
+    if len(sym_sizes) == 1:
+        return next(iter(sym_sizes))
+    return None
+
+
 @dataclass(frozen=True)
 class AbacusValidationCase:
     """Replay metadata derived from one registry-backed ABACUS benchmark case."""
@@ -50,6 +78,7 @@ class AbacusValidationCase:
     build_tool_id: str
     benchmark_selector: str
     build_preset: str
+    config_sym_size: int | None
     library: str
 
 
@@ -86,6 +115,7 @@ def _build_case_index() -> dict[str, AbacusValidationCase]:
                 build_tool_id="klee_cf",
                 benchmark_selector=selector_text,
                 build_preset=klee_build.preset,
+                config_sym_size=_infer_config_sym_size(benchmark_definition),
                 library=_validation_library_name(benchmark_definition.library_id),
             )
     return cases_by_stem
@@ -143,7 +173,7 @@ def _ensure_replay_executable(case: AbacusValidationCase, sym_size: int | None) 
         "--preset",
         _resolve_preset_name(
             case.build_preset,
-            sym_size,
+            sym_size if sym_size is not None else case.config_sym_size,
             owner=f"ABACUS replay build preset for {case.output_stem}",
         ),
     ]
@@ -197,12 +227,13 @@ def validate_results_dir(
                 shutil.copyfile(json_file, output_json)
             continue
 
+        effective_sym_size = sym_size if sym_size is not None else case.config_sym_size
         replay_executable = _ensure_replay_executable(case, sym_size)
         print(f"Validating {json_file.name} ({replayable_rows} replayable row(s)) with {replay_executable}")
         reproduce_return_code = reproduce_abacus_json_positives(
             input_json=str(json_file),
             executable=str(replay_executable),
-            sym_size=sym_size if sym_size is not None else 0,
+            sym_size=effective_sym_size if effective_sym_size is not None else 0,
             timeout=timeout,
             output=str(output_json),
             library=case.library,

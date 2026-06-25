@@ -15,6 +15,8 @@ class ValidateAbacusTest(unittest.TestCase):
             library_id="openssl",
             target_id="recp_sliced",
             code_path="benchmarks/openssl-1.1.1q",
+            extra_config={},
+            config_location="configs/benchmarks/openssl.toml.benchmarks[0]",
         )
         build = SimpleNamespace(preset="size_{sym_size}")
         expanded_case = SimpleNamespace(

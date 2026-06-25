@@ -6,8 +6,8 @@ abacus_root = "/datapool/theta-lin/Abacus"
 num_copies = 1
 tmp_dir = "/datapool/theta-lin-experiments/tmp"
 output = "/datapool/theta-lin-experiments/20260616_modexp_bench_abacus"
-# These benchmark descriptors own their ABACUS build and runner presets, so
-# leave campaign.sym_sizes unset and use one benchmark-config-driven bucket.
+# Modexp descriptors use size-templated ABACUS build and runner presets.
+sym_sizes = [4, 16]
 
 [benchmarks]
 abacus = [

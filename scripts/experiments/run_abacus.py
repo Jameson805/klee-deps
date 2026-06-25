@@ -57,6 +57,41 @@ def _resolve_preset_name(preset_template: str, sym_size: int | None, *, owner: s
     return preset_template
 
 
+def _infer_config_sym_size(benchmark_definition) -> int | None:
+    """Infer the config-owned sym size from fixed secret input layouts."""
+    raw_layout = benchmark_definition.extra_config.get("secret_layout")
+    if raw_layout is None:
+        return None
+    layout = expect_string(
+        benchmark_definition.extra_config,
+        "secret_layout",
+        benchmark_definition.config_location,
+    )
+    sym_sizes: set[int] = set()
+    for raw_entry in layout.split(","):
+        fields = raw_entry.strip().split(":")
+        if len(fields) < 2 or not fields[0] or not fields[1]:
+            raise SystemExit(f"{benchmark_definition.config_location}.secret_layout has invalid entry {raw_entry!r}")
+        size_text = fields[1]
+        if size_text == "{sym_size}":
+            return None
+        if not size_text.isdigit():
+            raise SystemExit(
+                f"{benchmark_definition.config_location}.secret_layout entry {raw_entry!r} has non-numeric size"
+            )
+        sym_sizes.add(int(size_text))
+    if len(sym_sizes) == 1:
+        return next(iter(sym_sizes))
+    return None
+
+
+def _resolve_effective_sym_size(benchmark_definition, requested_sym_size: int | None) -> int | None:
+    """Prefer the campaign bucket size, otherwise use fixed benchmark metadata when available."""
+    if requested_sym_size is not None:
+        return requested_sym_size
+    return _infer_config_sym_size(benchmark_definition)
+
+
 def _load_abacus_cases(benchmark_definition) -> list[dict[str, object]]:
     """Load ABACUS cases, preferring explicit per-tool overrides when present."""
     raw_cases = benchmark_definition.extra_config.get("abacus_cases")
@@ -217,9 +252,12 @@ def run_benchmark(
         abacus_root = Path(args.abacus_root)
         benchmark_definition = definition(library_id, target_id)
         build = build_for_tool(benchmark_definition, "abacus")
+        effective_sym_size = _resolve_effective_sym_size(benchmark_definition, args.sym_size)
         selector_text = format_benchmark_selector(library_id, target_id)
         local_context.log("##########")
         local_context.log(f"Begin experiments for {selector_text}")
+        if args.sym_size is None and effective_sym_size is not None:
+            local_context.log(f"resolved_sym_size={effective_sym_size}")
         local_context.log("##########")
         with prepare_benchmark_workspace(benchmark_definition.code_path, args.tmp_dir) as workspace:
             local_context.log(f"temporary_workspace={workspace.root}")
@@ -234,7 +272,7 @@ def run_benchmark(
                 "--preset",
                 _resolve_preset_name(
                     build.preset,
-                    args.sym_size,
+                    effective_sym_size,
                     owner=f"ABACUS build preset for {selector_text}",
                 ),
             ]
@@ -260,7 +298,7 @@ def run_benchmark(
                 resolved_runner_config = str(resolve_repo_path(runner_profile.config))
                 resolved_preset_name = _resolve_preset_name(
                     runner_profile.preset,
-                    args.sym_size,
+                    effective_sym_size,
                     owner=f"ABACUS runner preset for {selector_text}",
                 )
             output_metadata = {
@@ -273,7 +311,7 @@ def run_benchmark(
                 workspace,
                 abacus_root,
                 local_results_dir,
-                args.sym_size if args.sym_size is not None else 0,
+                effective_sym_size if effective_sym_size is not None else 0,
                 expect_string(case_table, "executable", case_location),
                 expect_string(case_table, "outfile", case_location),
                 metadata=output_metadata,
