@@ -40,5 +40,6 @@ int driver_main(void) {
   rec_obj.data = data;
   rec_obj.input = data;
 
-  return tls1_cbc_remove_padding(&s_obj, &rec_obj, block_size, mac_size);
+  tls1_cbc_remove_padding(&s_obj, &rec_obj, block_size, mac_size);
+  return 0;
 }

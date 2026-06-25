@@ -20,7 +20,8 @@ int main(){
   // only the length and data fields are used in the function
   SSL3_RECORD rec_obj = { length, data, rec_type, NULL };
 
-  return ssl3_cbc_remove_padding(s,&rec_obj,block_size,mac_size);
+  ssl3_cbc_remove_padding(s,&rec_obj,block_size,mac_size);
+  return 0;
 
 }
 

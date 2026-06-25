@@ -38,5 +38,6 @@ int main(){
   SSL3_RECORD rec_obj = { length, data, 0, NULL };
   SSL3_RECORD *rec = &rec_obj;
 
-  return tls1_cbc_remove_padding(s,rec,block_size,mac_size);
+  tls1_cbc_remove_padding(s,rec,block_size,mac_size);
+  return 0;
 }

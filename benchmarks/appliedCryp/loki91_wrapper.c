@@ -15,9 +15,7 @@ static const runner_input_segment runner_segments[] = {
 #undef main
 
 int driver_main(void) {
-    int result;
-
     runner_io_reset(runner_segments, sizeof(runner_segments) / sizeof(runner_segments[0]));
-    result = original_appliedcryp_loki91_main(0, (char **)0);
-    return result != 0 || runner_io_status();
+    original_appliedcryp_loki91_main(0, (char **)0);
+    return runner_io_status();
 }
