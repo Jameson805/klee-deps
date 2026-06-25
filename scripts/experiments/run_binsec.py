@@ -204,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sym-size", type=int, default=4)
     parser.add_argument("--jump-enum", type=int, default=10)
     parser.add_argument("--sse-depth", type=int, default=1_000_000_000_000)
-    parser.add_argument("--max-solver-time", default="30s")
+    parser.add_argument("--max-solver-time", default="5s")
     parser.add_argument("--fml-solver", default="z3")
     parser.add_argument("--smt-solver", default="z3")
     parser.add_argument(

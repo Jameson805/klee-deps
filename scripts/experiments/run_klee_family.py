@@ -260,7 +260,7 @@ def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     parser.add_argument("max_time", help="Overall timeout for each KLEE run")
     parser.add_argument("--sym-size", type=int, default=4)
     parser.add_argument("--loop-max-iterations", type=int, default=10)
-    parser.add_argument("--max-solver-time", default="30s")
+    parser.add_argument("--max-solver-time", default="5s")
     parser.add_argument(
         "--istats-write-interval",
         default="0s",

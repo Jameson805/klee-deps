@@ -26,6 +26,7 @@ When `--use-cv-model=true`, the implementation treats this as an invariant: ever
 The candidate set is explicit in the implementation. For code paths that enable candidate search, KLEE-CF tries candidates in this order:
 
 - the state's current concrete model;
+- scalar `0`, encoded as little-endian object bytes `{0x00, 0x00, ...}`;
 - scalar `1`, encoded as little-endian object bytes `{0x01, 0x00, ...}`;
 - scalar `-1`, encoded as all-`0xff` object bytes;
 - `--cv-model-random-candidates=N` deterministic pseudo-random whole-state assignments, defaulting to 1.
@@ -44,15 +45,15 @@ For non-CT branch and memory checks, KLEE-CF now runs a clear escalation ladder 
 
 KLEE-CF fixes all original-side objects to the current model. It first tries chosen alternate values for the prime secret arrays. If no candidate makes the renamed expression differ from the fixed original expression, KLEE-CF adds `cond != renamedCond` and asks the solver only for prime secret values. The fixed/random candidate list is the cheap probe immediately before this solver call, not a separate fallback stage.
 
-2. Fixed current public, candidate or solver-chosen secret1 and secret2.
+2. Fixed current public, random candidate or solver-chosen secret1 and secret2.
 
-If fixing the original secret is too restrictive, KLEE-CF keeps only public objects fixed to the current model. Before invoking the solver, it tries fixed/random candidates for original secrets and, for each of those, fixed/random candidates for prime secrets. If those probes fail, it asks the solver for both secret sides under the fixed-public constraints plus `cond != renamedCond`.
+If fixing the original secret is too restrictive, KLEE-CF keeps only public objects fixed to the current model. Before invoking the solver, it tries the configured deterministic pseudo-random candidates for the original and prime secret arrays, skipping the fixed `0`, `1`, and `-1` probes because assigning both secret sides to the same fixed value cannot produce a divergent CT witness at this stage. If those random probes fail, it asks the solver for both secret sides under the fixed-public constraints plus `cond != renamedCond`.
 
-3. Symbolic public, candidate or solver-chosen public, secret1, and secret2.
+3. Symbolic public, random candidate or solver-chosen public, secret1, and secret2.
 
-As the most general fallback, KLEE-CF leaves public inputs symbolic too. It first tries fixed/random candidates for original public and secret values paired with fixed/random prime-secret candidates. If those probes fail, it adds `cond != renamedCond` under the path constraints and asks the solver for every original symbolic object and every prime secret object.
+As the most general fallback, KLEE-CF leaves public inputs symbolic too. It first tries the configured deterministic pseudo-random candidates for public, original secret, and prime secret arrays, again skipping the fixed `0`, `1`, and `-1` probes. If those probes fail, it adds `cond != renamedCond` under the path constraints and asks the solver for every original symbolic object and every prime secret object.
 
-This ordering matters because the fixed/random candidates are used as cheap probes just before each increasingly expensive solver query. They are not an independent proof stage. The solver fallback grows from only alternate secrets, to both secret sides, to full public-and-secret divergence.
+This ordering matters because candidate assignments are used as cheap probes just before each increasingly expensive solver query. They are not an independent proof stage. The solver fallback grows from only alternate secrets, to both secret sides, to full public-and-secret divergence.
 
 ## CLI options
 
@@ -62,19 +63,19 @@ This single option controls the whole concrete-model optimization and defaults t
 
 `--cv-model-random-candidates=N`
 
-This option controls how many deterministic pseudo-random assignments are tried after the fixed candidate values. It defaults to `1`. Setting it to `0` keeps only the current-model probe plus the fixed `1` and `-1` candidates.
+This option controls how many deterministic pseudo-random assignments are tried after the fixed candidate values. It defaults to `1`. Setting it to `0` keeps only the current-model probe plus the fixed `0`, `1`, and `-1` candidates in contexts that still enable fixed-value probing.
 
 After a new original path constraint is added, KLEE-CF checks whether the existing `concreteModel` satisfies that new condition. If not, it tries to repair the original-side model first with the explicit candidate list above and then, only if those candidates fail, with `solver->getInitialValues(...)` over the original path constraints.
 
 The current implementation intentionally keeps this repair check original-side only. It does not persist prime-secret bindings in `state.concreteModel`; instead, CT checks create a temporary mirrored model where each prime secret has the current original secret bytes. This avoids revalidating renamed relational constraints on every ordinary path update while preserving the invariant that each live state's model satisfies its original path constraints.
 
-For CT checks, the option adds chosen-value probes before each solver fallback level. The first probe keeps current public values and current original secrets fixed while substituting alternate values only for prime secret arrays. Later probes relax that fixed context: first allowing chosen original-secret values with public values still fixed, then allowing chosen public and original-secret values in the symbolic-public stage.
+For CT checks, the option adds chosen-value probes before each solver fallback level. The first probe keeps current public values and current original secrets fixed while substituting alternate fixed or random values only for prime secret arrays. Later probes relax that fixed context: first allowing random original-secret values with public values still fixed, then allowing random public and original-secret values in the symbolic-public stage. Those later CT stages skip the fixed `0`, `1`, and `-1` probes but still run the configured pseudo-random probes.
 
 This is a witness-finding optimization, not a proof optimization. If no concrete witness is found, KLEE-CF still falls back to a solver query for the same stage.
 
 For forks outside seed and replay modes, the option changes normal `fork()` handling. KLEE-CF first evaluates the branch under the current concrete model. It then tries the explicit candidate list for the opposite branch value before falling back to a solver query for that opposite side. If both sides have models, KLEE-CF creates both states. If only the current-model side is feasible or the opposite-side solver request fails, KLEE-CF continues that side and records the other side as deferred.
 
-Each local candidate probe uses the same fixed order: current model, scalar `1`, scalar `-1`, then the configured deterministic pseudo-random assignments. Fork handling uses that same ordering and relies on the current-model probe to pick the first concrete branch side.
+Local candidate probes that enable fixed values use this order: scalar `0`, scalar `1`, scalar `-1`, then the configured deterministic pseudo-random assignments. Fork handling uses that fixed-value ordering after the current model picks the first concrete branch side.
 
 The optimization is enabled by default:
 

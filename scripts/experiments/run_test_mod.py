@@ -49,7 +49,7 @@ def main() -> int:
             "--search=random-path",
             "--search=nurs:covnew",
             "--use-cv-model=true",
-            "--max-solver-time=30s",
+            "--max-solver-time=5s",
             "--max-memory=10000",
             "benchmarks/mbedtls-3.2.1/test_mod.bc",
         ],

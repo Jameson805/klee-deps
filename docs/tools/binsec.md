@@ -72,7 +72,7 @@ Replay is used to turn positive models into concrete execution comparisons when 
 - `--sym-size`
 - `--jump-enum`
 - `--sse-depth`
-- `--max-solver-time`
+- `--max-solver-time`: per-query formula/SMT timeout; default `5s`
 - `--fml-solver`
 - `--smt-solver`
 - `--benchmarks`

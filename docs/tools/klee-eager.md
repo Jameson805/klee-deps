@@ -117,9 +117,14 @@ The shared KLEE-family runner applies the same generic execution flow used by KL
 
 This keeps eager-mode comparisons close to the other KLEE variants at the runner layer.
 
+## Freestanding Runtime Support
+
+KLEE-Eager now loads the same focused freestanding `RuntimeExplicitBzero` archive as the other KLEE variants. The archive provides `explicit_bzero` as symbolic byte-zeroing runtime support, so secure-wipe code stays inside KLEE instead of falling back to the expensive external-call path that would concretize symbolic buffers.
+
 ## Important Option Surface
 
 - `--product-program-fallback`: eager-specific fallback or repair mode surfaced by the shared runner
+- `--skip-known-non-ct-checks=true|false`: skip repeated non-CT checks for an instruction after the first witness is found; default `true`
 - `--solver-backend=...`
 - `--search=...`
 - `--loop-max-iterations=...`
@@ -131,6 +136,7 @@ The main implementation anchors are:
 
 - `klee-eager/lib/Core/Executor.cpp`: `Dual` evaluation and binding, branch/switch checks, memory checks, external-call lockstep checks, `renameSecret`, and `checkLogCounterexample`;
 - `klee-eager/lib/Core/ExecutionState.h`: eager state extensions, including dual locals and dual address-space state;
+- `klee-eager/runtime/Freestanding/explicit_bzero.c`: symbolic freestanding secure-wipe support used to avoid external-call concretization;
 - `scripts/experiments/run_klee_family.py`: runner-level exposure of `--product-program-fallback`.
 
 These implementation files define the current eager product-program behavior. In particular, the code carries `Dual` expressions through execution instead of relying only on observation-time renaming.

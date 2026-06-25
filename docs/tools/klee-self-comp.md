@@ -62,14 +62,14 @@ Each event stores a `prefixConstraintIndex`. Rather than materializing a full pa
 
 ## Secret Renaming Over Completed Data
 
-KLEE-Self-Comp uses the same corrected recursive renaming shape as the product-program variants. `renameSecret(expr)` replaces secret array reads with primed reads, recurses into read indices, recurses into update-list indices and values, and rebuilds ordinary expression children when they contain renamed secrets.
+KLEE-Self-Comp uses the same corrected renaming shape as the product-program variants. `renameSecret(expr)` replaces secret array reads with primed reads, traverses read indices and update-list indices and values, and rebuilds ordinary expression children when they contain renamed secrets. The traversal is iterative and cached so large completed traces do not overflow the native stack while being prepared for relational queries.
 
 It also provides overloads for full constraint sets and completed traces:
 
 - `renameSecret(ConstraintSet)` renames each path constraint;
 - `renameSecret(CompletedTrace)` renames every recorded event value and the trace's path constraints.
 
-The current self-comp implementation uses local visited maps per rename call. It does not use KLEE-CF's executor-wide rename caches.
+The self-comp implementation uses executor-wide rename caches, cleared when new primed secret arrays are created, so repeated comparisons against completed traces can reuse previous renaming results.
 
 ## Completed Trace Comparison
 
@@ -119,6 +119,10 @@ The shared KLEE-family runner handles:
 - replay of positives through the benchmark replay executable
 
 KLEE-Self-Comp does not currently add a dedicated runner-level flag analogous to KLEE-CF's `--use-cv-model` or KLEE-Eager's `--product-program-fallback`.
+
+## Freestanding Runtime Support
+
+KLEE-Self-Comp now loads the same focused freestanding `RuntimeExplicitBzero` archive as the other KLEE variants. The archive provides `explicit_bzero` as symbolic byte-zeroing runtime support, so secure-wipe code stays inside KLEE instead of falling back to the expensive external-call path that would concretize symbolic buffers.
 
 ## Performance And Profiling Notes
 

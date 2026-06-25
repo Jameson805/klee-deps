@@ -85,7 +85,7 @@ For non-CT checks, the concrete-model path uses an escalation ladder:
 2. keep current public inputs fixed, then search both original and primed secrets;
 3. leave public inputs symbolic too, then search or solve for public, original secret, and primed secret values.
 
-At each level, KLEE-CF tries explicit concrete candidates before the corresponding solver query. The candidate order is the current state model, then fixed one-byte `1`, then all `0xff`, then deterministic pseudo-random whole-state assignments controlled by `--cv-model-random-candidates`. The current default is `1` deterministic pseudo-random whole-state candidate.
+At each level, KLEE-CF tries explicit concrete candidates before the corresponding solver query. The first CT level and ordinary fork/model-repair probes try fixed one-byte `0`, fixed one-byte `1`, all `0xff`, then deterministic pseudo-random whole-state assignments controlled by `--cv-model-random-candidates`. CT levels 2 and 3 skip the fixed assignments and still try the configured deterministic pseudo-random candidates. The current default is `1` deterministic pseudo-random whole-state candidate.
 
 The optimization is a witness-finding shortcut, not a replacement for relational solving. If the cheap candidates fail, KLEE-CF falls back to the solver for the same stage.
 
@@ -141,7 +141,8 @@ KLEE-CF relies on KLEE runtime bitcode for memory routines that should execute s
 ## Important Option Surface
 
 - `--use-cv-model=true|false`: enable or disable the concrete-model optimization path
-- `--cv-model-random-candidates=N`: number of deterministic pseudo-random whole-state candidates tried after the current-model probe and the fixed `1` and `-1` assignments; default `1`
+- `--cv-model-random-candidates=N`: number of deterministic pseudo-random whole-state candidates tried after any enabled fixed `0`, `1`, and `-1` assignments; CT levels 2 and 3 skip fixed assignments and still use these random candidates; default `1`
+- `--skip-known-non-ct-checks=true|false`: skip repeated non-CT checks for an instruction after the first witness is found; default `true`
 - `--use-batching-search=true|false`: enable or disable KLEE batching in the shared runner; default `true`
 - `--batch-instructions=N`: batching instruction budget used when batching is enabled; default `1000`
 - `--batch-time=T`: batching time budget used when batching is enabled; default `0s`, which leaves the instruction budget as the active batching limit
