@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import math
+import re
 from collections.abc import Mapping, Sequence
 from functools import lru_cache
 from pathlib import Path
@@ -29,6 +30,7 @@ LONG_COLUMNS = [
     "variant",
     "target",
     "benchmark",
+    "program_status",
     "verification_time_seconds",
     "total_repetitions",
     "completed_repetitions",
@@ -99,16 +101,82 @@ def _benchmark_label(library: str, variant: str) -> str:
     return f"{library}:{variant}"
 
 
-def _is_klee_family(row: Mapping[str, Any]) -> bool:
-    comparison_tool = str(row.get("comparison_tool", ""))
-    tool_family = str(row.get("tool_family", ""))
+def _eligible_for_best_selection(row: Mapping[str, Any]) -> bool:
+    return str(row.get("public_mode", "")) == "var_pub"
+
+
+def _is_klee_family(*, comparison_tool: str, tool_family: str) -> bool:
     return comparison_tool.startswith("klee") or tool_family.startswith("klee")
 
 
-def _eligible_for_best_selection(row: Mapping[str, Any]) -> bool:
-    if not _is_klee_family(row):
-        return True
-    return str(row.get("public_mode", "")) == "var_pub"
+def _result_json_has_positives(path: Path) -> bool:
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    data = payload.get("data")
+    return isinstance(data, list) and bool(data)
+
+
+def _klee_partially_completed_paths(klee_output_dir: Path) -> int | None:
+    info_path = klee_output_dir / "info"
+    try:
+        text = info_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    match = re.search(r"^KLEE: done: partially completed paths = (\d+)\s*$", text, flags=re.MULTILINE)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
+def _klee_program_status(repetition_dir: Path, case_id: str) -> str:
+    if _result_json_has_positives(repetition_dir / f"{case_id}.json"):
+        return "insecure"
+    if _klee_partially_completed_paths(repetition_dir / case_id) == 0:
+        return "secure"
+    return "unknown"
+
+
+def _binsec_program_status(repetition_dir: Path, case_id: str) -> str:
+    log_path = repetition_dir / "_worker_logs" / f"{case_id}.log"
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return "unknown"
+    matches = re.findall(r"^\[checkct:result\] Program status is : (secure|insecure|unknown)\b", text, flags=re.MULTILINE)
+    if not matches:
+        return "unknown"
+    return matches[-1]
+
+
+def _program_status_for_repetition(
+    timing_path: Path,
+    *,
+    case_id: str,
+    comparison_tool: str,
+    tool_family: str,
+) -> str:
+    repetition_dir = timing_path.parent.parent
+    if _is_klee_family(comparison_tool=comparison_tool, tool_family=tool_family):
+        return _klee_program_status(repetition_dir, case_id)
+    if comparison_tool == "binsec" or tool_family == "binsec":
+        return _binsec_program_status(repetition_dir, case_id)
+    if comparison_tool == "abacus" or tool_family == "abacus":
+        if _result_json_has_positives(repetition_dir / f"{case_id}.json"):
+            return "insecure"
+    return "unknown"
+
+
+def _merge_program_statuses(statuses: Sequence[str]) -> str:
+    if any(status == "insecure" for status in statuses):
+        return "insecure"
+    if statuses and all(status == "secure" for status in statuses):
+        return "secure"
+    return "unknown"
 
 
 def _format_duration(seconds: int) -> str:
@@ -185,6 +253,7 @@ def _merge_case_timings(
     target = ""
     timeout_seconds_values: list[int] = []
     case_id = ""
+    program_statuses: list[str] = []
 
     for path in paths:
         loaded = _read_timing_payload(path)
@@ -225,6 +294,18 @@ def _merge_case_timings(
         return None
 
     column_metadata = build_column_metadata(run_metadata, case_metadata)
+    comparison_tool = str(column_metadata["comparison_tool"])
+    tool_family = str(column_metadata["tool_family"])
+    if case_id:
+        program_statuses = [
+            _program_status_for_repetition(
+                path,
+                case_id=case_id,
+                comparison_tool=comparison_tool,
+                tool_family=tool_family,
+            )
+            for path in paths
+        ]
     public_mode_value = case_metadata.get("config")
     public_mode = public_mode_value.strip() if isinstance(public_mode_value, str) else ""
     if not library:
@@ -250,12 +331,13 @@ def _merge_case_timings(
     return {
         "source_column": column_metadata["source_column"],
         "configuration_label": column_metadata["configuration_label"],
-        "comparison_tool": column_metadata["comparison_tool"],
-        "tool_family": column_metadata["tool_family"],
+        "comparison_tool": comparison_tool,
+        "tool_family": tool_family,
         "library": library,
         "variant": variant,
         "target": target,
         "benchmark": _benchmark_label(library, variant),
+        "program_status": _merge_program_statuses(program_statuses),
         "public_mode": public_mode,
         "verification_time_seconds": merged_time,
         "total_repetitions": total,
@@ -388,11 +470,13 @@ def build_best_table_rows(
         label_by_source[source_column] = label if count == 1 else f"{label} ({count})"
     selected_sources = [str(row["source_column"]) for row in selected_configurations]
     lookup: dict[tuple[str, str, str], Mapping[str, Any]] = {}
+    statuses_by_key: dict[tuple[str, str, str], list[str]] = {}
     for row in rows:
         source_column = str(row["source_column"])
         if source_column not in selected_sources:
             continue
         key = (source_column, str(row["library"]), str(row["variant"]))
+        statuses_by_key.setdefault(key, []).append(str(row.get("program_status", "unknown")))
         previous = lookup.get(key)
         if previous is None or float(row["verification_time_seconds"]) > float(previous["verification_time_seconds"]):
             lookup[key] = row
@@ -404,15 +488,21 @@ def build_best_table_rows(
         }
     )
 
-    labels = [label_by_source[source_column] for source_column in selected_sources]
-    fieldnames = ["benchmark", *labels]
+    fieldnames = ["benchmark"]
+    for source_column in selected_sources:
+        label = label_by_source[source_column]
+        fieldnames.extend([label, f"{label} status"])
     table_rows: list[dict[str, str]] = []
     for library, variant, benchmark in benchmarks:
         output_row = {"benchmark": benchmark}
         for source_column in selected_sources:
+            key = (source_column, library, variant)
             output_row[label_by_source[source_column]] = _format_timing_cell(
-                lookup.get((source_column, library, variant))
+                lookup.get(key)
             )
+            output_row[f"{label_by_source[source_column]} status"] = _merge_program_statuses(
+                statuses_by_key.get(key, [])
+            ) if key in statuses_by_key else "-"
         table_rows.append(output_row)
     return fieldnames, table_rows
 

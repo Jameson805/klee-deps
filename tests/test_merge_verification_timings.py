@@ -37,7 +37,25 @@ class MergeVerificationTimingsTest(unittest.TestCase):
             "config": suffix,
         }
 
-    def test_repetitions_use_geometric_mean_and_best_table_uses_benchmark_rows(self) -> None:
+    def _write_klee_info(self, root: Path, run_name: str, case_id: str, partially_completed_paths: int) -> None:
+        output_dir = root / run_name / "0" / case_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "info").write_text(
+            "KLEE: done: completed paths = 1\n"
+            f"KLEE: done: partially completed paths = {partially_completed_paths}\n"
+            "KLEE: done: generated tests = 1\n",
+            encoding="utf-8",
+        )
+
+    def _write_binsec_status(self, root: Path, run_name: str, case_id: str, program_status: str) -> None:
+        log_dir = root / run_name / "0" / "_worker_logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        (log_dir / f"{case_id}.log").write_text(
+            f"[checkct:result] Program status is : {program_status} (1.0)\n",
+            encoding="utf-8",
+        )
+
+    def test_repetitions_use_geometric_mean_and_best_table_uses_var_pub_benchmark_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_run_metadata(
@@ -45,6 +63,7 @@ class MergeVerificationTimingsTest(unittest.TestCase):
                 {
                     "klee_fast": self._run_metadata("klee_fast", "klee_cf", searcher="dfs"),
                     "klee_slow": self._run_metadata("klee_slow", "klee_cf"),
+                    "abacus_run": self._run_metadata("abacus_run", "abacus"),
                     "binsec_run": self._run_metadata("binsec_run", "binsec"),
                 },
             )
@@ -144,6 +163,41 @@ class MergeVerificationTimingsTest(unittest.TestCase):
                 exit_code=0,
                 status="timeout",
             )
+            write_verification_timing(
+                root / "binsec_run" / "0",
+                case_id="toy_v1_a_var_pub",
+                title="toy:v1 a (var_pub)",
+                metadata=self._case_metadata(library="toy", target="a", suffix="var_pub"),
+                timeout_seconds=7200,
+                elapsed_seconds=33.0,
+                exit_code=0,
+                status="completed",
+            )
+            write_verification_timing(
+                root / "abacus_run" / "0",
+                case_id="toy_v1_a_fix_pub",
+                title="toy:v1 a (fix_pub)",
+                metadata=self._case_metadata(library="toy", target="a"),
+                timeout_seconds=7200,
+                elapsed_seconds=2.0,
+                exit_code=0,
+                status="completed",
+            )
+            write_verification_timing(
+                root / "abacus_run" / "0",
+                case_id="toy_v1_a_var_pub",
+                title="toy:v1 a (var_pub)",
+                metadata=self._case_metadata(library="toy", target="a", suffix="var_pub"),
+                timeout_seconds=7200,
+                elapsed_seconds=44.0,
+                exit_code=0,
+                status="completed",
+            )
+            self._write_klee_info(root, "klee_fast", "toy_v1_a_var_pub", 0)
+            self._write_klee_info(root, "klee_fast", "toy_v1_b_var_pub", 0)
+            self._write_klee_info(root, "klee_slow", "toy_v1_a_var_pub", 0)
+            self._write_klee_info(root, "klee_slow", "toy_v1_b_var_pub", 0)
+            self._write_binsec_status(root, "binsec_run", "toy_v1_a_var_pub", "secure")
 
             rows = merge_verification_timings.collect_timing_rows(root)
             by_source_and_target = {
@@ -161,16 +215,47 @@ class MergeVerificationTimingsTest(unittest.TestCase):
             selected = merge_verification_timings.select_best_configurations(rows)
             self.assertEqual(
                 {row["comparison_tool"]: row["source_column"] for row in selected},
-                {"klee_cf": "klee_fast_var_pub", "binsec": "binsec_run_fix_pub"},
+                {
+                    "abacus": "abacus_run_var_pub",
+                    "klee_cf": "klee_fast_var_pub",
+                    "binsec": "binsec_run_var_pub",
+                },
             )
 
             fieldnames, table_rows = merge_verification_timings.build_best_table_rows(rows, selected)
-            self.assertEqual(fieldnames, ["benchmark", "CT-Witness", "Binsec/Rel 2"])
+            self.assertEqual(
+                fieldnames,
+                [
+                    "benchmark",
+                    "CT-Witness",
+                    "CT-Witness status",
+                    "Abacus",
+                    "Abacus status",
+                    "Binsec/Rel 2",
+                    "Binsec/Rel 2 status",
+                ],
+            )
             self.assertEqual(
                 table_rows,
                 [
-                    {"benchmark": "toy:a", "CT-Witness": "11.00s", "Binsec/Rel 2": "TO(2h)"},
-                    {"benchmark": "toy:b", "CT-Witness": "20.00s", "Binsec/Rel 2": "-"},
+                    {
+                        "benchmark": "toy:a",
+                        "CT-Witness": "11.00s",
+                        "CT-Witness status": "secure",
+                        "Abacus": "44.00s",
+                        "Abacus status": "unknown",
+                        "Binsec/Rel 2": "33.00s",
+                        "Binsec/Rel 2 status": "secure",
+                    },
+                    {
+                        "benchmark": "toy:b",
+                        "CT-Witness": "20.00s",
+                        "CT-Witness status": "secure",
+                        "Abacus": "-",
+                        "Abacus status": "-",
+                        "Binsec/Rel 2": "-",
+                        "Binsec/Rel 2 status": "-",
+                    },
                 ],
             )
 
@@ -195,7 +280,42 @@ class MergeVerificationTimingsTest(unittest.TestCase):
             lines = output_path.read_text(encoding="utf-8").splitlines()
 
             self.assertIn("status_counts", lines[0])
+            self.assertIn("program_status", lines[0])
             self.assertEqual(json.loads(rows[0]["status_counts"]), {"completed": 1})
+            self.assertEqual(rows[0]["program_status"], "unknown")
+
+    def test_klee_program_status_uses_positives_and_partially_completed_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_run_metadata(root, {"klee_run": self._run_metadata("klee_run", "klee_cf")})
+            for case_id, target, partially_completed_paths in (
+                ("toy_secure_var_pub", "secure", 0),
+                ("toy_unknown_var_pub", "unknown", 1),
+                ("toy_insecure_var_pub", "insecure", 1),
+            ):
+                write_verification_timing(
+                    root / "klee_run" / "0",
+                    case_id=case_id,
+                    title=f"toy:{target} (var_pub)",
+                    metadata=self._case_metadata(library="toy", target=target, suffix="var_pub"),
+                    timeout_seconds=7200,
+                    elapsed_seconds=1.5,
+                    exit_code=0,
+                    status="completed",
+                )
+                self._write_klee_info(root, "klee_run", case_id, partially_completed_paths)
+
+            (root / "klee_run" / "0" / "toy_insecure_var_pub.json").write_text(
+                json.dumps({"data": [{"kind": "branch"}], "metadata": {}}) + "\n",
+                encoding="utf-8",
+            )
+
+            rows = merge_verification_timings.collect_timing_rows(root)
+
+            self.assertEqual(
+                {row["target"]: row["program_status"] for row in rows},
+                {"secure": "secure", "unknown": "unknown", "insecure": "insecure"},
+            )
 
     def test_old_timing_payload_infers_variant_from_canonical_case_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
