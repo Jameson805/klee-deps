@@ -3,7 +3,7 @@ num_copies = 1
 max_parallel_workers = 96
 temp_dir = "/scratch/$USER/$SLURM_JOB_ID"
 # output = "/work/yl925/klee-deps/modexp_bench_test"
-output = "/dkucc/home/yl925/klee-results/modexp_bench_test_20260621"
+output = "/dkucc/home/yl925/klee-results/modexp_bench_test_20260622a"
 # run_time = "3m"
 run_time = "2h"
 sliced_map_csv = "configs/postprocess/sliced_map.csv"
@@ -12,8 +12,8 @@ filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-all = ["bearssl:modexp", "libgcrypt:default", "mbedtls:default", "openssl:default"]
-klee_cf = ["bearssl:modexp", "libgcrypt:default", "libgcrypt:sliced", "mbedtls:default", "mbedtls:sliced", "openssl:default", "openssl:sliced"]
+all = ["bearssl:modexp", "libgcrypt:modexp", "mbedtls:modexp", "openssl:recp", "openssl:mont", "openssl:mont_consttime", "openssl:mont_word"]
+klee_cf = ["bearssl:modexp", "libgcrypt:modexp", "libgcrypt:modexp_sliced", "mbedtls:modexp", "mbedtls:modexp_sliced", "openssl:recp", "openssl:mont", "openssl:mont_consttime", "openssl:mont_word", "openssl:recp_sliced", "openssl:mont_sliced", "openssl:mont_word_sliced"]
 
 [runs]
 klee_cf_default_4 = false

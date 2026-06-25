@@ -3,7 +3,7 @@ num_copies = 1
 max_parallel_workers = 96
 temp_dir = "/scratch/$USER/$SLURM_JOB_ID"
 # output = "/work/yl925/klee-deps/constantine_bench_test"
-output = "/dkucc/home/yl925/klee-results/constantine_bench_test_20260621"
+output = "/dkucc/home/yl925/klee-results/constantine_bench_test_20260622a"
 # run_time = "3m"
 run_time = "2h"
 sliced_map_csv = "configs/postprocess/sliced_map.csv"
@@ -12,7 +12,7 @@ filtered_locations_csv = "configs/postprocess/filtered_locations.csv"
 by_library_output_prefix = "filtered_reproduction_status_by_library"
 
 [benchmarks]
-all = ["appliedcryp:default", "bearssl:aes_des", "ghostrider:default", "libg:default", "openssl_almeida:default", "pycrypto:default"]
+all = ["appliedcryp:3way", "appliedcryp:des", "appliedcryp:loki91", "bearssl:aes_big", "bearssl:des_tab", "ghostrider:findmax", "ghostrider:matmul", "libg:des", "openssl_almeida:tls_rempad_luk13", "pycrypto:arc4"]
 
 [runs]
 klee_cf_default_4 = false
