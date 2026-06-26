@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 from dataclasses import dataclass
+import importlib
 import os
 from pathlib import Path
 import signal
@@ -29,6 +30,7 @@ from scripts.experiments.common import (
     benchmark_csv_from_config,
     cleanup_launched_process,
     duration_to_seconds,
+    launch_output_captured_process,
     launch_prefixed_module,
     resolve_repo_path,
     terminate_processes,
@@ -290,6 +292,7 @@ def main(argv: list[str] | None = None) -> int:
     run_targets: list[tuple[str, str]] = []
     run_metadata_by_destination: dict[str, dict[str, object]] = {}
     active_runs: list[LaunchedProcess] = []
+    pending_case_task_groups: list[list[tuple[str, object, tuple[object, ...], Path]]] = []
     run_env = dict(os.environ)
     launch_failures = 0
     cpu_budget = detect_cpu_budget()
@@ -310,13 +313,33 @@ def main(argv: list[str] | None = None) -> int:
 
         effective_parallel_budget = max_parallel_workers if max_parallel_workers is not None else cpu_budget
         per_worker_case_limit: int | None = None
-        if effective_parallel_budget is not None and enabled_run_keys:
-            total_campaign_workers = len(enabled_run_keys) * num_copies
-            per_worker_case_limit = max(1, effective_parallel_budget // total_campaign_workers)
+        direct_case_run_keys = {
+            run_definition.run_key
+            for run_definition in run_definitions
+            if run_definition.run_key in enabled_run_keys
+            and callable(
+                getattr(
+                    importlib.import_module(available_tools[run_definition.tool_name].module_name),
+                    "campaign_case_tasks",
+                    None,
+                )
+            )
+        }
+        fallback_campaign_workers = (len(enabled_run_keys) - len(direct_case_run_keys)) * num_copies
+        global_worker_limit = max_parallel_workers if max_parallel_workers is not None else (
+            cpu_budget if direct_case_run_keys else None
+        )
+        if direct_case_run_keys:
             print(
-                "campaign will cap each top-level worker to "
+                "campaign will schedule exposed per-case workers directly under "
+                f"the shared limit ({global_worker_limit or 'unbounded'})"
+            )
+        if effective_parallel_budget is not None and fallback_campaign_workers:
+            per_worker_case_limit = max(1, effective_parallel_budget // fallback_campaign_workers)
+            print(
+                "campaign will cap each fallback top-level worker to "
                 f"{per_worker_case_limit} concurrent inner cases "
-                f"across {total_campaign_workers} campaign workers"
+                f"across {fallback_campaign_workers} campaign workers"
             )
 
         build_jobs = 1
@@ -358,6 +381,30 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(signal.SIGINT, handle_signal)
         signal.signal(signal.SIGTERM, handle_signal)
 
+        def launch_pending_case_tasks() -> None:
+            nonlocal launch_failures
+            while pending_case_task_groups:
+                next_groups: list[list[tuple[str, object, tuple[object, ...], Path]]] = []
+                for group in pending_case_task_groups:
+                    case_tag, worker_target, worker_args, current_worker_log_path = group[0]
+                    print(f"[{case_tag}] starting; log: {current_worker_log_path}")
+                    while global_worker_limit is not None and len(active_runs) >= global_worker_limit:
+                        launch_failures |= reap_finished(block_until_one=True)
+                    active_runs.append(
+                        launch_output_captured_process(
+                            case_tag,
+                            worker_target,
+                            worker_args,
+                            env=run_env,
+                            cwd=REPO_ROOT,
+                            log_path=current_worker_log_path,
+                            verbose=args.verbose,
+                        )
+                    )
+                    if len(group) > 1:
+                        next_groups.append(group[1:])
+                pending_case_task_groups[:] = next_groups
+
         def launch_run(tag: str, dst: str, tool: CampaignTool, base_args: list[str]) -> None:
             nonlocal launch_failures
             # Preserve the destination root layout expected by the merge step:
@@ -367,22 +414,48 @@ def main(argv: list[str] | None = None) -> int:
                 return
             destination_root = Path(dst)
             destination_root.mkdir(parents=True, exist_ok=True)
+            module = importlib.import_module(tool.module_name)
+            enumerate_case_tasks = getattr(module, "campaign_case_tasks", None)
             for copy_index in range(num_copies):
                 worker_destination = destination_root / str(copy_index)
-                worker_destination.mkdir(parents=True, exist_ok=True)
                 worker_tag = f"{tag} #{copy_index}"
-                current_worker_log_path = worker_log_path(destination_root, copy_index)
                 worker_argv = tool.build_worker_argv(
                     base_args,
                     benchmark_csv=benchmark_csv_by_tool[tool.tool_id],
                     results_dir=worker_destination,
                     tmp_dir=temp_dir_raw,
-                    case_parallelism=per_worker_case_limit,
+                    case_parallelism=None if callable(enumerate_case_tasks) else per_worker_case_limit,
                 )
+                if callable(enumerate_case_tasks):
+                    shutil.rmtree(worker_destination, ignore_errors=True)
+                    worker_destination.mkdir(parents=True, exist_ok=True)
+                    case_tasks = enumerate_case_tasks(worker_argv)
+                    print(
+                        f"[{worker_tag}] queued {len(case_tasks)} case workers; results: {worker_destination}"
+                    )
+                    pending_group: list[tuple[str, object, tuple[object, ...], Path]] = []
+                    for case_task in case_tasks:
+                        current_worker_log_path = worker_destination / "_worker_logs" / f"{case_task.log_stem}.log"
+                        current_worker_log_path.parent.mkdir(parents=True, exist_ok=True)
+                        case_tag = f"{worker_tag} {case_task.tag}"
+                        pending_group.append(
+                            (
+                                case_tag,
+                                case_task.worker_target,
+                                case_task.worker_args,
+                                current_worker_log_path,
+                            )
+                        )
+                    if pending_group:
+                        pending_case_task_groups.append(pending_group)
+                    continue
+
+                worker_destination.mkdir(parents=True, exist_ok=True)
+                current_worker_log_path = worker_log_path(destination_root, copy_index)
                 print(
                     f"[{worker_tag}] starting; results: {worker_destination}; log: {current_worker_log_path}"
                 )
-                while max_parallel_workers is not None and len(active_runs) >= max_parallel_workers:
+                while global_worker_limit is not None and len(active_runs) >= global_worker_limit:
                     launch_failures |= reap_finished(block_until_one=True)
                 active_runs.append(
                     launch_prefixed_module(
@@ -630,6 +703,7 @@ def main(argv: list[str] | None = None) -> int:
         write_run_metadata(output_dir, run_metadata_by_destination)
 
         if not args.postprocess_only:
+            launch_pending_case_tasks()
             while active_runs:
                 launch_failures |= reap_finished(block_until_one=True)
             if launch_failures != 0:

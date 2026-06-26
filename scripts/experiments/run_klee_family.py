@@ -20,6 +20,7 @@ import shlex
 import shutil
 import time
 from scripts.experiments.common import (
+    CampaignCaseTask,
     ExperimentContext,
     LaunchedProcess,
     REPO_ROOT,
@@ -252,6 +253,112 @@ def _load_klee_preprocess_profiles(benchmark_definition, tool_id: str) -> list[d
     return profiles
 
 
+def _parse_campaign_args_for_mode(mode: str, argv: list[str] | None) -> tuple[argparse.Namespace, list[tuple[str, str]]]:
+    """Parse KLEE-family arguments for campaign-owned case scheduling."""
+    profile = _mode_profile(mode)
+    is_klee_cf = profile.tool_id == "klee_cf"
+    parser = argparse.ArgumentParser(description="Run one of the KLEE-based experiment configurations.")
+    parser.add_argument("max_time", help="Overall timeout for each KLEE run")
+    parser.add_argument("--sym-size", type=int, default=4)
+    parser.add_argument("--loop-max-iterations", type=int, default=10)
+    parser.add_argument("--max-solver-time", default="5s")
+    parser.add_argument("--istats-write-interval", default="0s")
+    parser.add_argument("--kill-after", default="1800s")
+    parser.add_argument("--max-memory", type=int, default=10000)
+    parser.add_argument("--use-batching-search", default="true", choices=("true", "false"))
+    parser.add_argument("--batch-instructions", type=int, default=1000)
+    parser.add_argument("--batch-time", default="0s")
+    parser.add_argument("--config", help="Run only KLEE cases whose config id matches this value")
+    parser.add_argument("--mod-exp-only", action="store_true")
+    parser.add_argument("--search", default="random-path,nurs:covnew")
+    if profile.extra_flag == "use_cv_model":
+        parser.add_argument("--use-cv-model", default="true")
+    elif profile.extra_flag == "product_program_fallback":
+        parser.add_argument("--product-program-fallback", action="store_true")
+    parser.add_argument("--solver-backend", default="stp", choices=SOLVER_BACKENDS)
+    parser.add_argument("--optimize-array", default="false", choices=OPTIMIZE_ARRAY_VALUES)
+    if is_klee_cf:
+        parser.add_argument("--optimize-concrete-object-state-reads", default="true", choices=("true", "false"))
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--tmp-dir", default="/tmp")
+    parser.add_argument("--results-dir", default=profile.results_dir)
+    parser.add_argument("--benchmarks")
+    parser.add_argument("--max-parallel-cases", type=int)
+    args = parser.parse_args(argv)
+
+    try:
+        args.max_time_seconds = duration_to_seconds(args.max_time, "max_time")
+    except ValueError as error:
+        raise SystemExit(f"Error: {error}") from error
+    if args.loop_max_iterations < 0:
+        raise SystemExit(
+            f"Error: loop_max_iterations must be a non-negative integer (got '{args.loop_max_iterations}')"
+        )
+    if args.sym_size < 0:
+        raise SystemExit(f"Error: sym_size must be a non-negative integer (got '{args.sym_size}')")
+    if args.max_memory < 0:
+        raise SystemExit(f"Error: max_memory must be a non-negative integer (got '{args.max_memory}')")
+    if args.batch_instructions < 0:
+        raise SystemExit(
+            f"Error: batch_instructions must be a non-negative integer (got '{args.batch_instructions}')"
+        )
+    if args.max_parallel_cases is not None and args.max_parallel_cases <= 0:
+        raise SystemExit("Error: max_parallel_cases must be a positive integer when set")
+    try:
+        benchmarks = selected_benchmarks(mode, args.benchmarks)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+    return args, benchmarks
+
+
+def campaign_case_tasks_for_mode(mode: str, argv: list[str] | None = None) -> list[CampaignCaseTask]:
+    """Return one globally schedulable campaign task per selected KLEE case."""
+    args, benchmarks = _parse_campaign_args_for_mode(mode, argv)
+    results_dir = resolve_repo_path(args.results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    klee_executable = str(resolve_klee_tool_layout(_mode_profile(mode).executable_artifact).binary)
+    loop_limiter_plugin = str(resolve_artifact_path("loop_limiter_plugin", expected_kind="shared-library"))
+
+    tasks: list[CampaignCaseTask] = []
+    seen_result_names: set[str] = set()
+    for library_id, target_id in benchmarks:
+        benchmark_definition = definition(library_id, target_id)
+        case_entries = _filter_klee_cases(
+            _load_klee_cases(benchmark_definition, mode),
+            args.config,
+            f"{benchmark_definition.config_location}.klee_cases",
+        )
+        if not case_entries:
+            continue
+        if mode not in benchmark_definition.tools:
+            raise ValueError(f"{benchmark_definition.config_location}.klee_cases requires {mode!r} in tools")
+        for index, raw_case in enumerate(case_entries):
+            case_location = f"{benchmark_definition.config_location}.klee_cases[{index}]"
+            case_table = expect_table(raw_case, case_location)
+            result_name = expect_string(case_table, "result_name", case_location)
+            if result_name in seen_result_names:
+                raise SystemExit(f"duplicate KLEE result_name across selected cases: {result_name}")
+            seen_result_names.add(result_name)
+            tasks.append(
+                CampaignCaseTask(
+                    tag=expect_string(case_table, "title", case_location),
+                    log_stem=result_name,
+                    worker_target=run_benchmark,
+                    worker_args=(
+                        None,
+                        None,
+                        str(results_dir),
+                        args,
+                        klee_executable,
+                        loop_limiter_plugin,
+                        mode,
+                        library_id,
+                        target_id,
+                        index,
+                    ),
+                )
+            )
+    return tasks
 def main_for_mode(mode: str, argv: list[str] | None = None) -> int:
     """CLI entrypoint shared by the KLEE-family wrappers."""
     profile = _mode_profile(mode)
@@ -498,6 +605,8 @@ def run_benchmark(
 ) -> None:
     """Build one benchmark variant and execute one or more selected KLEE cases."""
     def worker_main() -> None:
+        limit_bytes = 70_000_000 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))
         local_profile = _mode_profile(mode)
         local_context = context or ExperimentContext()
         local_env = env or dict(os.environ)

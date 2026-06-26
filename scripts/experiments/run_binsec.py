@@ -22,6 +22,7 @@ from typing import Any
 tomllib = importlib.import_module("tomllib" if sys.version_info >= (3, 11) else "tomli")
 
 from scripts.experiments.common import (
+    CampaignCaseTask,
     CampaignTool,
     ExperimentContext,
     LaunchedProcess,
@@ -195,6 +196,81 @@ def _load_binsec_cases(benchmark_definition) -> list[dict[str, object]]:
 def resolve_binsec_executable() -> str:
     """Resolve the BINSEC executable from the workspace build manifest."""
     return str(resolve_executable_path("binsec"))
+
+
+def _parse_campaign_args(argv: list[str] | None) -> tuple[argparse.Namespace, list[tuple[str, str]]]:
+    """Parse BINSEC arguments for campaign-owned case scheduling."""
+    parser = argparse.ArgumentParser(description="Run BINSEC over the configured benchmark set.")
+    parser.add_argument("max_time", help="Timeout for BINSEC (for example: 60, 1m, 4h, 2h30m)")
+    parser.add_argument("--sym-size", type=int, default=4)
+    parser.add_argument("--jump-enum", type=int, default=10)
+    parser.add_argument("--sse-depth", type=int, default=1_000_000_000_000)
+    parser.add_argument("--max-solver-time", default="5s")
+    parser.add_argument("--fml-solver", default="z3")
+    parser.add_argument("--smt-solver", default="z3")
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--tmp-dir", default="/tmp")
+    parser.add_argument("--results-dir", default="results/binsec_results")
+    parser.add_argument("--max-parallel-cases", type=int)
+    parser.add_argument("--benchmarks")
+    args = parser.parse_args(argv)
+
+    try:
+        args.max_time_seconds = duration_to_seconds(args.max_time, "max_time")
+        args.max_solver_time_seconds = duration_to_seconds(args.max_solver_time, "max_solver_time")
+    except ValueError as error:
+        raise SystemExit(f"Error: {error}") from error
+    for name in ("sym_size", "jump_enum", "sse_depth"):
+        value = getattr(args, name)
+        if value < 0:
+            raise SystemExit(f"Error: {name} must be a non-negative integer (got '{value}')")
+    if not args.fml_solver:
+        raise SystemExit("Error: fml solver name must be non-empty")
+    if not args.smt_solver:
+        raise SystemExit("Error: smt solver name must be non-empty")
+    if args.max_parallel_cases is not None and args.max_parallel_cases <= 0:
+        raise SystemExit("Error: max_parallel_cases must be a positive integer when set")
+    try:
+        benchmarks = selected_benchmarks("binsec", args.benchmarks)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+    args.tmp_dir = str(Path(args.tmp_dir).expanduser().resolve())
+    return args, benchmarks
+
+
+def campaign_case_tasks(argv: list[str] | None = None) -> list[CampaignCaseTask]:
+    """Return one globally schedulable campaign task per selected BINSEC case."""
+    args, benchmarks = _parse_campaign_args(argv)
+    results_dir = resolve_repo_path(args.results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    binsec_executable = resolve_binsec_executable()
+
+    tasks: list[CampaignCaseTask] = []
+    seen_stats_stems: set[str] = set()
+    for library_id, target_id in benchmarks:
+        benchmark_definition = definition(library_id, target_id)
+        case_entries = _load_binsec_cases(benchmark_definition)
+        if not case_entries:
+            continue
+        if "binsec" not in benchmark_definition.tools:
+            raise ValueError(f"{benchmark_definition.config_location}.binsec_cases requires 'binsec' in tools")
+        for index, raw_case in enumerate(case_entries):
+            case_location = f"{benchmark_definition.config_location}.binsec_cases[{index}]"
+            case_table = expect_table(raw_case, case_location)
+            stats_file = expect_string(case_table, "stats_file", case_location)
+            stats_stem = Path(stats_file).stem
+            if stats_stem in seen_stats_stems:
+                raise SystemExit(f"duplicate BINSEC stats stem across selected cases: {stats_stem}")
+            seen_stats_stems.add(stats_stem)
+            tasks.append(
+                CampaignCaseTask(
+                    tag=expect_string(case_table, "title", case_location),
+                    log_stem=stats_stem,
+                    worker_target=run_benchmark,
+                    worker_args=(None, str(results_dir), args, binsec_executable, library_id, target_id, index),
+                )
+            )
+    return tasks
 
 
 def main(argv: list[str] | None = None) -> int:

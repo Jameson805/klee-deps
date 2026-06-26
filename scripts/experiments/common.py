@@ -119,6 +119,16 @@ class CampaignTool:
         return argv
 
 
+@dataclass(frozen=True)
+class CampaignCaseTask:
+    """One concrete benchmark case that a campaign can schedule globally."""
+
+    tag: str
+    log_stem: str
+    worker_target: Callable[..., None]
+    worker_args: tuple[object, ...]
+
+
 @dataclass
 class LaunchedProcess:
     """Track one spawned worker process plus its output-forwarding thread."""
@@ -287,6 +297,21 @@ def _run_module_worker(
     raise SystemExit(exit_code)
 
 
+def _run_output_captured_callable(
+    target: Callable[..., None],
+    target_args: tuple[object, ...],
+    env: dict[str, str] | None,
+    cwd: str | None,
+    output_queue: object,
+) -> None:
+    if env is not None:
+        os.environ.clear()
+        os.environ.update(env)
+    if cwd is not None:
+        os.chdir(cwd)
+    target(*target_args, output_queue)
+
+
 def launch_output_captured_process(
     tag: str,
     target: Callable[..., None],
@@ -294,13 +319,15 @@ def launch_output_captured_process(
     *,
     log_path: Path,
     verbose: bool = False,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
 ) -> LaunchedProcess:
     """Spawn a worker process and stream its combined output into ``log_path``."""
     ctx = multiprocessing.get_context("spawn")
     output_queue, child_output_queue = ctx.Pipe(duplex=False)
     process = ctx.Process(
-        target=target,
-        args=(*target_args, child_output_queue),
+        target=_run_output_captured_callable,
+        args=(target, target_args, dict(env) if env is not None else None, str(cwd) if cwd is not None else None, child_output_queue),
         name=tag,
     )
     process.start()

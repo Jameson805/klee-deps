@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from scripts.experiments.common import CampaignTool
-from scripts.experiments.run_klee_family import main_for_mode
+from scripts.experiments.run_klee_family import campaign_case_tasks_for_mode, main_for_mode
 
 
 CAMPAIGN_TOOL = CampaignTool(tool_id="klee_eager", module_name=__name__, case_parallel_arg="--max-parallel-cases")
@@ -13,6 +13,11 @@ CAMPAIGN_TOOL = CampaignTool(tool_id="klee_eager", module_name=__name__, case_pa
 def main(argv: list[str] | None = None) -> int:
     """Dispatch to the shared KLEE-family runner in KLEE-Eager mode."""
     return main_for_mode("klee_eager", argv)
+
+
+def campaign_case_tasks(argv: list[str] | None = None):
+    """Return campaign-schedulable KLEE-Eager case tasks."""
+    return campaign_case_tasks_for_mode("klee_eager", argv)
 
 
 if __name__ == "__main__":
